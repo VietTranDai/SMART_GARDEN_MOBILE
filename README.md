@@ -1,50 +1,107 @@
-# Welcome to your Expo app 👋
+# Smart Farm Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A Smart Farm monitoring and control mobile application built with React Native and Expo.
 
-## Get started
+## Features
 
-1. Install dependencies
+- Real-time monitoring of farm environment data
+- Remote control of farm equipment
+- User authentication and management
+- Analytics and reporting
+- Notifications and alerts
 
-   ```bash
-   npm install
-   ```
+## Getting Started
 
-2. Start the app
+### Prerequisites
 
-   ```bash
-    npx expo start
-   ```
+- Node.js (v16 or later)
+- npm or yarn
+- Expo CLI
 
-In the output, you'll find options to open the app in a
+### Installation
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+1. Clone the repository:
 
 ```bash
-npm run reset-project
+git clone https://github.com/your-username/smart-farm-mobile.git
+cd smart-farm-mobile
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+2. Install dependencies:
 
-## Learn more
+```bash
+npm install
+# or
+yarn install
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+3. Environment configuration:
+   The project uses two environment files:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+   - `.env` - Default development environment (points to localhost)
+   - `.env.production` - Production environment
 
-## Join the community
+   The default `.env` file is set up with localhost:8080 as the API URL.
 
-Join our community of developers creating universal apps.
+4. Start the development server:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+npm start
+# or
+yarn start
+```
+
+## Environment Configuration
+
+The application uses environment files to configure API settings with proper React Native support. The following variables are supported:
+
+| Variable    | Description                        | Development Default   | Production Default              |
+| ----------- | ---------------------------------- | --------------------- | ------------------------------- |
+| API_URL     | Base URL for API requests          | http://localhost:8080 | https://your-production-api.com |
+| API_TIMEOUT | Request timeout in milliseconds    | 20000                 | 20000                           |
+| API_VERSION | API version                        | v1                    | v1                              |
+| API_DEBUG   | Enable debug logging for API calls | true                  | false                           |
+
+### How Environment Variables Work
+
+This project uses environment variables to ensure proper configuration:
+
+- Environment variables are securely loaded at build time
+- Strong TypeScript support with type definitions in `env.d.ts`
+- Centralized configuration in `config/environment.ts`
+- Fallback default values for safety
+
+## Project Structure
+
+- `app/` - Expo Router application screens
+- `components/` - Reusable UI components
+- `config/` - Configuration files
+- `constants/` - Application constants
+- `contexts/` - React contexts
+- `hooks/` - Custom React hooks
+- `modules/` - Feature modules
+- `service/` - API services
+- `store/` - State management
+- `utils/` - Utility functions
+
+## API Configuration
+
+API requests are centralized through the `apiClient` service, which:
+
+- Uses Axios for HTTP requests
+- Automatically adds authentication tokens to requests
+- Handles token expiration and logout
+- Provides optional debug logging for API calls
+- Uses environment variables for configuration
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature-name`
+3. Commit your changes: `git commit -m 'Add some feature'`
+4. Push to the branch: `git push origin feature/your-feature-name`
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
