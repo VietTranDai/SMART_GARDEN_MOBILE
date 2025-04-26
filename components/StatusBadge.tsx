@@ -13,13 +13,26 @@ export default function StatusBadge({ status }: StatusBadgeProps) {
   const getStatusColor = () => {
     switch (status) {
       case "healthy":
-        return theme.success;
+        return theme.plantHealthy;
       case "needs-attention":
-        return theme.warning;
+        return theme.plantWarning;
       case "critical":
-        return theme.error;
+        return theme.plantDanger;
       default:
-        return theme.success;
+        return theme.plantHealthy;
+    }
+  };
+
+  const getStatusBackgroundColor = () => {
+    switch (status) {
+      case "healthy":
+        return `${theme.plantHealthy}20`; // 20% opacity
+      case "needs-attention":
+        return `${theme.plantWarning}20`;
+      case "critical":
+        return `${theme.plantDanger}20`;
+      default:
+        return `${theme.plantHealthy}20`;
     }
   };
 
@@ -37,8 +50,18 @@ export default function StatusBadge({ status }: StatusBadgeProps) {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: getStatusColor() }]}>
-      <Text style={styles.text}>{getStatusText()}</Text>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: getStatusBackgroundColor(),
+          borderColor: getStatusColor(),
+        },
+      ]}
+    >
+      <Text style={[styles.text, { color: getStatusColor() }]}>
+        {getStatusText()}
+      </Text>
     </View>
   );
 }
@@ -48,10 +71,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    borderWidth: 1,
   },
   text: {
-    color: "white",
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: "600",
   },
 });

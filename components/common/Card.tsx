@@ -175,7 +175,7 @@ function Card({
       return {};
 
     return {
-      shadowColor: "#000",
+      shadowColor: theme.shadow,
       shadowOffset: {
         width: 0,
         height: 2,
@@ -202,7 +202,7 @@ function Card({
             })
           : 5,
     };
-  }, [withShadow, variant, withAnimation, animateOnPress, shadowAnim]);
+  }, [withShadow, variant, withAnimation, animateOnPress, shadowAnim, theme]);
 
   // Render card content
   const renderCardContent = useCallback(() => {
@@ -246,16 +246,18 @@ function Card({
       return (
         <BlurView
           intensity={blurIntensity}
-          tint="light"
+          tint={theme.background === "#FFFFFF" ? "light" : "dark"}
           style={styles.blurContainer}
         >
           {content}
         </BlurView>
       );
-    } else if (variant === "gradient") {
+    }
+
+    if (variant === "gradient") {
       return (
         <LinearGradient
-          colors={gradientColors}
+          colors={gradientColors || [theme.primaryLight, theme.primaryDark]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.gradientContainer}
@@ -270,69 +272,67 @@ function Card({
     title,
     subtitle,
     headerComponent,
-    children,
     footerComponent,
+    children,
     variant,
-    contentStyle,
+    theme,
     titleStyle,
     subtitleStyle,
-    theme,
+    contentStyle,
     blurIntensity,
     gradientColors,
   ]);
 
-  // Create container component based on onPress
-  const Container = onPress ? Pressable : View;
-
-  // Define press handlers
-  const pressableProps = onPress
-    ? {
-        onPress,
-        onPressIn: handlePressIn,
-        onPressOut: handlePressOut,
-        disabled,
-      }
-    : {};
-
-  return (
+  const CardComponent = (
     <Animated.View
       style={[
         styles.card,
         getCardBaseStyle(),
-        getShadowStyle(),
-        withAnimation && animateOnPress
-          ? { transform: [{ scale: scaleAnim }] }
-          : {},
+        withShadow && getShadowStyle(),
+        {
+          transform: [
+            {
+              scale: withAnimation && animateOnPress ? scaleAnim : 1,
+            },
+          ],
+        },
         style,
       ]}
       onLayout={handleLayout}
     >
-      <Container style={styles.container} {...pressableProps}>
-        {renderCardContent()}
-      </Container>
+      {renderCardContent()}
     </Animated.View>
   );
+
+  // If card is pressable, wrap it in a Pressable
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        disabled={disabled}
+        style={({ pressed }) => ({
+          opacity: disabled ? 0.6 : 1,
+        })}
+      >
+        {CardComponent}
+      </Pressable>
+    );
+  }
+
+  // Otherwise just return the card
+  return CardComponent;
 }
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 16,
     overflow: "hidden",
-  },
-  container: {
-    overflow: "hidden",
-    flex: 1,
+    margin: 8,
   },
   header: {
     padding: 16,
     paddingBottom: 8,
-  },
-  content: {
-    padding: 16,
-  },
-  footer: {
-    padding: 16,
-    paddingTop: 8,
   },
   title: {
     fontSize: 18,
@@ -341,12 +341,18 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-    opacity: 0.7,
+    lineHeight: 20,
+  },
+  content: {
+    padding: 16,
+    paddingTop: 8,
+  },
+  footer: {
+    padding: 16,
+    paddingTop: 0,
   },
   blurContainer: {
     flex: 1,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255, 255, 255, 0.3)",
   },
   gradientContainer: {
     flex: 1,

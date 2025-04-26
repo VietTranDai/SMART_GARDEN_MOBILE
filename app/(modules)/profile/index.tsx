@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,47 +6,157 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
+  Switch,
+  Pressable,
+  Alert,
 } from "react-native";
 import { useUser } from "@/contexts/UserContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Ionicons,
   MaterialCommunityIcons,
   FontAwesome5,
+  MaterialIcons,
+  Feather,
 } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { removeItem } from "@/utils/asyncStorage";
+
+const CustomSwitch = ({
+  value,
+  onValueChange,
+  disabled,
+  tint,
+  theme,
+}: {
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+  disabled: boolean;
+  tint: string;
+  theme: any;
+}) => (
+  <Pressable
+    onPress={() => {
+      if (!disabled) {
+        onValueChange(!value);
+      }
+    }}
+    style={{ padding: 5 }}
+    hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+  >
+    <Switch
+      trackColor={{ false: "#767577", true: tint }}
+      thumbColor={value ? theme.primary : "#f4f3f4"}
+      ios_backgroundColor="#3e3e3e"
+      onValueChange={onValueChange}
+      value={value}
+      disabled={disabled}
+    />
+  </Pressable>
+);
 
 export default function ProfileScreen() {
   const { user, signOut } = useUser();
-  const theme = useAppTheme();
+  const appTheme = useAppTheme();
+  const {
+    setTheme,
+    isDarkMode,
+    theme: themeMode,
+    effectiveColorScheme,
+  } = useTheme();
+
+  const darkModeInteractingRef = useRef(false);
+  const systemThemeInteractingRef = useRef(false);
+  const lastSwitchTimeRef = useRef(0);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      darkModeInteractingRef.current = false;
+      systemThemeInteractingRef.current = false;
+    }, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [isDarkMode, themeMode]);
+
+  const handleThemeChange = useCallback(
+    (value: boolean) => {
+      if (darkModeInteractingRef.current) return;
+      darkModeInteractingRef.current = true;
+      const now = Date.now();
+      if (now - lastSwitchTimeRef.current < 500) return;
+      lastSwitchTimeRef.current = now;
+
+      if (typeof setTheme !== "function" || typeof isDarkMode === "undefined") return;
+
+      if ((value && !isDarkMode) || (!value && isDarkMode)) {
+        setTheme(value ? "dark" : "light");
+      }
+    },
+    [isDarkMode, setTheme]
+  );
+
+  const handleSystemThemeToggle = useCallback(
+    (useSystemTheme: boolean) => {
+      if (systemThemeInteractingRef.current) return;
+      systemThemeInteractingRef.current = true;
+      const now = Date.now();
+      if (now - lastSwitchTimeRef.current < 500) return;
+       lastSwitchTimeRef.current = now;
+
+      if (useSystemTheme && themeMode !== "system") {
+        setTheme("system");
+      } else if (!useSystemTheme && themeMode === "system") {
+        setTheme(effectiveColorScheme);
+      }
+    },
+    [themeMode, effectiveColorScheme, setTheme]
+  );
 
   const handleSignOut = async () => {
     try {
       await signOut();
     } catch (error) {
       console.error("Failed to sign out:", error);
+      Alert.alert("Error", "Failed to sign out. Please try again.");
+    }
+  };
+
+  const resetOnboarding = async () => {
+    try {
+      Alert.alert(
+        "Reset Onboarding",
+        "This will reset the onboarding screens and sign you out. Continue?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "OK",
+            onPress: async () => {
+              await removeItem("@onboarding_completed");
+              handleSignOut();
+            },
+            style: "destructive",
+          },
+        ]
+      );
+    } catch (error) {
+      Alert.alert("Error", "Failed to reset onboarding status");
     }
   };
 
   const progressToNextLevel = () => {
     if (!user?.gardener) return 0;
-
-    // Calculate progress percentage
-    // This would ideally come from comparing current XP to next level's min XP
-    // For now, we'll use a placeholder value
     return 75;
   };
 
   return (
     <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.backgroundSecondary }]}
+      style={[styles.container, { backgroundColor: appTheme.backgroundSecondary }]}
       edges={["bottom"]}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Profile Header */}
         <View
-          style={[styles.profileHeader, { backgroundColor: theme.primary }]}
+          style={[styles.profileHeader, { backgroundColor: appTheme.primary }]}
         >
           <View style={styles.profileImageContainer}>
             <Image
@@ -58,10 +168,10 @@ export default function ProfileScreen() {
             <View
               style={[
                 styles.levelBadge,
-                { backgroundColor: theme.backgroundSecondary },
+                { backgroundColor: appTheme.backgroundSecondary },
               ]}
             >
-              <Text style={[styles.levelText, { color: theme.primary }]}>
+              <Text style={[styles.levelText, { color: appTheme.primary }]}>
                 {user?.gardener?.experienceLevel?.icon || "🌱"}{" "}
                 {user?.gardener?.experienceLevel?.level || 1}
               </Text>
@@ -91,23 +201,22 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* Profile Details */}
         <View
-          style={[styles.detailsContainer, { backgroundColor: theme.card }]}
+          style={[styles.detailsContainer, { backgroundColor: appTheme.card }]}
         >
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+          <Text style={[styles.sectionTitle, { color: appTheme.text }]}>
             Personal Information
           </Text>
 
           <View style={styles.infoRow}>
             <View style={styles.infoIcon}>
-              <Ionicons name="mail-outline" size={20} color={theme.primary} />
+              <Ionicons name="mail-outline" size={20} color={appTheme.primary} />
             </View>
             <View style={styles.infoContent}>
-              <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>
+              <Text style={[styles.infoLabel, { color: appTheme.textSecondary }]}>
                 Email
               </Text>
-              <Text style={[styles.infoValue, { color: theme.text }]}>
+              <Text style={[styles.infoValue, { color: appTheme.text }]}>
                 {user?.email || "gardener@example.com"}
               </Text>
             </View>
@@ -115,13 +224,13 @@ export default function ProfileScreen() {
 
           <View style={styles.infoRow}>
             <View style={styles.infoIcon}>
-              <Ionicons name="call-outline" size={20} color={theme.primary} />
+              <Ionicons name="call-outline" size={20} color={appTheme.primary} />
             </View>
             <View style={styles.infoContent}>
-              <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>
+              <Text style={[styles.infoLabel, { color: appTheme.textSecondary }]}>
                 Phone
               </Text>
-              <Text style={[styles.infoValue, { color: theme.text }]}>
+              <Text style={[styles.infoValue, { color: appTheme.text }]}>
                 {user?.phoneNumber || "Not provided"}
               </Text>
             </View>
@@ -132,14 +241,14 @@ export default function ProfileScreen() {
               <Ionicons
                 name="calendar-outline"
                 size={20}
-                color={theme.primary}
+                color={appTheme.primary}
               />
             </View>
             <View style={styles.infoContent}>
-              <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>
+              <Text style={[styles.infoLabel, { color: appTheme.textSecondary }]}>
                 Date of Birth
               </Text>
-              <Text style={[styles.infoValue, { color: theme.text }]}>
+              <Text style={[styles.infoValue, { color: appTheme.text }]}>
                 {user?.dateOfBirth
                   ? new Date(user.dateOfBirth).toLocaleDateString()
                   : "Not provided"}
@@ -152,23 +261,32 @@ export default function ProfileScreen() {
               <Ionicons
                 name="location-outline"
                 size={20}
-                color={theme.primary}
+                color={appTheme.primary}
               />
             </View>
             <View style={styles.infoContent}>
-              <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>
+              <Text style={[styles.infoLabel, { color: appTheme.textSecondary }]}>
                 Address
               </Text>
-              <Text style={[styles.infoValue, { color: theme.text }]}>
+              <Text style={[styles.infoValue, { color: appTheme.text }]}>
                 {user?.address || "Not provided"}
               </Text>
             </View>
           </View>
+
+          <TouchableOpacity
+            style={styles.editDetailsButton}
+            onPress={() => router.push("/(modules)/profile/edit")}
+          >
+            <Feather name="edit-2" size={16} color={appTheme.primary} />
+            <Text style={[styles.editDetailsText, { color: appTheme.primary }]}>
+              Edit Details
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Gardener Stats */}
-        <View style={[styles.statsContainer, { backgroundColor: theme.card }]}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+        <View style={[styles.statsContainer, { backgroundColor: appTheme.card }]}>
+          <Text style={[styles.sectionTitle, { color: appTheme.text }]}>
             Gardener Statistics
           </Text>
 
@@ -177,17 +295,17 @@ export default function ProfileScreen() {
               <View
                 style={[
                   styles.statIconContainer,
-                  { backgroundColor: theme.primary + "20" },
+                  { backgroundColor: appTheme.primary + "20" },
                 ]}
               >
                 <MaterialCommunityIcons
                   name="flower"
                   size={24}
-                  color={theme.primary}
+                  color={appTheme.primary}
                 />
               </View>
-              <Text style={[styles.statValue, { color: theme.text }]}>3</Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+              <Text style={[styles.statValue, { color: appTheme.text }]}>{user?.gardener?.gardens?.length ?? 0}</Text>
+              <Text style={[styles.statLabel, { color: appTheme.textSecondary }]}>
                 Gardens
               </Text>
             </View>
@@ -196,17 +314,17 @@ export default function ProfileScreen() {
               <View
                 style={[
                   styles.statIconContainer,
-                  { backgroundColor: theme.primary + "20" },
+                  { backgroundColor: appTheme.primary + "20" },
                 ]}
               >
                 <MaterialCommunityIcons
                   name="sprout"
                   size={24}
-                  color={theme.primary}
+                  color={appTheme.primary}
                 />
               </View>
-              <Text style={[styles.statValue, { color: theme.text }]}>12</Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+              <Text style={[styles.statValue, { color: appTheme.text }]}>{user?.gardener?.plants?.length ?? 0}</Text>
+              <Text style={[styles.statLabel, { color: appTheme.textSecondary }]}>
                 Plants
               </Text>
             </View>
@@ -215,54 +333,131 @@ export default function ProfileScreen() {
               <View
                 style={[
                   styles.statIconContainer,
-                  { backgroundColor: theme.primary + "20" },
+                  { backgroundColor: appTheme.primary + "20" },
                 ]}
               >
                 <MaterialCommunityIcons
                   name="calendar-check"
                   size={24}
-                  color={theme.primary}
+                  color={appTheme.primary}
                 />
               </View>
-              <Text style={[styles.statValue, { color: theme.text }]}>24</Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+              <Text style={[styles.statValue, { color: appTheme.text }]}>{user?.gardener?.completedTasks ?? 0}</Text>
+              <Text style={[styles.statLabel, { color: appTheme.textSecondary }]}>
                 Tasks Completed
               </Text>
             </View>
           </View>
         </View>
 
-        {/* Action Buttons */}
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: theme.card }]}
-            onPress={() => router.push("/(modules)/profile/edit")}
-          >
-            <Ionicons name="create-outline" size={20} color={theme.primary} />
-            <Text style={[styles.actionText, { color: theme.text }]}>
-              Edit Profile
+        <View style={[styles.settingsSection, { backgroundColor: appTheme.card }]}>
+          <Text style={[styles.sectionTitle, { color: appTheme.text }]}>
+            Settings & More
+          </Text>
+
+          <View style={[styles.menuItem]}>
+            <Feather
+              name="moon"
+              size={20}
+              color={appTheme.primary}
+              style={styles.menuIcon}
+            />
+            <Text style={[styles.menuText, { color: appTheme.text }]}>
+              Dark Mode
             </Text>
-          </TouchableOpacity>
+            <CustomSwitch
+              value={isDarkMode}
+              onValueChange={handleThemeChange}
+              disabled={themeMode === "system"}
+              tint={`${appTheme.primary}80`}
+              theme={appTheme}
+            />
+          </View>
+          <View style={[styles.menuItem]}>
+            <Feather
+              name="smartphone"
+              size={20}
+              color={appTheme.primary}
+              style={styles.menuIcon}
+            />
+            <Text style={[styles.menuText, { color: appTheme.text }]}>
+              Use System Settings
+            </Text>
+            <CustomSwitch
+              value={themeMode === "system"}
+              onValueChange={handleSystemThemeToggle}
+              disabled={false}
+              tint={`${appTheme.primary}80`}
+              theme={appTheme}
+            />
+          </View>
 
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: theme.card }]}
-            onPress={() => router.push("/(modules)/settings")}
+            style={styles.menuItem}
+            onPress={() => router.push("/profile/help")}
           >
-            <Ionicons name="settings-outline" size={20} color={theme.primary} />
-            <Text style={[styles.actionText, { color: theme.text }]}>
-              Settings
+            <Ionicons
+              name="help-circle-outline"
+              size={20}
+              color={appTheme.primary}
+              style={styles.menuIcon}
+            />
+            <Text style={[styles.menuText, { color: appTheme.text }]}>
+              Help & Support
             </Text>
+            <MaterialIcons
+              name="chevron-right"
+              size={24}
+              color={appTheme.textTertiary}
+            />
           </TouchableOpacity>
-
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: theme.card }]}
-            onPress={handleSignOut}
+            style={styles.menuItem}
+            onPress={() => router.push("/profile/about")}
           >
-            <Ionicons name="log-out-outline" size={20} color={theme.error} />
-            <Text style={[styles.actionText, { color: theme.error }]}>
-              Sign Out
+            <Ionicons
+              name="information-circle-outline"
+              size={20}
+              color={appTheme.primary}
+              style={styles.menuIcon}
+            />
+            <Text style={[styles.menuText, { color: appTheme.text }]}>
+              About
             </Text>
+            <MaterialIcons
+              name="chevron-right"
+              size={24}
+              color={appTheme.textTertiary}
+            />
           </TouchableOpacity>
+        </View>
+
+        <View style={[styles.dangerZone, { backgroundColor: appTheme.card }]}>
+            <Text style={[styles.sectionTitle, { color: appTheme.error }]}>
+              Danger Zone
+            </Text>
+            <TouchableOpacity style={styles.menuItem} onPress={resetOnboarding}>
+            <Ionicons
+                name="refresh-outline"
+                size={20}
+                color={appTheme.error}
+                style={styles.menuIcon}
+            />
+            <Text style={[styles.menuText, { color: appTheme.error }]}>
+                Reset Onboarding
+            </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={handleSignOut}>
+            <Ionicons
+                name="log-out-outline"
+                size={20}
+                color={appTheme.error}
+                style={styles.menuIcon}
+            />
+            <Text style={[styles.menuText, { color: appTheme.error }]}>
+                Sign Out
+            </Text>
+            </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -274,23 +469,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 30,
   },
   profileHeader: {
     alignItems: "center",
-    padding: 24,
-    paddingBottom: 30,
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
   profileImageContainer: {
     position: "relative",
-    marginBottom: 16,
+    marginBottom: 15,
   },
   profileImage: {
     width: 100,
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: "white",
+    borderColor: "#FFF",
   },
   levelBadge: {
     position: "absolute",
@@ -299,52 +496,54 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "white",
+    borderWidth: 1,
+    borderColor: "#FFF",
   },
   levelText: {
     fontSize: 12,
-    fontFamily: "Inter-Bold",
+    fontWeight: "bold",
   },
   profileName: {
     fontSize: 22,
-    fontFamily: "Inter-Bold",
-    color: "white",
+    fontWeight: "bold",
+    color: "#FFFFFF",
     marginBottom: 4,
   },
   profileRole: {
     fontSize: 14,
-    fontFamily: "Inter-Medium",
-    color: "rgba(255, 255, 255, 0.8)",
-    marginBottom: 16,
+    color: "#FFFFFFB3",
+    marginBottom: 15,
+    textTransform: "uppercase",
+    letterSpacing: 1,
   },
   experienceContainer: {
-    width: "100%",
+    width: "80%",
     alignItems: "center",
   },
   experienceBar: {
-    width: "80%",
-    height: 6,
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
-    borderRadius: 3,
+    width: "100%",
+    height: 8,
+    backgroundColor: "#FFFFFF40",
+    borderRadius: 4,
     overflow: "hidden",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   experienceFill: {
     height: "100%",
-    backgroundColor: "white",
-    borderRadius: 3,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 4,
   },
   experienceText: {
     fontSize: 12,
-    fontFamily: "Inter-Medium",
-    color: "rgba(255, 255, 255, 0.9)",
+    color: "#FFFFFFB3",
   },
   detailsContainer: {
-    margin: 16,
+    marginHorizontal: 15,
+    marginTop: -20,
     borderRadius: 12,
-    padding: 16,
-    elevation: 2,
+    padding: 20,
+    marginBottom: 15,
+    elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -352,35 +551,48 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontFamily: "Inter-Bold",
-    marginBottom: 16,
+    fontWeight: "bold",
+    marginBottom: 15,
   },
   infoRow: {
     flexDirection: "row",
-    marginBottom: 16,
+    alignItems: "center",
+    marginBottom: 15,
   },
   infoIcon: {
-    width: 40,
+    width: 30,
     alignItems: "center",
+    marginRight: 15,
   },
   infoContent: {
     flex: 1,
   },
   infoLabel: {
     fontSize: 12,
-    fontFamily: "Inter-Regular",
     marginBottom: 2,
   },
   infoValue: {
     fontSize: 14,
-    fontFamily: "Inter-Medium",
+    fontWeight: "500",
+  },
+   editDetailsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+    paddingVertical: 8,
+  },
+  editDetailsText: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: "600",
   },
   statsContainer: {
-    margin: 16,
-    marginTop: 0,
+    marginHorizontal: 15,
     borderRadius: 12,
-    padding: 16,
-    elevation: 2,
+    padding: 20,
+    marginBottom: 15,
+    elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -392,43 +604,62 @@ const styles = StyleSheet.create({
   },
   statItem: {
     alignItems: "center",
+    flex: 1,
   },
   statIconContainer: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
     marginBottom: 8,
   },
   statValue: {
     fontSize: 18,
-    fontFamily: "Inter-Bold",
+    fontWeight: "bold",
     marginBottom: 2,
   },
   statLabel: {
     fontSize: 12,
-    fontFamily: "Inter-Regular",
+    textAlign: "center",
   },
-  actionsContainer: {
-    margin: 16,
-    marginTop: 0,
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
+  settingsSection: {
+    marginHorizontal: 15,
     borderRadius: 12,
-    marginBottom: 12,
-    elevation: 2,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    marginBottom: 15,
+    elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  actionText: {
-    marginLeft: 12,
-    fontSize: 14,
-    fontFamily: "Inter-Medium",
+  dangerZone: {
+    marginHorizontal: 15,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    marginBottom: 15,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+  },
+  menuIcon: {
+    width: 30,
+    marginRight: 15,
+  },
+  menuText: {
+    flex: 1,
+    fontSize: 15,
   },
 });

@@ -21,6 +21,8 @@ export default function GardenActivityItem({
   date,
   description,
 }: GardenActivityItemProps) {
+  const theme = useAppTheme();
+
   const getIcon = () => {
     switch (type) {
       case "watering":
@@ -41,17 +43,17 @@ export default function GardenActivityItem({
   const getIconColor = () => {
     switch (type) {
       case "watering":
-        return colors.info;
+        return theme.waterLevel;
       case "fertilizing":
-        return colors.success;
+        return theme.soilQuality;
       case "pruning":
-        return colors.warning;
+        return theme.secondary;
       case "harvesting":
-        return colors.error;
+        return theme.accent;
       case "planting":
-        return colors.primary;
+        return theme.gardenOutdoor;
       default:
-        return colors.neutral;
+        return theme.primary;
     }
   };
 
@@ -73,7 +75,7 @@ export default function GardenActivityItem({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { borderBottomColor: theme.borderLight }]}>
       <View
         style={[
           styles.iconContainer,
@@ -88,10 +90,16 @@ export default function GardenActivityItem({
       </View>
       <View style={styles.contentContainer}>
         <View style={styles.headerContainer}>
-          <Text style={styles.title}>{getActivityTitle()}</Text>
-          <Text style={styles.date}>{date}</Text>
+          <Text style={[styles.title, { color: theme.text }]}>
+            {getActivityTitle()}
+          </Text>
+          <Text style={[styles.date, { color: theme.textTertiary }]}>
+            {date}
+          </Text>
         </View>
-        <Text style={styles.description}>{description}</Text>
+        <Text style={[styles.description, { color: theme.textSecondary }]}>
+          {description}
+        </Text>
       </View>
     </View>
   );
@@ -103,7 +111,6 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: themeGray,
   },
   iconContainer: {
     width: 40,
@@ -125,15 +132,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: "600",
-    color: colors.textDark,
   },
   date: {
     fontSize: 12,
-    color: colors.textLight,
   },
   description: {
     fontSize: 14,
-    color: colors.textMedium,
     lineHeight: 20,
   },
 });

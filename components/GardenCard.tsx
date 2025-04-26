@@ -40,6 +40,17 @@ export default function GardenCard({
     return `${diffDays} days ago`;
   };
 
+  const getWaterStatusColor = () => {
+    const diffDays = Math.ceil(
+      Math.abs(new Date().getTime() - lastWatered.getTime()) /
+        (1000 * 60 * 60 * 24)
+    );
+
+    if (diffDays <= 1) return theme.waterLevel;
+    if (diffDays <= 3) return theme.plantWarning;
+    return theme.plantDanger;
+  };
+
   const getGardenTypeIcon = () => {
     switch (type) {
       case "vegetable":
@@ -55,9 +66,31 @@ export default function GardenCard({
     }
   };
 
+  const getGardenTypeColor = () => {
+    switch (type) {
+      case "vegetable":
+        return theme.gardenOutdoor;
+      case "flower":
+        return theme.gardenIndoor;
+      case "herb":
+        return theme.tertiary;
+      case "fruit":
+        return theme.accent;
+      default:
+        return theme.primary;
+    }
+  };
+
   return (
     <TouchableOpacity
-      style={[styles.container, { backgroundColor: theme.card }]}
+      style={[
+        styles.container,
+        {
+          backgroundColor: theme.card,
+          shadowColor: theme.shadow,
+          borderColor: theme.borderLight,
+        },
+      ]}
       onPress={onPress}
       activeOpacity={0.8}
     >
@@ -75,7 +108,7 @@ export default function GardenCard({
             <Ionicons
               name={getGardenTypeIcon()}
               size={16}
-              color={theme.textTertiary}
+              color={getGardenTypeColor()}
             />
             <Text style={[styles.detailText, { color: theme.textSecondary }]}>
               {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -83,14 +116,14 @@ export default function GardenCard({
           </View>
 
           <View style={styles.detailItem}>
-            <Ionicons name="water" size={16} color={theme.textTertiary} />
+            <Ionicons name="water" size={16} color={getWaterStatusColor()} />
             <Text style={[styles.detailText, { color: theme.textSecondary }]}>
               Last watered: {formatLastWatered()}
             </Text>
           </View>
 
           <View style={styles.detailItem}>
-            <Ionicons name="leaf" size={16} color={theme.textTertiary} />
+            <Ionicons name="leaf" size={16} color={theme.primary} />
             <Text style={[styles.detailText, { color: theme.textSecondary }]}>
               {plantCount} {plantCount === 1 ? "plant" : "plants"}
             </Text>
@@ -105,11 +138,13 @@ const styles = StyleSheet.create({
   container: {
     borderRadius: 12,
     overflow: "hidden",
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    borderWidth: 1,
+    marginHorizontal: 8,
+    marginVertical: 8,
   },
   image: {
     width: "100%",

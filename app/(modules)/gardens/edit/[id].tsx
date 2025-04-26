@@ -146,7 +146,7 @@ export default function EditGardenScreen() {
           onPress: () => {
             // In a real app, you would send a delete request to an API
             Alert.alert("Success", "Garden deleted successfully!", [
-              { text: "OK", onPress: () => router.push("/gardens") },
+              { text: "OK", onPress: () => router.push("/(modules)/gardens/") }, // Updated redirect path
             ]);
           },
         },
@@ -242,7 +242,7 @@ const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: "#F5F7FA",
+      backgroundColor: theme.backgroundAlt || "#F5F7FA", // Use theme
     },
     formContainer: {
       padding: 20,
@@ -263,72 +263,79 @@ const createStyles = (theme: any) =>
       bottom: 10,
       right: 10,
       backgroundColor: "rgba(0,0,0,0.6)",
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 20,
       flexDirection: "row",
       alignItems: "center",
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 20,
     },
     editImageText: {
       color: "white",
-      marginLeft: 6,
-      fontSize: 14,
+      marginLeft: 5,
+      fontSize: 12,
+      fontFamily: theme.fonts?.medium || "Inter-Medium",
     },
     formGroup: {
       marginBottom: 20,
     },
     label: {
-      fontSize: 16,
-      fontWeight: "600",
+      fontSize: 15,
+      fontFamily: theme.fonts?.medium || "Inter-Medium",
+      color: theme.textSecondary,
       marginBottom: 8,
-      color: "#333",
     },
     input: {
-      backgroundColor: "white",
-      borderWidth: 1,
-      borderColor: "#ddd",
+      backgroundColor: theme.card || "white",
       borderRadius: 8,
-      padding: 12,
+      paddingHorizontal: 15,
+      paddingVertical: 12,
       fontSize: 16,
+      fontFamily: theme.fonts?.regular || "Inter-Regular",
+      color: theme.text,
+      borderWidth: 1,
+      borderColor: theme.border || "#E0E0E0",
     },
     textArea: {
-      minHeight: 100,
+      height: 100,
+      textAlignVertical: "top",
     },
     pickerContainer: {
-      backgroundColor: "white",
-      borderWidth: 1,
-      borderColor: "#ddd",
+      backgroundColor: theme.card || "white",
       borderRadius: 8,
-      overflow: "hidden",
+      borderWidth: 1,
+      borderColor: theme.border || "#E0E0E0",
+      overflow: "hidden", // Needed for borderRadius on Android
     },
     picker: {
-      height: 50,
+      // height: 50, // Adjust height if needed
+      // Note: Styling Picker component directly can be tricky across platforms.
+      color: theme.text,
     },
     saveButton: {
       backgroundColor: theme.primary,
-      paddingVertical: 14,
+      paddingVertical: 15,
       borderRadius: 8,
       alignItems: "center",
-      marginBottom: 12,
+      marginTop: 10,
     },
     saveButtonText: {
-      color: "white",
-      fontWeight: "bold",
+      color: theme.card || "white",
       fontSize: 16,
+      fontFamily: theme.fonts?.bold || "Inter-Bold",
     },
     deleteButton: {
-      backgroundColor: "#f44336",
-      paddingVertical: 14,
+      backgroundColor: theme.error,
+      paddingVertical: 15,
       borderRadius: 8,
       alignItems: "center",
+      marginTop: 15,
       flexDirection: "row",
       justifyContent: "center",
-      marginTop: 12,
     },
     deleteButtonText: {
-      color: "white",
-      fontWeight: "bold",
+      color: theme.card || "white",
       fontSize: 16,
+      fontFamily: theme.fonts?.bold || "Inter-Bold",
       marginLeft: 8,
     },
   });

@@ -13,17 +13,7 @@ import { UserProvider, useUser } from "@/contexts/UserContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as Notifications from "expo-notifications";
-import {
-  Text,
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  Platform,
-  Alert,
-} from "react-native";
-import { useAppTheme } from "@/hooks/useAppTheme";
-import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { Ionicons } from "@expo/vector-icons";
+import { Text, View, StyleSheet, TouchableOpacity } from "react-native";
 import { ONBOARDING_COMPLETED_KEY } from "@/constants/strings"; // Import the constant
 
 // Configure notifications with a simple try-catch pattern
@@ -48,15 +38,15 @@ function errorHandler(error: Error) {
   // You could do more here like logging to a service
   return (
     <View style={styles.errorContainer}>
-      <Text style={styles.errorTitle}>Something went wrong</Text>
+      <Text style={styles.errorTitle}>Đã xảy ra lỗi</Text>
       <Text style={styles.errorMessage}>
-        {error.message || "An unexpected error occurred"}
+        {error.message || "Đã xảy ra lỗi không mong muốn"}
       </Text>
       <TouchableOpacity
         style={styles.errorButton}
         onPress={() => router.replace("/(modules)/home")}
       >
-        <Text style={styles.errorButtonText}>Go to Home</Text>
+        <Text style={styles.errorButtonText}>Về trang chủ</Text>
       </TouchableOpacity>
     </View>
   );
@@ -84,9 +74,9 @@ class ErrorBoundary extends React.Component<
     if (this.state.hasError) {
       return (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>Something went wrong</Text>
+          <Text style={styles.errorTitle}>Đã xảy ra lỗi</Text>
           <Text style={styles.errorMessage}>
-            The application encountered an unexpected error
+            Ứng dụng gặp phải lỗi không mong muốn
           </Text>
           <TouchableOpacity
             style={styles.errorButton}
@@ -99,7 +89,7 @@ class ErrorBoundary extends React.Component<
               }
             }}
           >
-            <Text style={styles.errorButtonText}>Go to Home</Text>
+            <Text style={styles.errorButtonText}>Về trang chủ</Text>
           </TouchableOpacity>
         </View>
       );
@@ -158,75 +148,14 @@ function RootLayoutNavigator() {
     checkOnboarding();
   }, [user, segments, navigationState?.key, isLoading]);
 
-  // Xử lý lỗi cho react-navigation
-  React.useEffect(() => {
-    // Đơn giản hóa cách xử lý lỗi navigation
-    const handleError = (error: any) => {
-      console.error("Navigation error:", error);
-    };
-
-    // Đăng ký error fallback handler
-    const originalConsoleError = console.error;
-    console.error = (...args: any[]) => {
-      // Gọi hàm gốc trước
-      originalConsoleError.apply(console, args);
-
-      // Kiểm tra nếu lỗi liên quan đến navigation
-      const errorMessage = args.join(" ");
-      if (
-        errorMessage.includes("navigation") ||
-        errorMessage.includes("route") ||
-        errorMessage.includes("match") ||
-        errorMessage.includes("undefined")
-      ) {
-        // Thực hiện xử lý lỗi navigation an toàn
-        setTimeout(() => {
-          try {
-            // Thử quay về trang chính
-            if (
-              router &&
-              typeof router.canGoBack === "function" &&
-              router.canGoBack()
-            ) {
-              router.back();
-            } else {
-              // Fallback an toàn
-              try {
-                router.replace("/(modules)/home");
-              } catch (e) {
-                try {
-                  router.navigate("/");
-                } catch (fallbackError) {
-                  // Chỉ ghi log, không làm gì thêm để tránh vòng lặp vô hạn
-                  console.warn("All navigation fallbacks failed");
-                }
-              }
-            }
-          } catch (navigateError) {
-            // Chỉ ghi log, không làm gì thêm
-            console.warn("Navigation error handler failed", navigateError);
-          }
-        }, 100);
-      }
-    };
-
-    // Cleanup
-    return () => {
-      console.error = originalConsoleError;
-    };
-  }, []);
-
-  // Không khai báo route 'tutorial' để tránh lỗi
+  // Only include routes that actually exist in the app
   return (
     <Stack>
-      {/* Changed from (tabs) to (modules) to match the actual directory */}
       <Stack.Screen name="(modules)" options={{ headerShown: false }} />
-      <Stack.Screen name="gardens/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="gardens/create" options={{ headerShown: false }} />
-      <Stack.Screen name="gardens/edit/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="+not-found" />
       <Stack.Screen name="plants/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="plants/create" options={{ headerShown: false }} />
-      {/* Added auth and onboarding screens which were missing */}
+      <Stack.Screen name="plants/index" options={{ headerShown: false }} />
       <Stack.Screen name="auth/index" options={{ headerShown: false }} />
       <Stack.Screen name="onboarding/index" options={{ headerShown: false }} />
     </Stack>

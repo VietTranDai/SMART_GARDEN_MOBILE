@@ -103,18 +103,26 @@ function Button({
     switch (variant) {
       case "primary":
         return {
-          backgroundColor: theme.primary,
-          borderColor: theme.primary,
+          backgroundColor: disabled
+            ? theme.buttonBackgroundDisabled
+            : theme.buttonBackground,
+          borderColor: disabled
+            ? theme.buttonBackgroundDisabled
+            : theme.buttonBackground,
         };
       case "secondary":
         return {
-          backgroundColor: theme.secondary,
-          borderColor: theme.secondary,
+          backgroundColor: disabled
+            ? theme.buttonBackgroundDisabled
+            : theme.secondary,
+          borderColor: disabled
+            ? theme.buttonBackgroundDisabled
+            : theme.secondary,
         };
       case "outline":
         return {
           backgroundColor: "transparent",
-          borderColor: theme.primary,
+          borderColor: disabled ? theme.buttonTextDisabled : theme.primary,
           borderWidth: 1,
         };
       case "text":
@@ -136,27 +144,36 @@ function Button({
         };
       default:
         return {
-          backgroundColor: theme.primary,
-          borderColor: theme.primary,
+          backgroundColor: disabled
+            ? theme.buttonBackgroundDisabled
+            : theme.buttonBackground,
+          borderColor: disabled
+            ? theme.buttonBackgroundDisabled
+            : theme.buttonBackground,
         };
     }
-  }, [variant, theme]);
+  }, [variant, theme, disabled]);
 
   // Get text color based on variant
   const getTextColor = useCallback(() => {
+    if (disabled) {
+      return theme.buttonTextDisabled;
+    }
+
     switch (variant) {
       case "primary":
       case "secondary":
       case "gradient":
       case "glass":
-        return "#FFFFFF";
+        return theme.buttonText;
       case "outline":
+        return theme.buttonTextSecondary;
       case "text":
-        return theme.primary;
+        return theme.textLink;
       default:
-        return "#FFFFFF";
+        return theme.buttonText;
     }
-  }, [variant, theme]);
+  }, [variant, theme, disabled]);
 
   // Get button size
   const getButtonSize = useCallback(() => {
@@ -244,7 +261,7 @@ function Button({
     if (variant === "gradient") {
       return (
         <LinearGradient
-          colors={gradientColors}
+          colors={gradientColors || [theme.primaryLight, theme.primaryDark]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.gradientContainer, getButtonSize()]}
@@ -252,61 +269,72 @@ function Button({
           {content}
         </LinearGradient>
       );
-    } else if (variant === "glass") {
+    }
+
+    if (variant === "glass") {
       return (
         <BlurView
-          intensity={40}
-          tint="dark"
+          intensity={80}
+          tint="default"
           style={[styles.glassContainer, getButtonSize()]}
         >
           {content}
         </BlurView>
       );
-    } else {
-      return content;
     }
+
+    return content;
   }, [
     loading,
     leftIcon,
     rightIcon,
-    title,
-    variant,
     getTextColor,
     getTextSize,
     textStyle,
+    variant,
     gradientColors,
     getButtonSize,
+    theme,
   ]);
 
-  // Create animated Touchable component
-  const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+  // Disable button if loading or disabled
+  const isButtonDisabled = loading || disabled;
 
   return (
-    <AnimatedTouchable
+    <Animated.View
       style={[
-        styles.button,
-        getButtonStyle(),
-        getShadowStyle(),
-        variant !== "gradient" && variant !== "glass" ? getButtonSize() : {},
-        disabled || loading ? { opacity: 0.7 } : {},
-        withAnimation && animationType === "scale"
-          ? { transform: [{ scale: animatedValue }] }
-          : {},
-        withAnimation && animationType === "opacity" && isPressed
-          ? { opacity: 0.8 }
-          : {},
-        style,
+        withAnimation && animationType === "scale" ? animatedStyle : null,
+        hasShadow ? getShadowStyle() : null,
       ]}
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      disabled={disabled || loading}
-      activeOpacity={withAnimation ? 0.9 : 0.8}
     >
-      {renderButtonContent()}
-    </AnimatedTouchable>
+      <Pressable
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        disabled={isButtonDisabled}
+        style={({ pressed }) => [
+          styles.button,
+          getButtonStyle(),
+          getButtonSize(),
+          {
+            opacity:
+              withAnimation && animationType === "opacity" && pressed
+                ? 0.7
+                : isButtonDisabled
+                ? 0.5
+                : 1,
+          },
+          style,
+        ]}
+      >
+        {renderButtonContent()}
+      </Pressable>
+    </Animated.View>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders
+export default memo(Button);
 
 const styles = StyleSheet.create({
   button: {
@@ -314,10 +342,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 10,
-    overflow: "hidden",
   },
   text: {
-    fontFamily: "Inter-SemiBold",
+    fontWeight: "600",
     textAlign: "center",
   },
   leftIcon: {
@@ -327,22 +354,15 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   gradientContainer: {
-    width: "100%",
-    height: "100%",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
+    borderRadius: 10,
   },
   glassContainer: {
-    width: "100%",
-    height: "100%",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255, 255, 255, 0.3)",
+    borderRadius: 10,
   },
 });
-
-export default memo(Button);
