@@ -1,19 +1,23 @@
-import apiClient from "./apiClient";
-import authService from "./auth.service";
-import endpoints from "./endpoints";
-
 /**
- * Service module exports
+ * Service Index
  *
- * This file exports all API services as a single module.
- * Add additional services here as they are created.
+ * Export all service modules for easier imports
  */
 
-export { apiClient, authService, endpoints };
+// Auth and base API services
+import apiClient from "./apiClient";
 
-// Export default object with all services for easier imports
+// API service modules
+import * as apiServices from "./api";
+
+// Export individual services
+export { apiClient };
+
+// Export all API services
+export * from "./api";
+
+// Default export for backwards compatibility
 export default {
-  api: apiClient,
-  auth: authService,
-  endpoints,
+  apiClient,
+  ...apiServices,
 };

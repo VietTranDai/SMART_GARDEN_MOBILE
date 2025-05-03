@@ -16,91 +16,14 @@ import {
 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { router } from "expo-router";
+import { Alert, AlertStatus } from "@/types/gardens/alert.types";
+import { weatherService } from "@/service/api";
 
-// Define Alert interface
-interface Alert {
-  id: string;
-  type:
-    | "WEATHER"
-    | "SENSOR_ERROR"
-    | "SYSTEM"
-    | "CROP_CONDITION"
-    | "ACTIVITY"
-    | "MAINTENANCE"
-    | "SECURITY";
-  title: string;
-  message: string;
-  gardenId: string;
-  gardenName: string;
-  timestamp: string;
-  status: "PENDING" | "IN_PROGRESS" | "RESOLVED" | "IGNORED";
-  suggestion?: string;
+// Extended Alert type with UI-specific properties
+interface AlertUI extends Alert {
+  title?: string;
+  gardenName?: string;
 }
-
-// Mock alert data
-const MOCK_ALERTS: Alert[] = [
-  {
-    id: "1",
-    type: "WEATHER",
-    title: "Heavy Rain Alert",
-    message:
-      "Heavy rain expected in your garden area in the next 24 hours. Consider protecting sensitive plants.",
-    gardenId: "1",
-    gardenName: "Backyard Garden",
-    timestamp: "2025-04-20T14:30:00Z",
-    status: "PENDING",
-    suggestion: "Move potted plants under cover or use protective coverings.",
-  },
-  {
-    id: "2",
-    type: "SENSOR_ERROR",
-    title: "Soil Moisture Sensor Disconnected",
-    message:
-      "The soil moisture sensor in your Rooftop Herbs garden has been disconnected for over 3 hours.",
-    gardenId: "2",
-    gardenName: "Rooftop Herbs",
-    timestamp: "2025-04-19T09:15:00Z",
-    status: "IN_PROGRESS",
-    suggestion:
-      "Check sensor batteries or connection. You may need to reconnect the device.",
-  },
-  {
-    id: "3",
-    type: "CROP_CONDITION",
-    title: "Low Soil Moisture Detected",
-    message:
-      "Soil moisture levels in your tomato plants are critically low. Plants may be at risk.",
-    gardenId: "1",
-    gardenName: "Backyard Garden",
-    timestamp: "2025-04-18T10:45:00Z",
-    status: "RESOLVED",
-    suggestion:
-      "Water your tomatoes immediately and consider adjusting your watering schedule.",
-  },
-  {
-    id: "4",
-    type: "ACTIVITY",
-    title: "Fertilizing Due",
-    message:
-      "Your Backyard Garden is due for fertilizing. Last application was 30 days ago.",
-    gardenId: "1",
-    gardenName: "Backyard Garden",
-    timestamp: "2025-04-15T16:20:00Z",
-    status: "PENDING",
-    suggestion: "Apply recommended fertilizer according to your crop's needs.",
-  },
-  {
-    id: "5",
-    type: "SYSTEM",
-    title: "System Update Available",
-    message:
-      "A new system update is available with improved sensor accuracy and new features.",
-    gardenId: "",
-    gardenName: "",
-    timestamp: "2025-04-10T08:00:00Z",
-    status: "IGNORED",
-  },
-];
 
 // Add a date formatting function
 const formatDate = (dateString: string, format: string = "default"): string => {
@@ -113,44 +36,58 @@ const formatDate = (dateString: string, format: string = "default"): string => {
 
 export default function AlertsScreen() {
   const theme = useAppTheme();
-  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [alerts, setAlerts] = useState<AlertUI[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("ALL");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAlerts();
   }, []);
 
   const fetchAlerts = async () => {
-    // Simulate API call
-    setTimeout(() => {
-      setAlerts(MOCK_ALERTS);
+    try {
+      setError(null);
+      const alertsData = await weatherService.getAlerts();
+      setAlerts(alertsData as AlertUI[]);
+    } catch (err) {
+      console.error("Failed to fetch alerts:", err);
+      setError("Không thể tải thông báo. Vui lòng thử lại sau.");
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    // Simulate data refresh
-    setTimeout(() => {
-      setAlerts(MOCK_ALERTS);
-      setRefreshing(false);
-    }, 1500);
+    await fetchAlerts();
+    setRefreshing(false);
   }, []);
 
-  const updateAlertStatus = (id: string, newStatus: Alert["status"]) => {
-    setAlerts((prevAlerts) =>
-      prevAlerts.map((alert) =>
-        alert.id === id ? { ...alert, status: newStatus } : alert
-      )
-    );
+  const updateAlertStatus = async (id: number, newStatus: AlertStatus) => {
+    try {
+      if (newStatus === AlertStatus.RESOLVED) {
+        await weatherService.resolveAlert(id);
+      } else {
+        await weatherService.updateAlert(id, { status: newStatus });
+      }
+
+      // Update local state after successful API call
+      setAlerts((prevAlerts) =>
+        prevAlerts.map((alert) =>
+          alert.id === id ? { ...alert, status: newStatus } : alert
+        )
+      );
+    } catch (err) {
+      console.error(`Failed to update alert ${id} status:`, err);
+    }
   };
 
-  const handleAlertPress = (alert: Alert) => {
+  const handleAlertPress = (alert: AlertUI) => {
     // If pending, mark as in progress
-    if (alert.status === "PENDING") {
-      updateAlertStatus(alert.id, "IN_PROGRESS");
+    if (alert.status === AlertStatus.PENDING) {
+      updateAlertStatus(alert.id, AlertStatus.IN_PROGRESS);
     }
 
     // Navigate based on alert type
@@ -159,12 +96,6 @@ export default function AlertsScreen() {
         router.push("/(modules)/weather" as any);
         break;
       case "SENSOR_ERROR":
-      case "CROP_CONDITION":
-        if (alert.gardenId) {
-          const path = `/(modules)/gardens/${alert.gardenId}`;
-          router.push(path as any);
-        }
-        break;
       case "ACTIVITY":
         router.push("/(modules)/tasks" as any);
         break;
@@ -178,18 +109,36 @@ export default function AlertsScreen() {
     }
   };
 
-  const resolveAllAlerts = () => {
-    setAlerts((prevAlerts) =>
-      prevAlerts.map((alert) =>
-        alert.status === "PENDING" || alert.status === "IN_PROGRESS"
-          ? { ...alert, status: "RESOLVED" }
-          : alert
-      )
-    );
+  const resolveAllAlerts = async () => {
+    try {
+      // Get all unresolved alerts
+      const unresolvedAlerts = alerts.filter(
+        (alert) =>
+          alert.status === AlertStatus.PENDING ||
+          alert.status === AlertStatus.IN_PROGRESS
+      );
+
+      // Resolve each alert
+      await Promise.all(
+        unresolvedAlerts.map((alert) => weatherService.resolveAlert(alert.id))
+      );
+
+      // Update local state
+      setAlerts((prevAlerts) =>
+        prevAlerts.map((alert) =>
+          alert.status === AlertStatus.PENDING ||
+          alert.status === AlertStatus.IN_PROGRESS
+            ? { ...alert, status: AlertStatus.RESOLVED }
+            : alert
+        )
+      );
+    } catch (err) {
+      console.error("Failed to resolve all alerts:", err);
+    }
   };
 
-  const dismissAlert = (id: string) => {
-    updateAlertStatus(id, "IGNORED");
+  const dismissAlert = async (id: number) => {
+    await updateAlertStatus(id, AlertStatus.IGNORED);
   };
 
   const formatTimestamp = (timestamp: string) => {
@@ -302,7 +251,7 @@ export default function AlertsScreen() {
     return alert.status === filter;
   });
 
-  const renderAlertItem = ({ item }: { item: Alert }) => (
+  const renderAlertItem = ({ item }: { item: AlertUI }) => (
     <TouchableOpacity
       style={[
         styles.alertItem,
@@ -318,7 +267,7 @@ export default function AlertsScreen() {
       <View style={styles.alertContent}>
         <View style={styles.alertHeaderRow}>
           <Text style={[styles.alertTitle, { color: theme.text }]}>
-            {item.title}
+            {item.title || item.type}
           </Text>
           <Text style={[styles.alertTime, { color: theme.textTertiary }]}>
             {formatTimestamp(item.timestamp)}
@@ -359,7 +308,7 @@ export default function AlertsScreen() {
             {item.status === "PENDING" && (
               <TouchableOpacity
                 style={styles.actionButton}
-                onPress={() => updateAlertStatus(item.id, "RESOLVED")}
+                onPress={() => updateAlertStatus(item.id, AlertStatus.RESOLVED)}
               >
                 <Text style={[styles.actionText, { color: theme.success }]}>
                   Resolve
@@ -486,7 +435,7 @@ export default function AlertsScreen() {
           <FlatList
             data={filteredAlerts}
             renderItem={renderAlertItem}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item.id.toString()}
             contentContainerStyle={styles.listContent}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />

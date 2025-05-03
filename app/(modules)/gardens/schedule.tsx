@@ -16,64 +16,15 @@ import {
 import { Stack, useRouter, useGlobalSearchParams } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { taskService, gardenService } from "@/service/api";
+import { Garden, WateringSchedule, TaskStatus } from "@/types";
 
 // Comment out DateTimePicker import until package is properly installed
 // import DateTimePicker from "@react-native-community/datetimepicker";
 
-// Types based on Prisma schema
-interface WateringSchedule {
-  id: string;
-  scheduledAt: string;
-  amount: number;
-  status: "PENDING" | "COMPLETED" | "SKIPPED";
-  createdAt: string;
-}
-
-interface Garden {
-  id: string;
-  name: string;
-  plantName?: string;
-  plantGrowStage?: string;
-  soilMoisture?: number;
-}
-
-// Mock garden data
-const GARDEN: Garden = {
-  id: "1",
-  name: "Vegetable Garden",
-  plantName: "Tomato",
-  plantGrowStage: "Fruiting",
-  soilMoisture: 45,
-};
-
-// Mock watering schedules
-const MOCK_SCHEDULES: WateringSchedule[] = [
-  {
-    id: "1",
-    scheduledAt: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
-    amount: 0.5,
-    status: "PENDING",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    scheduledAt: new Date(Date.now() + 172800000).toISOString(), // Day after tomorrow
-    amount: 0.75,
-    status: "PENDING",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "3",
-    scheduledAt: new Date(Date.now() - 86400000).toISOString(), // Yesterday
-    amount: 0.5,
-    status: "COMPLETED",
-    createdAt: new Date(Date.now() - 172800000).toISOString(),
-  },
-];
-
 export default function WateringScheduleScreen() {
   const router = useRouter();
-  const { id } = useGlobalSearchParams(); // Assume this is gardenId
+  const { id } = useGlobalSearchParams(); // Garden ID
   const theme = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -81,6 +32,7 @@ export default function WateringScheduleScreen() {
   const [schedules, setSchedules] = useState<WateringSchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // New schedule state
   const [showScheduleForm, setShowScheduleForm] = useState(false);
@@ -92,28 +44,43 @@ export default function WateringScheduleScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
-  useEffect(() => {
-    // In a real app, fetch data from API using the garden ID `id`
-    console.log("Fetching data for garden ID:", id);
-    setTimeout(() => {
-      // Use the passed ID to find the correct garden if needed, or just use the mock
-      setGarden(GARDEN);
-      setSchedules(MOCK_SCHEDULES);
-      setLoading(false);
-    }, 1000);
-  }, [id]);
+  const fetchData = async () => {
+    if (!id) return;
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    // In a real app, refresh data from API using the garden ID `id`
-    console.log("Refreshing data for garden ID:", id);
-    setTimeout(() => {
-      setSchedules(MOCK_SCHEDULES); // Re-fetch schedules
-      setRefreshing(false);
-    }, 1000);
+    try {
+      setError(null);
+      const gardenId = typeof id === "string" ? id : id.toString();
+
+      // Fetch garden details
+      const gardenData = await gardenService.getGardenById(gardenId);
+      setGarden(gardenData);
+
+      // Fetch watering schedules
+      const schedulesData = await taskService.getGardenWateringSchedules(
+        gardenId
+      );
+      setSchedules(schedulesData);
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+      setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCreateSchedule = () => {
+  useEffect(() => {
+    fetchData();
+  }, [id]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+  };
+
+  const handleCreateSchedule = async () => {
+    if (!id) return;
+
     setIsCreating(true);
 
     // Combine date and time for scheduled time
@@ -133,20 +100,16 @@ export default function WateringScheduleScreen() {
       return;
     }
 
-    // In a real app, send to API with gardenId = id
-    console.log("Creating manual schedule for garden ID:", id);
-    setTimeout(() => {
-      const newSchedule: WateringSchedule = {
-        id: Date.now().toString(),
+    try {
+      const gardenId = typeof id === "string" ? id : id.toString();
+
+      const newSchedule = await taskService.createWateringSchedule(gardenId, {
         scheduledAt: scheduledAt.toISOString(),
         amount: parseFloat(waterAmount),
-        status: "PENDING",
-        createdAt: new Date().toISOString(),
-      };
+      });
 
       setSchedules((prev) => [newSchedule, ...prev]);
       setShowScheduleForm(false);
-      setIsCreating(false);
       setScheduleDate(new Date());
       setScheduleTime(new Date());
       setWaterAmount("0.5");
@@ -155,65 +118,47 @@ export default function WateringScheduleScreen() {
         "Schedule Created",
         "Your watering schedule has been created successfully!"
       );
-    }, 1000);
+    } catch (err) {
+      console.error("Failed to create schedule:", err);
+      Alert.alert(
+        "Error",
+        "Failed to create watering schedule. Please try again."
+      );
+    } finally {
+      setIsCreating(false);
+    }
   };
 
-  const handleCreateAutomaticSchedule = () => {
+  const handleCreateAutomaticSchedule = async () => {
+    if (!id) return;
+
     setIsCreating(true);
 
-    // In a real app, this would use garden data, plant type, growth stage,
-    // sensor data, and weather forecasts to create an optimal schedule
-    console.log("Creating automatic schedule for garden ID:", id);
-    setTimeout(() => {
-      // Calculate tomorrow morning at 7:00 AM
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(7, 0, 0, 0);
+    try {
+      const gardenId = typeof id === "string" ? id : id.toString();
 
-      // Calculate water amount based on plant type and soil moisture
-      // This is a simplified example
-      let amount = 0.5; // Default amount in liters
-
-      if (garden?.soilMoisture && garden.soilMoisture < 30) {
-        amount = 0.75; // More water for dry soil
-      } else if (garden?.soilMoisture && garden.soilMoisture > 70) {
-        amount = 0.25; // Less water for moist soil
-      }
-
-      // Adjust based on plant type and stage
-      // This would be much more sophisticated in a real app
-      if (
-        garden?.plantName === "Tomato" &&
-        garden?.plantGrowStage === "Fruiting"
-      ) {
-        amount *= 1.25; // Tomatoes need more water during fruiting
-      }
-
-      const newSchedule: WateringSchedule = {
-        id: Date.now().toString(),
-        scheduledAt: tomorrow.toISOString(),
-        amount,
-        status: "PENDING",
-        createdAt: new Date().toISOString(),
-      };
+      const newSchedule = await taskService.generateAutomaticSchedule(gardenId);
 
       setSchedules((prev) => [newSchedule, ...prev]);
-      setIsCreating(false);
 
       Alert.alert(
-        "Smart Schedule Created",
-        `Automatic watering scheduled for tomorrow at 7:00 AM with ${amount.toFixed(
-          2
-        )} liters of water, optimized for your ${garden?.plantName} in the ${
-          garden?.plantGrowStage
-        } stage.`
+        "Schedule Created",
+        "Automatic watering schedule has been created based on your garden's needs."
       );
-    }, 1500);
+    } catch (err) {
+      console.error("Failed to create automatic schedule:", err);
+      Alert.alert(
+        "Error",
+        "Failed to create automatic watering schedule. Please try again."
+      );
+    } finally {
+      setIsCreating(false);
+    }
   };
 
-  const handleDeleteSchedule = (scheduleId: string) => {
+  const handleDeleteSchedule = async (scheduleId: number) => {
     Alert.alert(
-      "Delete Schedule",
+      "Confirm Delete",
       "Are you sure you want to delete this watering schedule?",
       [
         {
@@ -223,32 +168,51 @@ export default function WateringScheduleScreen() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => {
-            // In a real app, delete from API using scheduleId
-            console.log("Deleting schedule ID:", scheduleId);
-            setSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
+          onPress: async () => {
+            try {
+              await taskService.deleteWateringSchedule(scheduleId);
+              setSchedules((prev) =>
+                prev.filter((schedule) => schedule.id !== scheduleId)
+              );
+            } catch (err) {
+              console.error("Failed to delete schedule:", err);
+              Alert.alert(
+                "Error",
+                "Failed to delete watering schedule. Please try again."
+              );
+            }
           },
         },
       ]
     );
   };
 
-  const handleChangeStatus = (
-    scheduleId: string,
-    newStatus: "PENDING" | "COMPLETED" | "SKIPPED"
+  const handleChangeStatus = async (
+    scheduleId: number,
+    newStatus: TaskStatus
   ) => {
-    // In a real app, update in API using scheduleId
-    console.log(`Updating status for schedule ${scheduleId} to ${newStatus}`);
-    setSchedules((prev) =>
-      prev.map((s) =>
-        s.id === scheduleId
-          ? {
-              ...s,
-              status: newStatus,
-            }
-          : s
-      )
-    );
+    try {
+      if (newStatus === TaskStatus.COMPLETED) {
+        await taskService.completeWateringSchedule(scheduleId);
+      } else if (newStatus === TaskStatus.SKIPPED) {
+        await taskService.skipWateringSchedule(scheduleId);
+      }
+
+      // Update local state
+      setSchedules((prev) =>
+        prev.map((schedule) =>
+          schedule.id === scheduleId
+            ? { ...schedule, status: newStatus }
+            : schedule
+        )
+      );
+    } catch (err) {
+      console.error(`Failed to update schedule ${scheduleId} status:`, err);
+      Alert.alert(
+        "Error",
+        "Failed to update watering schedule status. Please try again."
+      );
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -353,7 +317,9 @@ export default function WateringScheduleScreen() {
             <View style={styles.actionButtonsContainer}>
               <TouchableOpacity
                 style={styles.actionButton}
-                onPress={() => handleChangeStatus(item.id, "COMPLETED")}
+                onPress={() =>
+                  handleChangeStatus(item.id, TaskStatus.COMPLETED)
+                }
               >
                 <Ionicons
                   name="checkmark-circle"
@@ -363,7 +329,7 @@ export default function WateringScheduleScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.actionButton}
-                onPress={() => handleChangeStatus(item.id, "SKIPPED")}
+                onPress={() => handleChangeStatus(item.id, TaskStatus.SKIPPED)}
               >
                 <Ionicons name="close-circle" size={22} color={theme.error} />
               </TouchableOpacity>
@@ -400,7 +366,7 @@ export default function WateringScheduleScreen() {
       <View style={[styles.container, styles.centered]}>
         <Ionicons name="alert-circle-outline" size={40} color={theme.error} />
         <Text style={[styles.errorText, { color: theme.text }]}>
-          Could not load garden data.
+          {error || "Could not load garden data."}
         </Text>
       </View>
     );
@@ -534,7 +500,7 @@ export default function WateringScheduleScreen() {
                   new Date(b.scheduledAt).getTime()
               )}
               renderItem={renderScheduleItem}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => item.id.toString()}
               scrollEnabled={false} // Disable scrolling within ScrollView
               ItemSeparatorComponent={() => <View style={styles.separator} />}
             />
@@ -555,7 +521,7 @@ export default function WateringScheduleScreen() {
                   new Date(a.scheduledAt).getTime()
               )}
               renderItem={renderScheduleItem}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => item.id.toString()}
               scrollEnabled={false} // Disable scrolling within ScrollView
               ItemSeparatorComponent={() => <View style={styles.separator} />}
             />

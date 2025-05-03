@@ -13,119 +13,82 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { Ionicons, MaterialIcons, Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-
-// Mock data for tasks
-const TASKS_DATA = [
-  {
-    id: "1",
-    type: "WATERING",
-    description: "Water tomato plants in the main bed",
-    gardenName: "Backyard Garden",
-    dueDate: "2025-04-20T10:00:00Z",
-    status: "PENDING",
-  },
-  {
-    id: "2",
-    type: "FERTILIZING",
-    description: "Apply liquid fertilizer to rose bushes",
-    gardenName: "Front Yard Flowers",
-    dueDate: "2025-04-21T08:30:00Z",
-    status: "PENDING",
-  },
-  {
-    id: "3",
-    type: "PRUNING",
-    description: "Prune apple trees - remove dead branches",
-    gardenName: "Orchard Section A",
-    dueDate: "2025-04-19T15:00:00Z",
-    status: "COMPLETED",
-  },
-  {
-    id: "4",
-    type: "HARVESTING",
-    description: "Harvest ripe strawberries from patch 1",
-    gardenName: "Berry Patch",
-    dueDate: "2025-04-18T11:00:00Z",
-    status: "COMPLETED",
-  },
-  {
-    id: "5",
-    type: "PEST_CONTROL",
-    description: "Check for aphids on cabbage and apply neem oil if needed",
-    gardenName: "Vegetable Garden Plot B",
-    dueDate: "2025-04-22T09:00:00Z",
-    status: "PENDING",
-  },
-  {
-    id: "6",
-    type: "PLANTING",
-    description: "Plant new basil seedlings",
-    gardenName: "Herb Garden Pots",
-    dueDate: "2025-04-23T14:00:00Z",
-    status: "PENDING",
-  },
-  {
-    id: "7",
-    type: "WEEDING",
-    description: "Weed the carrot patch",
-    gardenName: "Vegetable Garden Plot A",
-    dueDate: "2025-04-20T16:00:00Z",
-    status: "SKIPPED",
-  },
-];
-
-// Define the Task interface
-interface Task {
-  id: string;
-  type: string;
-  description: string;
-  gardenName: string;
-  dueDate: string;
-  status: "PENDING" | "COMPLETED" | "SKIPPED";
-}
+import { taskService } from "@/service/api";
+import { TaskStatus, Task } from "@/types/activities/task.types";
 
 export default function TasksScreen() {
   const theme = useAppTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [filter, setFilter] = useState<
-    "ALL" | "PENDING" | "COMPLETED" | "SKIPPED"
-  >("ALL");
+  const [filter, setFilter] = useState<"ALL" | TaskStatus>("ALL");
+  const [error, setError] = useState<string | null>(null);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
+  const fetchTasks = useCallback(async () => {
+    try {
+      setError(null);
+      const params: { status?: TaskStatus } = {};
+      if (filter !== "ALL") {
+        params.status = filter;
+      }
+      const tasksData = await taskService.getTasks(params);
+      setTasks(tasksData);
+    } catch (err) {
+      console.error("Failed to load tasks:", err);
+      setError("Không thể tải danh sách nhiệm vụ. Vui lòng thử lại sau.");
+    } finally {
+      setLoading(false);
+    }
+  }, [filter]);
+
   useEffect(() => {
     setLoading(true);
-    const timer = setTimeout(() => {
-      setTasks(TASKS_DATA as Task[]);
-      setLoading(false);
-    }, 800);
-    return () => clearTimeout(timer);
-  }, []);
+    fetchTasks();
+  }, [fetchTasks]);
 
-  const filteredTasks = useMemo(() => {
-    if (filter === "ALL") return tasks;
-    return tasks.filter((task) => task.status === filter);
-  }, [tasks, filter]);
-
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setLoading(true);
-    setTimeout(() => {
-      setTasks(TASKS_DATA.sort(() => 0.5 - Math.random()) as Task[]);
-      setLoading(false);
-      setRefreshing(false);
-    }, 1500);
-  }, []);
+    await fetchTasks();
+    setRefreshing(false);
+  }, [fetchTasks]);
 
-  const getStatusColor = (status: string) => {
+  const handleCompleteTask = async (taskId: number) => {
+    try {
+      await taskService.completeTask(taskId);
+      // Update local task state
+      setTasks((prevTasks) =>
+        prevTasks.map((task) =>
+          task.id === taskId ? { ...task, status: TaskStatus.COMPLETED } : task
+        )
+      );
+    } catch (err) {
+      console.error("Failed to complete task:", err);
+    }
+  };
+
+  const handleSkipTask = async (taskId: number) => {
+    try {
+      await taskService.skipTask(taskId);
+      // Update local task state
+      setTasks((prevTasks) =>
+        prevTasks.map((task) =>
+          task.id === taskId ? { ...task, status: TaskStatus.SKIPPED } : task
+        )
+      );
+    } catch (err) {
+      console.error("Failed to skip task:", err);
+    }
+  };
+
+  const getStatusColor = (status: TaskStatus) => {
     switch (status) {
-      case "COMPLETED":
+      case TaskStatus.COMPLETED:
         return theme.success;
-      case "SKIPPED":
+      case TaskStatus.SKIPPED:
         return theme.warning;
-      case "PENDING":
+      case TaskStatus.PENDING:
         return theme.primary;
       default:
         return theme.textTertiary;
@@ -195,76 +158,69 @@ export default function TasksScreen() {
             {item.type.replace("_", " ")}
           </Text>
           <Text style={styles.taskGarden} numberOfLines={1}>
-            {item.gardenName}
+            {item.gardenId}
           </Text>
         </View>
-        <View
-          style={[
-            styles.taskStatus,
-            { backgroundColor: getStatusColor(item.status) + "26" },
-          ]}
-        >
-          <Text
-            style={[
-              styles.taskStatusText,
-              { color: getStatusColor(item.status) },
-            ]}
-          >
-            {item.status}
-          </Text>
-        </View>
+        {item.status === TaskStatus.PENDING && (
+          <View style={styles.taskActions}>
+            <TouchableOpacity
+              style={styles.taskActionButton}
+              onPress={() => handleCompleteTask(item.id)}
+            >
+              <Ionicons
+                name="checkmark-outline"
+                size={18}
+                color={theme.success}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.taskActionButton}
+              onPress={() => handleSkipTask(item.id)}
+            >
+              <Ionicons name="close-outline" size={18} color={theme.warning} />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
       <Text style={styles.taskDescription} numberOfLines={2}>
         {item.description}
       </Text>
       <View style={styles.taskFooter}>
-        <Ionicons
-          name="calendar-clear-outline"
-          size={16}
-          color={theme.textSecondary}
-        />
-        <Text style={styles.dueDateText}>{formatDate(item.dueDate)}</Text>
-        <View style={styles.taskActions}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              console.log("Complete Task", item.id);
-            }}
+        <View style={styles.dueDateContainer}>
+          <Ionicons name="time-outline" size={14} color={theme.textSecondary} />
+          <Text style={styles.dueDate}>{formatDate(item.dueDate)}</Text>
+        </View>
+        <View
+          style={[
+            styles.statusBadge,
+            { backgroundColor: getStatusColor(item.status) + "1A" },
+          ]}
+        >
+          <Text
+            style={[styles.statusText, { color: getStatusColor(item.status) }]}
           >
-            <Feather name="check-circle" size={20} color={theme.success} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              console.log("Skip Task", item.id);
-            }}
-          >
-            <Feather name="skip-forward" size={20} color={theme.warning} />
-          </TouchableOpacity>
+            {item.status}
+          </Text>
         </View>
       </View>
     </TouchableOpacity>
   );
 
   const renderFilterButton = (
-    buttonFilter: "ALL" | "PENDING" | "COMPLETED" | "SKIPPED",
+    buttonFilter: "ALL" | TaskStatus,
     text: string
   ) => (
     <TouchableOpacity
       style={[
         styles.filterButton,
-        {
-          backgroundColor: filter === buttonFilter ? theme.primary : theme.card,
-        },
+        filter === buttonFilter && styles.filterButtonActive,
       ]}
       onPress={() => setFilter(buttonFilter)}
     >
       <Text
         style={[
-          styles.filterText,
-          { color: filter === buttonFilter ? theme.card : theme.textSecondary },
+          styles.filterButtonText,
+          filter === buttonFilter && styles.filterButtonTextActive,
         ]}
       >
         {text}
@@ -273,24 +229,53 @@ export default function TasksScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <View style={styles.filterContainer}>
-        {renderFilterButton("ALL", "All")}
-        {renderFilterButton("PENDING", "Pending")}
-        {renderFilterButton("COMPLETED", "Completed")}
-        {renderFilterButton("SKIPPED", "Skipped")}
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Nhiệm vụ</Text>
       </View>
 
-      {loading ? (
+      <View style={styles.filterContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {renderFilterButton("ALL", "Tất cả")}
+          {renderFilterButton(TaskStatus.PENDING, "Đang chờ")}
+          {renderFilterButton(TaskStatus.COMPLETED, "Đã hoàn thành")}
+          {renderFilterButton(TaskStatus.SKIPPED, "Đã bỏ qua")}
+        </ScrollView>
+      </View>
+
+      {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={styles.loadingText}>Đang tải nhiệm vụ...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color={theme.error} />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchTasks}>
+            <Text style={styles.retryButtonText}>Thử lại</Text>
+          </TouchableOpacity>
+        </View>
+      ) : tasks.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons
+            name="clipboard-outline"
+            size={64}
+            color={theme.textTertiary}
+          />
+          <Text style={styles.emptyTitle}>Không có nhiệm vụ nào</Text>
+          <Text style={styles.emptyText}>
+            {filter === "ALL"
+              ? "Bạn chưa có nhiệm vụ nào. Thêm cây trồng mới để bắt đầu."
+              : `Không có nhiệm vụ nào ở trạng thái "${filter}".`}
+          </Text>
         </View>
       ) : (
         <FlatList
-          data={filteredTasks}
+          data={tasks}
           renderItem={renderTaskItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContainer}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.taskList}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -300,46 +285,15 @@ export default function TasksScreen() {
               tintColor={theme.primary}
             />
           }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Feather
-                name="check-square"
-                size={48}
-                color={theme.textTertiary}
-              />
-              <Text style={styles.emptyTitle}>
-                {filter === "ALL"
-                  ? "No tasks found"
-                  : `No ${filter.toLowerCase()} tasks`}
-              </Text>
-              <Text style={styles.emptySubtitle}>
-                {filter === "ALL"
-                  ? "Add a new task or check back later."
-                  : `You have no tasks with status "${filter}".`}
-              </Text>
-              <TouchableOpacity
-                style={[
-                  styles.addButtonInline,
-                  { backgroundColor: theme.primary },
-                ]}
-                onPress={() => router.push("/(modules)/tasks/new")}
-              >
-                <Ionicons name="add" size={20} color={theme.background} />
-                <Text style={styles.addButtonText}>Add New Task</Text>
-              </TouchableOpacity>
-            </View>
-          }
         />
       )}
 
-      {!loading && (
-        <TouchableOpacity
-          style={[styles.floatingAddButton, { backgroundColor: theme.primary }]}
-          onPress={() => router.push("/(modules)/tasks/new")}
-        >
-          <Ionicons name="add" size={30} color={theme.card} />
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: theme.primary }]}
+        onPress={() => router.push("/(modules)/tasks/create")}
+      >
+        <Ionicons name="add-outline" size={24} color="white" />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -349,6 +303,19 @@ const createStyles = (theme: any) =>
     container: {
       flex: 1,
       backgroundColor: theme.backgroundSecondary,
+    },
+    header: {
+      padding: 16,
+      paddingTop: 24,
+      paddingBottom: 20,
+      backgroundColor: theme.background,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.borderLight,
+    },
+    title: {
+      fontSize: 20,
+      fontFamily: "Inter-SemiBold",
+      color: theme.text,
     },
     filterContainer: {
       flexDirection: "row",
@@ -364,16 +331,72 @@ const createStyles = (theme: any) =>
       paddingHorizontal: 16,
       borderRadius: 20,
     },
-    filterText: {
+    filterButtonActive: {
+      backgroundColor: theme.primary,
+    },
+    filterButtonText: {
       fontSize: 14,
       fontFamily: "Inter-Medium",
+    },
+    filterButtonTextActive: {
+      color: theme.card,
     },
     loadingContainer: {
       flex: 1,
       justifyContent: "center",
       alignItems: "center",
     },
-    listContainer: {
+    loadingText: {
+      fontSize: 16,
+      fontFamily: "Inter-Medium",
+      color: theme.textSecondary,
+      marginTop: 16,
+    },
+    errorContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 30,
+    },
+    errorText: {
+      fontSize: 16,
+      fontFamily: "Inter-Medium",
+      color: theme.error,
+      marginBottom: 24,
+    },
+    retryButton: {
+      padding: 16,
+      borderRadius: 8,
+      backgroundColor: theme.primary,
+    },
+    retryButtonText: {
+      fontSize: 16,
+      fontFamily: "Inter-Medium",
+      color: theme.card,
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 30,
+      marginTop: 50,
+    },
+    emptyTitle: {
+      fontSize: 18,
+      fontFamily: "Inter-SemiBold",
+      color: theme.text,
+      marginTop: 20,
+      marginBottom: 8,
+      textAlign: "center",
+    },
+    emptyText: {
+      fontSize: 14,
+      fontFamily: "Inter-Regular",
+      color: theme.textSecondary,
+      textAlign: "center",
+      marginBottom: 24,
+    },
+    taskList: {
       padding: 16,
     },
     taskCard: {
@@ -416,16 +439,6 @@ const createStyles = (theme: any) =>
       color: theme.textSecondary,
       marginTop: 2,
     },
-    taskStatus: {
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 12,
-    },
-    taskStatusText: {
-      fontSize: 12,
-      fontFamily: "Inter-Medium",
-      textTransform: "capitalize",
-    },
     taskDescription: {
       fontSize: 14,
       fontFamily: "Inter-Regular",
@@ -446,7 +459,7 @@ const createStyles = (theme: any) =>
       flexDirection: "row",
       alignItems: "center",
     },
-    dueDateText: {
+    dueDate: {
       fontSize: 13,
       fontFamily: "Inter-Regular",
       color: theme.textSecondary,
@@ -455,46 +468,21 @@ const createStyles = (theme: any) =>
     taskActions: {
       flexDirection: "row",
     },
-    actionButton: {
+    taskActionButton: {
       marginLeft: 10,
       padding: 5,
     },
-    emptyContainer: {
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      padding: 30,
-      marginTop: 50,
+    statusBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
     },
-    emptyTitle: {
-      fontSize: 18,
-      fontFamily: "Inter-SemiBold",
-      color: theme.text,
-      marginTop: 20,
-      marginBottom: 8,
-      textAlign: "center",
-    },
-    emptySubtitle: {
-      fontSize: 14,
-      fontFamily: "Inter-Regular",
-      color: theme.textSecondary,
-      textAlign: "center",
-      marginBottom: 24,
-    },
-    addButtonInline: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingVertical: 10,
-      paddingHorizontal: 20,
-      borderRadius: 8,
-    },
-    addButtonText: {
-      color: theme.background,
-      fontSize: 15,
+    statusText: {
+      fontSize: 12,
       fontFamily: "Inter-Medium",
-      marginLeft: 8,
+      textTransform: "capitalize",
     },
-    floatingAddButton: {
+    fab: {
       position: "absolute",
       bottom: 24,
       right: 24,

@@ -1,512 +1,49 @@
 import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
-  RefreshControl,
   ActivityIndicator,
-  SectionList,
   Platform,
+  RefreshControl,
+  SectionList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import React, { useEffect, useState, useCallback, useMemo } from "react";
-import {
-  Feather,
-  FontAwesome5,
-  MaterialIcons,
-  MaterialCommunityIcons,
-  Ionicons,
-} from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
-import * as ImagePicker from "expo-image-picker";
+import {Stack, useLocalSearchParams, useRouter} from "expo-router";
+import React, {useCallback, useEffect, useMemo, useState} from "react";
+import {Feather, FontAwesome5, MaterialIcons,} from "@expo/vector-icons";
+import {useAppTheme} from "@/hooks/useAppTheme";
 
 // Import custom components
 import WeatherDisplay from "@/components/garden/WeatherDisplay";
-import SensorDetailView, {
-  SensorInfo,
-} from "@/components/garden/SensorDetailView";
+import SensorDetailView from "@/components/garden/SensorDetailView";
 import GardenStatusCard from "@/components/garden/GardenStatusCard";
 import AlertsList from "@/components/garden/AlertsList";
 import ActivityList from "@/components/garden/ActivityList";
 
+// Import API services
+import gardenService from "@/service/api/garden.service";
+import weatherService from "@/service/api/weather.service";
+import sensorService from "@/service/api/sensor.service";
+import taskService from "@/service/api/task.service";
+
+// Import weather types directly from the weather types file
+import {DailyForecast, HourlyForecast, WeatherObservation} from "@/types/weather/weather.types";
+
 // Import enums and potentially types from the central database constants/types file
 import {
-  ActivityType,
-  TaskStatus,
-  SensorType,
-  GardenStatus,
-  GardenType,
-  AlertType,
+  Alert,
   AlertStatus,
-  NotificationMethod,
-} from "@/constants/database";
+  Garden,
+  GardenActivity,
+  GardenStatus,
+  Sensor,
+  TaskStatus,
+  WateringScheduleItem,
+} from "@/types";
+import {apiClient} from "@/service";
 
-// Temporarily remove import from '@/constants/types' as module not found
-// import {
-//   Garden,
-//   SensorData,
-//   WateringSchedule,
-//   WeatherObservation,
-// } from "@/constants/types";
-
-// --- Define Local Interfaces based on Usage ---
-interface AlertListItem {
-  id: string;
-  type: AlertType;
-  message: string;
-  suggestion?: string;
-  timestamp: string;
-  status: AlertStatus;
-}
-
-interface ActivityListItem {
-  id: string;
-  name: string;
-  type: ActivityType;
-  icon:
-    | keyof typeof MaterialCommunityIcons.glyphMap
-    | keyof typeof Ionicons.glyphMap;
-  timestamp: string;
-  details: string;
-}
-
-const randomDate = (start: Date, end: Date) =>
-  new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
-
-// Mock Garden Detail Data Generator
-const generateMockGarden = (id: string): any => {
-  const gardenTypes = Object.values(GardenType);
-  const gardenStatuses = Object.values(GardenStatus);
-  const plantNames = [
-    "Cà chua",
-    "Húng quế",
-    "Bạc hà",
-    "Xà lách",
-    "Dâu tây",
-    "Dưa chuột",
-  ];
-  const growthStages = [
-    "Gieo hạt",
-    "Nảy mầm",
-    "Sinh trưởng",
-    "Ra hoa",
-    "Đậu quả",
-    "Thu hoạch",
-  ];
-  const cities = ["TP. Hồ Chí Minh", "Hà Nội", "Đà Nẵng", "Cần Thơ"];
-  const districts = ["Quận 1", "Thủ Đức", "Bình Thạnh", "Hai Bà Trưng"];
-  const wards = ["Phường 1", "An Khánh", "Phường 26", "Bạch Mai"];
-
-  const now = new Date();
-  const sixMonthsAgo = new Date(
-    now.getFullYear(),
-    now.getMonth() - 6,
-    now.getDate()
-  );
-  const twoMonthsAgo = new Date(
-    now.getFullYear(),
-    now.getMonth() - 2,
-    now.getDate()
-  );
-  const oneMonthAgo = new Date(
-    now.getFullYear(),
-    now.getMonth() - 1,
-    now.getDate()
-  );
-
-  const gardenIdInt = parseInt(id, 10) || 1;
-  const plantIdx = gardenIdInt % plantNames.length;
-  const typeIdx = gardenIdInt % gardenTypes.length;
-  const statusIdx = gardenIdInt % gardenStatuses.length;
-
-  return {
-    id: gardenIdInt,
-    gardenKey: `VUON_${id.padStart(4, "0")}`,
-    name: `Vườn ${id} - ${plantNames[plantIdx]}`,
-    street: `${Math.floor(Math.random() * 100) + 1} Đường Vườn Xanh`,
-    ward: wards[gardenIdInt % wards.length],
-    district: districts[gardenIdInt % districts.length],
-    city: cities[gardenIdInt % cities.length],
-    lat: 10.8 + (Math.random() - 0.5) * 0.1,
-    lng: 106.7 + (Math.random() - 0.5) * 0.1,
-    gardenerId: 1,
-    type: gardenTypes[typeIdx],
-    status: gardenStatuses[statusIdx],
-    plantName: plantNames[plantIdx],
-    plantGrowStage: growthStages[gardenIdInt % growthStages.length],
-    plantStartDate: randomDate(oneMonthAgo, now),
-    plantDuration: Math.floor(Math.random() * 60) + 60,
-    createdAt: randomDate(sixMonthsAgo, twoMonthsAgo),
-    updatedAt: now,
-    sensors: [],
-    sensorData: [],
-    alerts: [],
-    activities: [],
-    weatherData: [],
-    hourlyForecast: [],
-    dailyForecast: [],
-    task: [],
-    wateringSchedule: [],
-    post: [],
-  };
-};
-
-// Mock Weather Observation Generator
-const generateMockWeatherObservation = (): any => {
-  // Replace WeatherMain enum with hardcoded values as import failed
-  const weatherMains = [
-    "Clear",
-    "Clouds",
-    "Rain",
-    "Drizzle",
-    "Thunderstorm",
-    "Snow",
-    "Atmosphere",
-  ];
-  const weatherDescs = [
-    "trời quang",
-    "ít mây",
-    "mây rải rác",
-    "nhiều mây",
-    "mưa rào",
-    "mưa",
-    "dông",
-    "tuyết",
-    "sương mù",
-  ];
-  const iconCodes = [
-    "01d",
-    "02d",
-    "03d",
-    "04d",
-    "09d",
-    "10d",
-    "11d",
-    "13d",
-    "50d",
-  ];
-  const randomIdx = Math.floor(Math.random() * weatherMains.length);
-
-  return {
-    id: Math.floor(Math.random() * 10000),
-    gardenId: 0,
-    observedAt: new Date(),
-    temp: parseFloat((Math.random() * 15 + 20).toFixed(1)),
-    feelsLike: parseFloat((Math.random() * 15 + 20).toFixed(1)),
-    dewPoint: parseFloat((Math.random() * 10 + 15).toFixed(1)),
-    pressure: Math.round(Math.random() * 50 + 1000),
-    humidity: Math.round(Math.random() * 40 + 40),
-    clouds: Math.round(Math.random() * 100),
-    visibility: Math.round(Math.random() * 10000),
-    uvi: parseFloat((Math.random() * 11).toFixed(1)),
-    windSpeed: parseFloat((Math.random() * 10).toFixed(1)),
-    windDeg: Math.round(Math.random() * 360),
-    windGust:
-      Math.random() < 0.7
-        ? parseFloat((Math.random() * 15).toFixed(1))
-        : undefined,
-    rain1h:
-      Math.random() < 0.3
-        ? parseFloat((Math.random() * 20).toFixed(1))
-        : undefined,
-    snow1h:
-      Math.random() < 0.1
-        ? parseFloat((Math.random() * 10).toFixed(1))
-        : undefined,
-    weatherMain: weatherMains[randomIdx],
-    weatherDesc: weatherDescs[randomIdx % weatherDescs.length],
-    iconCode: iconCodes[randomIdx % iconCodes.length],
-    GardenActivity: [],
-  };
-};
-
-// Mock Sensor Info Generator (for SensorDetailView component)
-const generateMockSensors = (gardenId: string): SensorInfo[] => {
-  const sensorTypes = Object.values(SensorType);
-  const sensors: SensorInfo[] = [];
-  const now = Date.now();
-  let numericIdCounter = 0;
-
-  sensorTypes.forEach((type, index) => {
-    if (type === SensorType.SOIL_PH && Math.random() > 0.5) return;
-    if (type === SensorType.RAINFALL && Math.random() > 0.6) return;
-    if (type === SensorType.WATER_LEVEL && Math.random() > 0.7) return;
-
-    numericIdCounter++;
-    let value: number;
-    let unit: string;
-    let icon: string;
-    let name: string;
-    const statuses: ("normal" | "warning" | "critical")[] = [
-      "normal",
-      "warning",
-      "critical",
-    ];
-    // Note: SensorInfo doesn't have a status field either, this is just for local mock logic
-    // const status = statuses[Math.floor(Math.random() * statuses.length)];
-
-    switch (type) {
-      case SensorType.TEMPERATURE:
-        value = parseFloat((Math.random() * 15 + 18).toFixed(1));
-        unit = "°C";
-        icon = "thermometer";
-        name = "Nhiệt độ";
-        break;
-      case SensorType.HUMIDITY:
-        value = Math.round(Math.random() * 50 + 40);
-        unit = "%";
-        icon = "water-percent";
-        name = "Độ ẩm";
-        break;
-      case SensorType.SOIL_MOISTURE:
-        value = Math.round(Math.random() * 60 + 20);
-        unit = "%";
-        icon = "water";
-        name = "Độ ẩm đất";
-        break;
-      case SensorType.LIGHT:
-        value = Math.round(Math.random() * 20000 + 5000);
-        unit = " lux";
-        icon = "white-balance-sunny";
-        name = "Ánh sáng";
-        break;
-      case SensorType.WATER_LEVEL:
-        value = parseFloat((Math.random() * 10 + 5).toFixed(1));
-        unit = " cm";
-        icon = "waves";
-        name = "Mực nước";
-        break;
-      case SensorType.RAINFALL:
-        value = parseFloat((Math.random() * 5).toFixed(1));
-        unit = " mm/h";
-        icon = "weather-pouring";
-        name = "Lượng mưa";
-        break;
-      case SensorType.SOIL_PH:
-        value = parseFloat((Math.random() * 1.5 + 5.5).toFixed(1));
-        unit = " pH";
-        icon = "flask-outline";
-        name = "Độ pH Đất";
-        break;
-      default:
-        value = 0;
-        unit = "";
-        icon = "help-circle-outline";
-        name = "Unknown";
-    }
-
-    // Generate mock readings for SensorInfo
-    const mockReadings: { timestamp: string; value: number }[] = [];
-    const baseTime = Date.now() - 24 * 60 * 60 * 1000; // 24 hours ago
-    for (let h = 0; h < 24; h++) {
-      mockReadings.push({
-        timestamp: new Date(baseTime + h * 60 * 60 * 1000).toISOString(),
-        value: parseFloat(
-          (value + (Math.random() - 0.5) * (value * 0.1)).toFixed(1)
-        ), // Value +/- 10%
-      });
-    }
-
-    sensors.push({
-      // id: `${gardenId}-${type}-${index}`, // <-- Original string ID causing error
-      id: numericIdCounter * 1000 + index, // <-- Generate a simple numeric ID
-      type: type,
-      // Properties expected by SensorInfo interface:
-      sensorKey: `${type.toLowerCase()}_${gardenId}_${index}`,
-      createdAt: new Date(
-        now - Math.random() * 30 * 24 * 60 * 60 * 1000
-      ).toISOString(), // Within last month
-      updatedAt: new Date(now - Math.random() * 60 * 1000).toISOString(), // Within last minute
-      lastReading: mockReadings[mockReadings.length - 1]?.value ?? value, // Use last reading or current generated value
-      readings: mockReadings,
-      // Properties NOT in SensorInfo (remove name, value, unit, status, icon, lastUpdated):
-      // name: name, // Error: 'name' does not exist in type 'SensorInfo'.
-      // value: value,
-      // unit: unit,
-      // status: status,
-      // icon: icon, // Not part of SensorInfo
-      // lastUpdated: new Date(now - Math.random() * 60 * 60 * 1000).toISOString(),
-    });
-  });
-
-  return sensors;
-};
-
-// Mock Alerts Generator (Using AlertListItem type for component)
-const generateMockAlerts = (gardenId: string): AlertListItem[] => {
-  const alerts: AlertListItem[] = [];
-  const alertTypes = Object.values(AlertType).filter(
-    (t) => t !== AlertType.OTHER
-  );
-  const alertStatuses = Object.values(AlertStatus).filter(
-    (s) => s !== AlertStatus.RESOLVED && s !== AlertStatus.IGNORED
-  );
-  const count = Math.floor(Math.random() * 4);
-
-  for (let i = 0; i < count; i++) {
-    const type = alertTypes[Math.floor(Math.random() * alertTypes.length)];
-    const status =
-      alertStatuses[Math.floor(Math.random() * alertStatuses.length)];
-    let message = "";
-    let suggestion: string | undefined = undefined;
-
-    switch (type) {
-      case AlertType.WEATHER:
-        message = "Dự báo có mưa lớn sắp tới.";
-        suggestion = "Che chắn cây trồng nếu cần.";
-        break;
-      case AlertType.SENSOR_ERROR:
-        message = `Cảm biến ${SensorType.TEMPERATURE} mất kết nối.`;
-        suggestion = "Kiểm tra nguồn và kết nối.";
-        break;
-      case AlertType.PLANT_CONDITION:
-        message = "Phát hiện dấu hiệu sâu bệnh trên lá.";
-        suggestion = "Kiểm tra và xử lý sớm.";
-        break;
-      case AlertType.ACTIVITY:
-        message = "Lượng nước tưới có vẻ hơi nhiều.";
-        break;
-      case AlertType.MAINTENANCE:
-        message = "Đã đến lúc kiểm tra pin cảm biến.";
-        break;
-      case AlertType.SYSTEM:
-        message = "Mất điện tạm thời tại khu vườn.";
-        break;
-      case AlertType.SECURITY:
-        message = "Phát hiện chuyển động bất thường.";
-        break;
-      default:
-        message = "Cảnh báo chung.";
-    }
-
-    alerts.push({
-      id: `${gardenId}-alert-${i}`,
-      type: type,
-      message: message,
-      suggestion: suggestion,
-      timestamp: new Date(
-        Date.now() - Math.random() * 24 * 60 * 60 * 1000
-      ).toISOString(),
-      status: status,
-    });
-  }
-  return alerts;
-};
-
-// Mock Watering Schedule Generator
-const generateMockWateringSchedule = (gardenId: string): any[] => {
-  const schedules: any[] = [];
-  const count = Math.floor(Math.random() * 5) + 1; // 1 to 5 schedules
-
-  for (let i = 0; i < count; i++) {
-    const isPast = Math.random() > 0.4;
-    const scheduledAt = new Date(
-      Date.now() + (isPast ? -1 : 1) * (i + 1) * 12 * 60 * 60 * 1000
-    );
-    let status: "PENDING" | "COMPLETED" | "SKIPPED";
-    if (isPast) {
-      status = Math.random() > 0.3 ? "COMPLETED" : "SKIPPED";
-    } else {
-      status = "PENDING";
-    }
-
-    schedules.push({
-      id: Date.now() + i, // Use timestamp + index for robust unique numeric ID
-      gardenId: parseInt(gardenId),
-      scheduledAt: scheduledAt,
-      amount: parseFloat((Math.random() * 1 + 0.2).toFixed(1)),
-      status: status as TaskStatus,
-      createdAt: new Date(scheduledAt.getTime() - 60 * 60 * 1000),
-      updatedAt: new Date(),
-      tasks: [],
-      garden: {} as any,
-    });
-  }
-  return schedules.sort(
-    (a, b) => a.scheduledAt.getTime() - b.scheduledAt.getTime()
-  );
-};
-
-// Mock Activities Generator
-const generateMockActivities = (gardenId: string): ActivityListItem[] => {
-  const activities: ActivityListItem[] = [];
-  const activityTypes = Object.values(ActivityType);
-  const count = Math.floor(Math.random() * 8) + 3;
-
-  for (let i = 0; i < count; i++) {
-    const type =
-      activityTypes[Math.floor(Math.random() * activityTypes.length)];
-    let name = "";
-    let icon:
-      | keyof typeof MaterialCommunityIcons.glyphMap
-      | keyof typeof Ionicons.glyphMap = "leaf-outline";
-
-    switch (type) {
-      case ActivityType.PLANTING:
-        name = "Trồng cây mới";
-        icon = "sprout";
-        break;
-      case ActivityType.WATERING:
-        name = "Tưới nước";
-        icon = "water";
-        break;
-      case ActivityType.FERTILIZING:
-        name = "Bón phân";
-        icon = "flask-outline";
-        break;
-      case ActivityType.PRUNING:
-        name = "Tỉa cành";
-        icon = "content-cut";
-        break;
-      case ActivityType.HARVESTING:
-        name = "Thu hoạch";
-        icon = "basket-outline";
-        break;
-      // case ActivityType.PEST_CONTROL: // <-- Comment out - Property not found
-      //   name = "Kiểm tra sâu bệnh";
-      //   icon = "bug-outline";
-      //   break;
-      // case ActivityType.SOIL_TESTING: // <-- Error: Property 'SOIL_TESTING' does not exist...
-      //   name = "Kiểm tra đất";
-      //   icon = "test-tube";
-      //  break;
-      // name = "Kiểm tra sâu bệnh";
-      // icon = "bug-outline";
-      // break;
-      // case ActivityType.SOIL_TESTING: // <-- Comment out - Property not found
-      //   name = "Kiểm tra đất";
-      //   icon = "test-tube";
-      // break;
-      // case ActivityType.WEEDING: // <-- Comment out - Property not found
-      // name = "Nhổ cỏ";
-      // icon = "grass";
-      // break;
-      //   name = "Nhổ cỏ";
-      //   icon = "grass";
-      // break;
-      default:
-        name = "Hoạt động khác";
-    }
-
-    activities.push({
-      id: `${gardenId}-act-${i}`,
-      name: name,
-      type: type,
-      icon: icon,
-      timestamp: new Date(
-        Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000
-      ).toISOString(),
-      details: `Đã ${name.toLowerCase()} cho cây cà chua.`,
-    });
-  }
-  return activities.sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-  );
-};
 
 enum DetailSectionType {
-  HEADER_INFO = "HEADER_INFO",
   STATUS = "STATUS",
   WEATHER = "WEATHER",
   ALERTS = "ALERTS",
@@ -530,38 +67,94 @@ export default function GardenDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // State for garden data (using Prisma types where possible)
-  const [garden, setGarden] = useState<any | null>(null);
-  const [currentWeather, setCurrentWeather] = useState<any | null>(null);
-  const [hourlyForecast, setHourlyForecast] = useState<any[]>([]);
-  const [dailyForecast, setDailyForecast] = useState<any[]>([]);
-  const [sensors, setSensors] = useState<SensorInfo[]>([]);
-  const [alerts, setAlerts] = useState<AlertListItem[]>([]);
-  const [wateringSchedule, setWateringSchedule] = useState<any[]>([]);
-  const [activities, setActivities] = useState<ActivityListItem[]>([]);
-
-  // Load garden data using mock generators
+  // State for garden data
+  const [garden, setGarden] = useState<Garden | null>(null);
+  const [currentWeather, setCurrentWeather] = useState<WeatherObservation | null>(null);
+  const [hourlyForecast, setHourlyForecast] = useState<HourlyForecast[]>([]);
+  const [dailyForecast, setDailyForecast] = useState<DailyForecast[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [wateringSchedule, setWateringSchedule] = useState<WateringScheduleItem[]>([]);
+  const [activities, setActivities] = useState<GardenActivity[]>([]);
+  const [sensors, setSensors] = useState<Sensor[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Load garden data using API calls
   const loadGardenData = useCallback(async (gardenId: string) => {
     if (!gardenId) return;
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    setError(null);
+    
     try {
-      const gardenData = generateMockGarden(gardenId);
-      const weatherData = generateMockWeatherObservation();
-      weatherData.gardenId = gardenData.id;
-      const sensorData = generateMockSensors(gardenId);
-      const alertData = generateMockAlerts(gardenId);
-      const scheduleData = generateMockWateringSchedule(gardenId);
-      const activityData = generateMockActivities(gardenId);
-
+      // Load garden details
+      const gardenData = await gardenService.getGardenById(gardenId);
       setGarden(gardenData);
-      setCurrentWeather(weatherData);
-      setSensors(sensorData);
-      setAlerts(alertData);
-      setWateringSchedule(scheduleData);
-      setActivities(activityData);
+      
+      // Load weather data
+      try {
+        const weatherData = await weatherService.getCurrentWeather(gardenId);
+        setCurrentWeather(weatherData);
+      } catch (error) {
+        console.error("Failed to load weather data:", error);
+        setCurrentWeather(null);
+      }
+      
+      // Load hourly forecast
+      try {
+        const hourlyData = await weatherService.getHourlyForecast(gardenId);
+        setHourlyForecast(hourlyData);
+      } catch (error) {
+        console.error("Failed to load hourly forecast:", error);
+        setHourlyForecast([]);
+      }
+      
+      // Load daily forecast
+      try {
+        const dailyData = await weatherService.getDailyForecast(gardenId);
+        setDailyForecast(dailyData);
+      } catch (error) {
+        console.error("Failed to load daily forecast:", error);
+        setDailyForecast([]);
+      }
+      
+      // Load sensors
+      try {
+        const sensorData = await sensorService.getSensorsByGarden(gardenId);
+        setSensors(sensorData);
+      } catch (error) {
+        console.error("Failed to load sensor data:", error);
+        setSensors([]);
+      }
+      
+      // Load alerts
+      try {
+        const alertData = await weatherService.getAlertsByGarden(gardenId);
+        setAlerts(alertData);
+      } catch (error) {
+        console.error("Failed to load alerts:", error);
+        setAlerts([]);
+      }
+      
+      // Load watering schedule
+      try {
+        const response = await apiClient.get(`/gardens/${gardenId}/watering-schedule`);
+        setWateringSchedule(response.data);
+      } catch (error) {
+        console.error("Failed to load watering schedule:", error);
+        setWateringSchedule([]);
+      }
+      
+      // Load activities
+      try {
+        const response = await taskService.getActivitiesByGarden(gardenId);
+        setActivities(response);
+      } catch (error) {
+        console.error("Failed to load activities:", error);
+        setActivities([]);
+      }
+      
     } catch (error) {
       console.error("Failed to load garden data:", error);
+      setError("Failed to load garden data. Please try again.");
       setGarden(null);
     } finally {
       setIsLoading(false);
@@ -569,33 +162,49 @@ export default function GardenDetailScreen() {
   }, []);
 
   useEffect(() => {
-    if (id && typeof id === "string") {
-      loadGardenData(id);
+    if (id) {
+      loadGardenData(id).then(r => console.log(r));
     }
   }, [id, loadGardenData]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    if (id && typeof id === "string") {
+    if (id) {
       loadGardenData(id).finally(() => setRefreshing(false));
     } else {
       setRefreshing(false);
     }
   }, [id, loadGardenData]);
 
-  const handleResolveAlert = (alertId: string) => {
-    setAlerts((prevAlerts) =>
-      prevAlerts.map((alert) =>
-        alert.id === alertId
-          ? { ...alert, status: AlertStatus.RESOLVED }
-          : alert
-      )
-    );
+  const handleResolveAlert = async (alertId: number) => {
+    try {
+      await weatherService.resolveAlert(alertId);
+
+      setAlerts((prevAlerts) =>
+        prevAlerts.map((alert) =>
+          alert.id === alertId
+            ? { ...alert, status: AlertStatus.RESOLVED }
+            : alert
+        )
+      );
+    } catch (error) {
+      console.error("Failed to resolve alert:", error);
+      // Show error toast or message
+    }
   };
-  const handleIgnoreAlert = (alertId: string) => {
-    setAlerts((prevAlerts) =>
-      prevAlerts.filter((alert) => alert.id !== alertId)
-    );
+  
+  const handleIgnoreAlert = async (alertId: number) => {
+    try {
+      // Assuming there's an API endpoint to ignore alerts
+      await apiClient.post(`/alerts/${alertId}/ignore`);
+      
+      setAlerts((prevAlerts) =>
+        prevAlerts.filter((alert) => alert.id !== alertId)
+      );
+    } catch (error) {
+      console.error("Failed to ignore alert:", error);
+      // Show error toast or message
+    }
   };
 
   const getStatusColor = (
@@ -758,7 +367,7 @@ export default function GardenDetailScreen() {
                 dailyForecast={item.dailyForecast}
               />
             ) : (
-              <Text style={styles.noDataText}>Loading weather...</Text>
+              <Text style={styles.noDataText}>Đang tải dữ liệu thời tiết...</Text>
             )}
           </View>
         );
@@ -766,8 +375,8 @@ export default function GardenDetailScreen() {
         return (
           <AlertsList
             alerts={item}
-            onResolveAlert={handleResolveAlert}
-            onIgnoreAlert={handleIgnoreAlert}
+            onResolveAlert={(alertId: string) => handleResolveAlert(Number(alertId))}
+            onIgnoreAlert={(alertId: string) => handleIgnoreAlert(Number(alertId))}
           />
         );
       case DetailSectionType.SCHEDULE:
@@ -829,6 +438,7 @@ export default function GardenDetailScreen() {
         return (
           <SensorDetailView
             sensors={item}
+            data={item}
             onSelectSensor={(sensor) => router.push(`/sensors/${sensor.id}`)}
           />
         );
@@ -994,12 +604,24 @@ export default function GardenDetailScreen() {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <Feather name="alert-triangle" size={40} color={theme.error} />
-        <Text style={styles.errorText}>Không thể tải dữ liệu vườn.</Text>
+        <Text style={styles.errorText}>
+          {error || "Không thể tải dữ liệu vườn."}
+        </Text>
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButtonOnError}
         >
           <Text style={styles.backButtonText}>Quay lại</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => {
+            if (id) {
+              loadGardenData(id).then(r => console.log(r));
+            }
+          }}
+          style={[styles.backButtonOnError, { marginTop: 10, backgroundColor: theme.secondary }]}
+        >
+          <Text style={styles.backButtonText}>Thử lại</Text>
         </TouchableOpacity>
       </View>
     );
@@ -1012,11 +634,9 @@ export default function GardenDetailScreen() {
         sections={sections}
         keyExtractor={(item, index) => {
           // Ensure a unique string key even if item.id is missing/invalid
-          const keySuffix =
-            typeof item?.id === "string" || typeof item?.id === "number"
+          return typeof item?.id === "string" || typeof item?.id === "number"
               ? item.id.toString()
               : `idx-${index}`;
-          return keySuffix;
         }}
         renderItem={renderSectionItem}
         renderSectionHeader={renderSectionHeader}

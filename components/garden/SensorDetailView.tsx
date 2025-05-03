@@ -10,83 +10,85 @@ import {
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { LineChart } from "react-native-chart-kit";
-
-// Types based on Prisma schema
-export type SensorType =
-  | "HUMIDITY"
-  | "TEMPERATURE"
-  | "LIGHT"
-  | "WATER_LEVEL"
-  | "RAINFALL"
-  | "SOIL_MOISTURE"
-  | "SOIL_PH";
-
-interface SensorReading {
-  timestamp: string;
-  value: number;
-}
-
-export interface SensorInfo {
-  id: number;
-  sensorKey: string;
-  type: SensorType;
-  createdAt: string;
-  updatedAt: string;
-  lastReading?: number;
-  readings: SensorReading[];
-}
+import { Sensor, SensorType, SensorData } from "@/types";
 
 interface SensorDetailViewProps {
-  sensors: SensorInfo[];
-  onSelectSensor?: (sensor: SensorInfo) => void;
+  // Danh sách các sensor (metadata)
+  sensors: Sensor[];
+  // Toàn bộ readings của mọi sensor
+  data: SensorData[];
+  onSelectSensor?: (sensor: Sensor) => void;
 }
-
-// Function to convert hex color to RGB (simplified, assumes hex is valid)
-const hexToRgb = (hex: string) => {
-  let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result
-    ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16),
-      }
-    : { r: 0, g: 0, b: 0 }; // Fallback to black
-};
 
 export default function SensorDetailView({
   sensors,
+  data,
   onSelectSensor,
 }: SensorDetailViewProps) {
   const theme = useAppTheme();
-  const [selectedSensor, setSelectedSensor] = useState<SensorInfo | null>(
+  const [selectedSensor, setSelectedSensor] = useState<Sensor | null>(
     sensors.length > 0 ? sensors[0] : null
   );
 
-  const screenWidth = Dimensions.get("window").width - 32; // Account for padding
+  const screenWidth = Dimensions.get("window").width - 32;
 
-  const handleSelectSensor = (sensor: SensorInfo) => {
+  const handleSelectSensor = (sensor: Sensor) => {
     setSelectedSensor(sensor);
-    if (onSelectSensor) {
-      onSelectSensor(sensor);
-    }
+    onSelectSensor?.(sensor);
   };
 
-  // Sensor icon and unit mapping
+  // Lọc readings chỉ cho sensor đang chọn
+  const readings = selectedSensor
+    ? data.filter((d) => d.sensorId === selectedSensor.id)
+    : [];
+
+  // Sắp xếp readings theo thời gian tăng dần
+  const sortedReadings = [...readings].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  // Lấy reading cuối cùng để hiển thị current value
+  const latestReading = sortedReadings[sortedReadings.length - 1];
+
+  // Chuẩn bị data cho chart: chỉ lấy tối đa 24 readings cuối
+  const chartReadings = sortedReadings.slice(-24);
+
+  const formatChartData = (readings: SensorData[], type: SensorType) => ({
+    labels: readings.map((r) => {
+      const d = new Date(r.timestamp);
+      return `${d.getHours()}:${d.getMinutes().toString().padStart(2, "0")}`;
+    }),
+    datasets: [
+      {
+        data: readings.map((r) => r.value),
+        color: () => theme.primary,
+        strokeWidth: 2,
+      },
+    ],
+    legend: [getSensorName(type)],
+  });
+
+  const chartData = formatChartData(
+    chartReadings,
+    selectedSensor?.type ?? SensorType.TEMPERATURE
+  );
+
+  // Tiện helper (giữ nguyên từ bản cũ)
   const getSensorIcon = (type: SensorType) => {
     switch (type) {
-      case "TEMPERATURE":
+      case SensorType.TEMPERATURE:
         return "temperature-high";
-      case "HUMIDITY":
+      case SensorType.HUMIDITY:
         return "cloud-rain";
-      case "SOIL_MOISTURE":
+      case SensorType.SOIL_MOISTURE:
         return "water";
-      case "LIGHT":
+      case SensorType.LIGHT:
         return "sun";
-      case "WATER_LEVEL":
+      case SensorType.WATER_LEVEL:
         return "layer-group";
-      case "RAINFALL":
+      case SensorType.RAINFALL:
         return "cloud-showers-heavy";
-      case "SOIL_PH":
+      case SensorType.SOIL_PH:
         return "vial";
       default:
         return "question";
@@ -95,17 +97,17 @@ export default function SensorDetailView({
 
   const getSensorUnit = (type: SensorType) => {
     switch (type) {
-      case "TEMPERATURE":
+      case SensorType.TEMPERATURE:
         return "°C";
-      case "HUMIDITY":
-      case "SOIL_MOISTURE":
-      case "LIGHT":
+      case SensorType.HUMIDITY:
+      case SensorType.SOIL_MOISTURE:
+      case SensorType.LIGHT:
         return "%";
-      case "WATER_LEVEL":
+      case SensorType.WATER_LEVEL:
         return "cm";
-      case "RAINFALL":
+      case SensorType.RAINFALL:
         return "mm";
-      case "SOIL_PH":
+      case SensorType.SOIL_PH:
         return "pH";
       default:
         return "";
@@ -114,19 +116,19 @@ export default function SensorDetailView({
 
   const getSensorName = (type: SensorType) => {
     switch (type) {
-      case "TEMPERATURE":
+      case SensorType.TEMPERATURE:
         return "Nhiệt độ";
-      case "HUMIDITY":
+      case SensorType.HUMIDITY:
         return "Độ ẩm";
-      case "SOIL_MOISTURE":
+      case SensorType.SOIL_MOISTURE:
         return "Độ ẩm đất";
-      case "LIGHT":
+      case SensorType.LIGHT:
         return "Ánh sáng";
-      case "WATER_LEVEL":
+      case SensorType.WATER_LEVEL:
         return "Mực nước";
-      case "RAINFALL":
+      case SensorType.RAINFALL:
         return "Lượng mưa";
-      case "SOIL_PH":
+      case SensorType.SOIL_PH:
         return "Độ pH đất";
       default:
         return "Không rõ";
@@ -134,33 +136,32 @@ export default function SensorDetailView({
   };
 
   const getSensorStatus = (type: SensorType, value: number) => {
-    // These thresholds would ideally come from a configuration or be plant-specific
+    // Giữ nguyên logic thresholds từ bản cũ...
     switch (type) {
-      case "TEMPERATURE":
+      case SensorType.TEMPERATURE:
         if (value < 10 || value > 35) return "critical";
         if (value < 15 || value > 30) return "warning";
         return "normal";
-      case "HUMIDITY":
+      case SensorType.HUMIDITY:
         if (value < 30 || value > 90) return "critical";
         if (value < 40 || value > 80) return "warning";
         return "normal";
-      case "SOIL_MOISTURE":
+      case SensorType.SOIL_MOISTURE:
         if (value < 20) return "critical";
         if (value < 40) return "warning";
         return "normal";
-      case "LIGHT":
+      case SensorType.LIGHT:
         if (value < 30) return "critical";
         if (value < 50) return "warning";
         return "normal";
-      case "WATER_LEVEL":
+      case SensorType.WATER_LEVEL:
         if (value < 5) return "critical";
         if (value < 10) return "warning";
         return "normal";
-      case "RAINFALL":
-        // For rainfall, high values might be concerning but not necessarily critical
+      case SensorType.RAINFALL:
         if (value > 50) return "warning";
         return "normal";
-      case "SOIL_PH":
+      case SensorType.SOIL_PH:
         if (value < 5.5 || value > 7.5) return "critical";
         if (value < 6.0 || value > 7.0) return "warning";
         return "normal";
@@ -182,8 +183,7 @@ export default function SensorDetailView({
     }
   };
 
-  // Helper function to display Vietnamese status text
-  const getStatusText = (status: string): string => {
+  const getStatusText = (status: string) => {
     switch (status) {
       case "normal":
         return "Bình thường";
@@ -196,51 +196,14 @@ export default function SensorDetailView({
     }
   };
 
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    // Use Vietnamese locale
-    return date.toLocaleString("vi-VN", {
+  const formatDateTime = (ts: string) =>
+    new Date(ts).toLocaleString("vi-VN", {
       month: "numeric",
       day: "numeric",
       hour: "numeric",
       minute: "2-digit",
       hour12: false,
     });
-  };
-
-  // Format data for the chart
-  const formatChartData = (
-    readings: SensorReading[],
-    sensorType: SensorType
-  ) => {
-    // Sort readings by timestamp
-    const sortedReadings = [...readings].sort(
-      (a, b) =>
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-    );
-
-    // Take last 24 readings (or all if less than 24)
-    const displayReadings = sortedReadings.slice(-24);
-
-    return {
-      labels: displayReadings.map((reading) => {
-        const date = new Date(reading.timestamp);
-        // Format label as HH:mm
-        return `${date.getHours()}:${date
-          .getMinutes()
-          .toString()
-          .padStart(2, "0")}`;
-      }),
-      datasets: [
-        {
-          data: displayReadings.map((reading) => reading.value),
-          color: () => theme.primary,
-          strokeWidth: 2,
-        },
-      ],
-      legend: [getSensorName(sensorType)],
-    };
-  };
 
   if (!selectedSensor) {
     return (
@@ -252,24 +215,22 @@ export default function SensorDetailView({
     );
   }
 
-  const chartData = formatChartData(
-    selectedSensor.readings,
-    selectedSensor.type
-  );
+  const status = latestReading
+    ? getSensorStatus(selectedSensor.type, latestReading.value)
+    : "normal";
+  const statusColor = getStatusColor(status);
 
-  // Filter labels further for display
-  const chartLabelsFiltered = chartData.labels.filter(
-    (_, index) => index % Math.ceil(chartData.labels.length / 4) === 0
-  ); // Show max ~4-5 labels
-
-  const sensorStatus = getSensorStatus(
-    selectedSensor.type,
-    selectedSensor.lastReading || 0
-  );
-  const statusColor = getStatusColor(sensorStatus);
-  const statusText = getStatusText(sensorStatus);
-
-  // Get RGB values for chart configuration
+  // Tách RGB cho chart
+  const hexToRgb = (hex: string) => {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return m
+      ? {
+          r: parseInt(m[1], 16),
+          g: parseInt(m[2], 16),
+          b: parseInt(m[3], 16),
+        }
+      : { r: 0, g: 0, b: 0 };
+  };
   const primaryRgb = hexToRgb(theme.primary);
 
   return (
@@ -278,6 +239,7 @@ export default function SensorDetailView({
         Số liệu cảm biến
       </Text>
 
+      {/* Tabs chọn sensor */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -288,7 +250,7 @@ export default function SensorDetailView({
             key={sensor.id}
             style={[
               styles.sensorTab,
-              selectedSensor?.id === sensor.id
+              selectedSensor.id === sensor.id
                 ? {
                     backgroundColor: theme.primaryLight,
                     borderColor: theme.primary,
@@ -301,7 +263,7 @@ export default function SensorDetailView({
               name={getSensorIcon(sensor.type)}
               size={18}
               color={
-                selectedSensor?.id === sensor.id
+                selectedSensor.id === sensor.id
                   ? theme.primary
                   : theme.textSecondary
               }
@@ -309,7 +271,7 @@ export default function SensorDetailView({
             <Text
               style={[
                 styles.sensorTabText,
-                selectedSensor?.id === sensor.id
+                selectedSensor.id === sensor.id
                   ? { color: theme.primary, fontFamily: "Inter-SemiBold" }
                   : { color: theme.textSecondary },
               ]}
@@ -321,6 +283,7 @@ export default function SensorDetailView({
         ))}
       </ScrollView>
 
+      {/* Thông tin sensor đang chọn */}
       <View style={styles.selectedSensorContainer}>
         <View style={styles.sensorHeader}>
           <View style={styles.sensorTypeContainer}>
@@ -340,8 +303,7 @@ export default function SensorDetailView({
               {getSensorName(selectedSensor.type)}
             </Text>
           </View>
-
-          {selectedSensor.lastReading !== undefined && (
+          {latestReading && (
             <View style={styles.currentValueContainer}>
               <Text
                 style={[
@@ -352,7 +314,7 @@ export default function SensorDetailView({
                 Số liệu hiện tại:
               </Text>
               <Text style={[styles.currentValue, { color: statusColor }]}>
-                {selectedSensor.lastReading}
+                {latestReading.value}
                 <Text style={styles.unit}>
                   {getSensorUnit(selectedSensor.type)}
                 </Text>
@@ -360,19 +322,25 @@ export default function SensorDetailView({
               <View
                 style={[styles.statusBadge, { backgroundColor: statusColor }]}
               >
-                <Text style={styles.statusText}>{statusText}</Text>
+                <Text style={styles.statusText}>{getStatusText(status)}</Text>
               </View>
             </View>
           )}
         </View>
 
+        {/* Biểu đồ 24h */}
         <View style={styles.chartContainer}>
           <Text style={[styles.chartTitle, { color: theme.textSecondary }]}>
             Lịch sử 24 giờ
           </Text>
-          {selectedSensor.readings.length > 0 ? (
+          {chartReadings.length > 0 ? (
             <LineChart
-              data={{ ...chartData, labels: chartLabelsFiltered }}
+              data={{
+                ...chartData,
+                labels: chartData.labels.filter(
+                  (_, i) => i % Math.ceil(chartData.labels.length / 4) === 0
+                ),
+              }}
               width={screenWidth - 40}
               height={200}
               chartConfig={{
@@ -382,10 +350,8 @@ export default function SensorDetailView({
                 decimalPlaces: 1,
                 color: (opacity = 1) =>
                   `rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, ${opacity})`,
-                labelColor: (opacity = 1) => theme.textSecondary,
-                style: {
-                  borderRadius: 8,
-                },
+                labelColor: () => theme.textSecondary,
+                style: { borderRadius: 8 },
                 propsForDots: {
                   r: "4",
                   strokeWidth: "1",
@@ -398,13 +364,8 @@ export default function SensorDetailView({
               }}
               bezier
               style={styles.chartStyle}
-              withInnerLines={true}
-              withOuterLines={false}
-              withVerticalLabels={true}
-              withHorizontalLabels={true}
-              fromZero={false}
               segments={4}
-              verticalLabelRotation={30}
+              fromZero={false}
             />
           ) : (
             <View style={styles.noChartDataContainer}>
@@ -417,58 +378,54 @@ export default function SensorDetailView({
           )}
         </View>
 
+        {/* Bảng 10 readings mới nhất */}
         <View style={styles.latestReadingsContainer}>
           <Text style={[styles.latestReadingsTitle, { color: theme.text }]}>
             Latest Readings
           </Text>
           <ScrollView style={styles.readingsTable}>
-            {selectedSensor.readings.length > 0 ? (
-              selectedSensor.readings
-                .slice()
-                .sort((a, b) => {
+            {sortedReadings.length > 0 ? (
+              sortedReadings
+                .slice(-10)
+                .reverse()
+                .map((r, idx) => {
+                  const s = getSensorStatus(selectedSensor.type, r.value);
                   return (
-                    new Date(b.timestamp).getTime() -
-                    new Date(a.timestamp).getTime()
-                  );
-                })
-                .slice(0, 10)
-                .map((reading, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.readingRow,
-                      {
-                        backgroundColor:
-                          index % 2 === 0
-                            ? theme.backgroundSecondary
-                            : theme.card,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.readingTimestamp,
-                        { color: theme.textSecondary },
-                      ]}
-                    >
-                      {formatDateTime(reading.timestamp)}
-                    </Text>
-                    <Text style={[styles.readingValue, { color: theme.text }]}>
-                      {reading.value}
-                      {getSensorUnit(selectedSensor.type)}
-                    </Text>
                     <View
+                      key={idx}
                       style={[
-                        styles.readingStatus,
+                        styles.readingRow,
                         {
-                          backgroundColor: getStatusColor(
-                            getSensorStatus(selectedSensor.type, reading.value)
-                          ),
+                          backgroundColor:
+                            idx % 2 === 0
+                              ? theme.backgroundSecondary
+                              : theme.card,
                         },
                       ]}
-                    />
-                  </View>
-                ))
+                    >
+                      <Text
+                        style={[
+                          styles.readingTimestamp,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        {formatDateTime(r.timestamp)}
+                      </Text>
+                      <Text
+                        style={[styles.readingValue, { color: theme.text }]}
+                      >
+                        {r.value}
+                        {getSensorUnit(selectedSensor.type)}
+                      </Text>
+                      <View
+                        style={[
+                          styles.readingStatus,
+                          { backgroundColor: getStatusColor(s) },
+                        ]}
+                      />
+                    </View>
+                  );
+                })
             ) : (
               <Text
                 style={[styles.noReadingsText, { color: theme.textSecondary }]}

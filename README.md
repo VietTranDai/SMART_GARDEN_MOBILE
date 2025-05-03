@@ -10,6 +10,33 @@ A Smart Farm monitoring and control mobile application built with React Native a
 - Analytics and reporting
 - Notifications and alerts
 
+## API Integration
+
+This application has been integrated with a backend API following the Prisma schema. The integration is implemented through a service layer located in `service/api/`:
+
+### API Services
+
+- **Garden Service** (`service/api/garden.service.ts`): Manages garden creation, retrieval, updates, and deletion.
+- **Sensor Service** (`service/api/sensor.service.ts`): Handles sensor data operations and garden monitoring.
+- **Plant Service** (`service/api/plant.service.ts`): Provides plant information, growth stages, and care instructions.
+- **Task Service** (`service/api/task.service.ts`): Manages garden tasks, activities, and evaluations.
+- **Community Service** (`service/api/community.service.ts`): Handles social features like posts, comments, and following.
+- **Weather Service** (`service/api/weather.service.ts`): Provides weather data, forecasts, and alerts.
+- **User Service** (`service/api/user.service.ts`): Manages user profiles and account settings.
+
+All API services are exported from `service/api/index.ts` for easy importing throughout the application.
+
+### API Documentation
+
+The full API documentation is available in `docs/api_documentation.md`. It contains detailed information about all endpoints, request/response formats, and error handling.
+
+### Implementation Details
+
+- All services use `apiClient` for HTTP requests with proper authentication
+- Data types and interfaces match the Prisma schema for type safety
+- Proper error handling is implemented throughout the application
+- Services follow consistent patterns for maintainability
+
 ## Getting Started
 
 ### Prerequisites

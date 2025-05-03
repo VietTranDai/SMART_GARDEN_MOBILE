@@ -17,72 +17,62 @@ import { router } from "expo-router";
 import { Ionicons, AntDesign, Entypo } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import * as ImagePicker from "expo-image-picker";
-
-// Mock data for gardens - in real app, this would come from API
-const MOCK_GARDENS = [
-  {
-    id: "1",
-    name: "Backyard Garden",
-  },
-  {
-    id: "2",
-    name: "Rooftop Garden",
-  },
-  {
-    id: "3",
-    name: "Community Garden",
-  },
-];
-
-// Mock data for tags - in real app, this would come from API
-const MOCK_POPULAR_TAGS = [
-  "Tomatoes",
-  "Organic",
-  "Pests",
-  "Beginner",
-  "Harvest",
-  "Soil",
-  "Seeds",
-  "Indoor",
-  "Flowers",
-  "Vegetables",
-  "Herbs",
-  "Success",
-  "Help",
-  "Question",
-];
+import { communityService, gardenService } from "@/service/api";
+import { Garden, Tag, CreatePostDto } from "@/types";
 
 export default function NewPostScreen() {
   const theme = useAppTheme();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [images, setImages] = useState<string[]>([]);
-  const [tags, setTags] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [tagInput, setTagInput] = useState("");
-  const [selectedGarden, setSelectedGarden] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
+  const [selectedGarden, setSelectedGarden] = useState<Garden | null>(null);
   const [showGardenSelector, setShowGardenSelector] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [loadingImage, setLoadingImage] = useState(false);
+  const [gardens, setGardens] = useState<Garden[]>([]);
+  const [popularTags, setPopularTags] = useState<Tag[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch gardens and tags
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setError(null);
+        const [gardensData, tagsData] = await Promise.all([
+          gardenService.getGardens(),
+          communityService.getTags(),
+        ]);
+
+        setGardens(gardensData);
+        setPopularTags(tagsData);
+      } catch (err) {
+        console.error("Failed to load data:", err);
+        setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Add a tag to the post
-  const handleAddTag = (tag: string) => {
-    const formattedTag = tag.trim().replace(/\s+/g, "-");
+  const handleAddTag = (tag: Tag) => {
     if (
-      formattedTag &&
-      !tags.includes(formattedTag) &&
-      tags.length < 5 // Limit to 5 tags
+      !selectedTags.some((t) => t.id === tag.id) &&
+      selectedTags.length < 5 // Limit to 5 tags
     ) {
-      setTags([...tags, formattedTag]);
+      setSelectedTags([...selectedTags, tag]);
     }
     setTagInput("");
   };
 
   // Remove a tag from the post
-  const handleRemoveTag = (tag: string) => {
-    setTags(tags.filter((t) => t !== tag));
+  const handleRemoveTag = (tagId: number) => {
+    setSelectedTags(selectedTags.filter((t) => t.id !== tagId));
   };
 
   // Pick an image from the device gallery
@@ -125,7 +115,7 @@ export default function NewPostScreen() {
   };
 
   // Submit the post
-  const handleSubmitPost = () => {
+  const handleSubmitPost = async () => {
     if (!title.trim()) {
       Alert.alert("Error", "Please add a title for your post");
       return;
@@ -138,13 +128,71 @@ export default function NewPostScreen() {
 
     setSubmitting(true);
 
-    // In a real app, this would be an API call to create a new post
-    // For now, we simulate a delay and then navigate back
-    setTimeout(() => {
-      setSubmitting(false);
+    try {
+      // Using FormData instead of direct image paths
+      const formData = new FormData();
+      formData.append("title", title.trim());
+      formData.append("content", content.trim());
+
+      // Add tag IDs
+      selectedTags.forEach((tag) => {
+        formData.append("tagIds", tag.id.toString());
+      });
+
+      // Add garden ID if selected
+      if (selectedGarden?.id) {
+        formData.append("gardenId", selectedGarden.id.toString());
+      }
+
+      // Add images
+      images.forEach((image, index) => {
+        // Extract filename from path
+        const filename = image.split("/").pop() || `image_${index}.jpg`;
+
+        // Create file object from URI
+        const file = {
+          uri: image,
+          type: "image/jpeg",
+          name: filename,
+        };
+
+        // @ts-ignore - We need to ignore type checking here as the FormData types don't match React Native's file object
+        formData.append("images", file);
+      });
+
+      // @ts-ignore - Ignore the type error since communityService.createPost expects CreatePostDto but we're sending FormData
+      await communityService.createPost(formData);
+
+      // Navigate back after successful post creation
       router.back();
-    }, 1000);
+    } catch (err) {
+      console.error("Failed to create post:", err);
+      Alert.alert("Error", "Failed to create your post. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <View
+        style={[styles.loadingContainer, { backgroundColor: theme.background }]}
+      >
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View
+        style={[styles.errorContainer, { backgroundColor: theme.background }]}
+      >
+        <Ionicons name="alert-circle-outline" size={40} color={theme.error} />
+        <Text style={[styles.errorText, { color: theme.text }]}>{error}</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -223,7 +271,7 @@ export default function NewPostScreen() {
                   { backgroundColor: theme.cardAlt },
                 ]}
               >
-                {MOCK_GARDENS.map((garden) => (
+                {gardens.map((garden) => (
                   <TouchableOpacity
                     key={garden.id}
                     style={[
@@ -337,14 +385,14 @@ export default function NewPostScreen() {
                 <Text
                   style={[styles.tagsCount, { color: theme.textSecondary }]}
                 >
-                  {tags.length}/5
+                  {selectedTags.length}/5
                 </Text>
               </View>
 
               <View style={styles.selectedTagsContainer}>
-                {tags.map((tag) => (
+                {selectedTags.map((tag) => (
                   <View
-                    key={tag}
+                    key={tag.id}
                     style={[
                       styles.tagChip,
                       { backgroundColor: theme.primary + "20" },
@@ -353,10 +401,10 @@ export default function NewPostScreen() {
                     <Text
                       style={[styles.tagChipText, { color: theme.primary }]}
                     >
-                      #{tag}
+                      #{tag.name}
                     </Text>
                     <TouchableOpacity
-                      onPress={() => handleRemoveTag(tag)}
+                      onPress={() => handleRemoveTag(tag.id)}
                       style={styles.removeTagButton}
                     >
                       <Ionicons
@@ -369,7 +417,7 @@ export default function NewPostScreen() {
                 ))}
               </View>
 
-              {tags.length < 5 && (
+              {selectedTags.length < 5 && (
                 <View
                   style={[
                     styles.tagInputContainer,
@@ -382,7 +430,7 @@ export default function NewPostScreen() {
                     placeholderTextColor={theme.textTertiary}
                     value={tagInput}
                     onChangeText={setTagInput}
-                    onSubmitEditing={() => handleAddTag(tagInput)}
+                    onSubmitEditing={() => handleAddTag(selectedTags[0])}
                   />
                   <TouchableOpacity
                     style={[
@@ -393,7 +441,7 @@ export default function NewPostScreen() {
                           : theme.backgroundSecondary,
                       },
                     ]}
-                    onPress={() => handleAddTag(tagInput)}
+                    onPress={() => handleAddTag(selectedTags[0])}
                     disabled={!tagInput.trim()}
                   >
                     <Ionicons
@@ -410,31 +458,36 @@ export default function NewPostScreen() {
                 Popular Tags
               </Text>
               <View style={styles.popularTagsContainer}>
-                {MOCK_POPULAR_TAGS.map((tag) => (
+                {popularTags.map((tag) => (
                   <TouchableOpacity
-                    key={tag}
+                    key={tag.id}
                     style={[
                       styles.popularTag,
                       {
-                        backgroundColor: tags.includes(tag)
+                        backgroundColor: selectedTags.some(
+                          (t) => t.id === tag.id
+                        )
                           ? theme.primary + "20"
                           : theme.backgroundSecondary,
                       },
                     ]}
                     onPress={() => handleAddTag(tag)}
-                    disabled={tags.includes(tag) || tags.length >= 5}
+                    disabled={
+                      selectedTags.some((t) => t.id === tag.id) ||
+                      selectedTags.length >= 5
+                    }
                   >
                     <Text
                       style={[
                         styles.popularTagText,
                         {
-                          color: tags.includes(tag)
+                          color: selectedTags.some((t) => t.id === tag.id)
                             ? theme.primary
                             : theme.textSecondary,
                         },
                       ]}
                     >
-                      #{tag}
+                      #{tag.name}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -704,5 +757,20 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
     marginLeft: 6,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  errorText: {
+    fontSize: 16,
+    fontWeight: "500",
+    marginTop: 16,
   },
 });

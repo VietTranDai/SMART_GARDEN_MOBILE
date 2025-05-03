@@ -2,19 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, Image, Pressable } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
-
-export enum GardenStatus {
-  ACTIVE = "ACTIVE",
-  INACTIVE = "INACTIVE",
-}
-
-export enum GardenType {
-  INDOOR = "INDOOR",
-  OUTDOOR = "OUTDOOR",
-  BALCONY = "BALCONY",
-  ROOFTOP = "ROOFTOP",
-  WINDOW_SILL = "WINDOW_SILL",
-}
+import { GardenStatus, GardenType } from "@/types";
 
 interface GardenStatusCardProps {
   garden: {

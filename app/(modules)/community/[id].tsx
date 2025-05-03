@@ -11,115 +11,15 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
 import { useAppTheme } from "@/hooks/useAppTheme";
-
-// Enum to match Prisma schema
-enum VoteTargetType {
-  POST = "POST",
-  COMMENT = "COMMENT",
-}
-
-// Interfaces based on Prisma schema
-interface Post {
-  id: string;
-  gardenerId: string;
-  gardenerName: string;
-  gardenerImage: string;
-  gardenName: string;
-  title: string;
-  content: string;
-  images: string[];
-  tags: string[];
-  createdAt: string;
-  total_vote: number;
-  userVote?: number; // 1, -1, or undefined if user hasn't voted
-}
-
-interface Comment {
-  id: string;
-  postId: string;
-  gardenerId: string;
-  gardenerName: string;
-  gardenerImage: string;
-  parentId: string | null;
-  content: string;
-  score: number;
-  createdAt: string;
-  userVote?: number; // 1, -1, or undefined if user hasn't voted
-  replies?: Comment[];
-}
-
-// Mock data for a single post with full details
-const MOCK_POST: Post = {
-  id: "1",
-  gardenerId: "1",
-  gardenerName: "John Garden",
-  gardenerImage: "https://i.pravatar.cc/150?img=11",
-  gardenName: "Backyard Garden",
-  title: "My tomatoes are thriving!",
-  content:
-    "I've been using a new organic fertilizer and my tomatoes have never looked better. Has anyone else tried it?\n\nI planted them about 2 months ago and they've already doubled in size. The soil in my garden is quite clay-heavy, so I've been mixing in some compost and this new organic fertilizer I found at the local garden center.\n\nThe temperature has been pretty consistent around 75-85°F during the day, and I water them every other day.\n\nHas anyone else had success with organic fertilizers? Any recommendations for other varieties I should try next season?",
-  images: ["https://picsum.photos/800/500?random=1"],
-  tags: ["Tomatoes", "Organic", "Success"],
-  createdAt: "2025-04-20T10:00:00Z",
-  total_vote: 15,
-};
-
-// Mock data for comments
-const MOCK_COMMENTS: Comment[] = [
-  {
-    id: "101",
-    postId: "1",
-    gardenerId: "2",
-    gardenerName: "Sarah Green",
-    gardenerImage: "https://i.pravatar.cc/150?img=5",
-    parentId: null,
-    content:
-      "I've had great results with organic fertilizers too! What brand are you using?",
-    score: 8,
-    createdAt: "2025-04-20T11:30:00Z",
-  },
-  {
-    id: "102",
-    postId: "1",
-    gardenerId: "3",
-    gardenerName: "Mike Soil",
-    gardenerImage: "https://i.pravatar.cc/150?img=8",
-    parentId: null,
-    content:
-      "Those look fantastic! I've found that adding worm castings to my soil has also made a huge difference in my tomato plants.",
-    score: 5,
-    createdAt: "2025-04-20T12:15:00Z",
-  },
-  {
-    id: "103",
-    postId: "1",
-    gardenerId: "1",
-    gardenerName: "John Garden",
-    gardenerImage: "https://i.pravatar.cc/150?img=11",
-    parentId: "101",
-    content:
-      "Thanks! I'm using 'Garden Boost Organic'. It's pricey but worth it!",
-    score: 3,
-    createdAt: "2025-04-20T13:45:00Z",
-  },
-  {
-    id: "104",
-    postId: "1",
-    gardenerId: "4",
-    gardenerName: "Alice Petunia",
-    gardenerImage: "https://i.pravatar.cc/150?img=9",
-    parentId: null,
-    content:
-      "Have you had any issues with pests? My tomatoes always seem to attract aphids no matter what I do.",
-    score: 2,
-    createdAt: "2025-04-21T09:20:00Z",
-  },
-];
+import { communityService } from "@/service/api";
+import { Post, Comment, CreateCommentDto } from "@/types";
+import { VoteDto, VoteTargetType } from "@/types/social/post.types";
 
 export default function PostDetailScreen() {
   const theme = useAppTheme();
@@ -130,35 +30,60 @@ export default function PostDetailScreen() {
   const [newComment, setNewComment] = useState("");
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = async () => {
+    if (!id) return;
+
+    try {
+      setError(null);
+      setLoading(true);
+
+      const postId = typeof id === "string" ? id : id.toString();
+
+      // Fetch post details and comments in parallel
+      const [postData, commentsData] = await Promise.all([
+        communityService.getPostById(postId),
+        communityService.getPostComments(postId),
+      ]);
+
+      // Type assertion to resolve type conflicts
+      setPost(postData as any);
+      setComments(commentsData as any);
+    } catch (err) {
+      console.error("Failed to fetch post details:", err);
+      setError("Không thể tải bài viết. Vui lòng thử lại sau.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // In a real app, this would be an API call
-    setTimeout(() => {
-      setPost(MOCK_POST);
-      setComments(MOCK_COMMENTS);
-      setLoading(false);
-    }, 500);
+    fetchData();
   }, [id]);
 
   // Group comments into threads
   const formatComments = (): Comment[] => {
     const parentComments: Comment[] = [];
-    const commentMap: Record<string, Comment> = {};
+    const commentMap: Record<string, Comment & { replies?: Comment[] }> = {};
 
     // First pass: create a map of all comments
     comments.forEach((comment) => {
-      commentMap[comment.id] = { ...comment, replies: [] };
+      commentMap[comment.id.toString()] = { ...comment, replies: [] };
     });
 
     // Second pass: organize into parent-child relationships
     comments.forEach((comment) => {
       if (comment.parentId === null) {
-        parentComments.push(commentMap[comment.id]);
-      } else if (commentMap[comment.parentId]) {
-        commentMap[comment.parentId].replies = [
-          ...(commentMap[comment.parentId].replies || []),
-          commentMap[comment.id],
-        ];
+        parentComments.push(commentMap[comment.id.toString()] as Comment);
+      } else if (comment.parentId && commentMap[comment.parentId.toString()]) {
+        const parentComment = commentMap[comment.parentId.toString()];
+        if (parentComment) {
+          parentComment.replies = [
+            ...(parentComment.replies || []),
+            commentMap[comment.id.toString()] as Comment,
+          ];
+        }
       }
     });
 
@@ -188,91 +113,124 @@ export default function PostDetailScreen() {
     }
   };
 
-  const handleVote = (type: VoteTargetType, id: string, value: number) => {
-    // In a real app, this would be an API call
-    if (type === VoteTargetType.POST && post) {
-      const currentVote = post.userVote;
-      let newTotal = post.total_vote;
+  const handleVote = async (
+    targetType: VoteTargetType,
+    targetId: string,
+    voteValue: number
+  ) => {
+    try {
+      if (targetType === VoteTargetType.POST && post) {
+        // Call API to vote on post
+        const voteData: VoteDto = { voteValue: voteValue };
+        const result = await communityService.votePost(targetId, voteData);
 
-      if (currentVote === value) {
-        // User is un-voting
-        newTotal -= value;
-        setPost({ ...post, total_vote: newTotal, userVote: undefined });
-      } else if (currentVote === undefined) {
-        // User is voting for the first time
-        newTotal += value;
-        setPost({ ...post, total_vote: newTotal, userVote: value });
-      } else {
-        // User is changing their vote
-        newTotal = newTotal - currentVote + value;
-        setPost({ ...post, total_vote: newTotal, userVote: value });
+        // Update local state with the result from API
+        setPost({
+          ...post,
+          total_vote: result.total_vote,
+          userVote: result.userVote,
+        } as any);
+      } else if (targetType === VoteTargetType.COMMENT) {
+        // Call API to vote on comment
+        const voteData: VoteDto = { voteValue: voteValue };
+        const result = await communityService.voteComment(targetId, voteData);
+
+        // Update the comment in our local state
+        setComments(
+          (prev) =>
+            prev.map((comment) => {
+              if (comment.id.toString() === targetId) {
+                return {
+                  ...comment,
+                  score: result.score,
+                  userVote: result.userVote,
+                };
+              } else if (comment.replies) {
+                return {
+                  ...comment,
+                  replies: comment.replies.map((reply) =>
+                    reply.id.toString() === targetId
+                      ? {
+                          ...reply,
+                          score: result.score,
+                          userVote: result.userVote,
+                        }
+                      : reply
+                  ),
+                };
+              }
+              return comment;
+            }) as any
+        );
       }
-    } else if (type === VoteTargetType.COMMENT) {
-      const updatedComments = comments.map((comment) => {
-        if (comment.id === id) {
-          const currentVote = comment.userVote;
-          let newScore = comment.score;
-
-          if (currentVote === value) {
-            // User is un-voting
-            newScore -= value;
-            return { ...comment, score: newScore, userVote: undefined };
-          } else if (currentVote === undefined) {
-            // User is voting for the first time
-            newScore += value;
-            return { ...comment, score: newScore, userVote: value };
-          } else {
-            // User is changing their vote
-            newScore = newScore - currentVote + value;
-            return { ...comment, score: newScore, userVote: value };
-          }
-        }
-        return comment;
-      });
-
-      setComments(updatedComments);
+    } catch (err) {
+      console.error("Failed to register vote:", err);
+      Alert.alert("Error", "Failed to register your vote. Please try again.");
     }
   };
 
-  const handleSubmitComment = () => {
-    if (!newComment.trim()) return;
+  const handleSubmitComment = async () => {
+    if (!id || !newComment.trim()) return;
 
     setSubmitting(true);
+    try {
+      // Convert string ID to number if needed by the API
+      const postId = typeof id === "string" ? parseInt(id, 10) : id;
 
-    // In a real app, this would be an API call
-    setTimeout(() => {
-      const newCommentObj: Comment = {
-        id: `new-${Date.now()}`,
-        postId: post?.id || "",
-        gardenerId: "current-user", // In a real app, this would be the current user's ID
-        gardenerName: "Current User", // In a real app, this would be the current user's name
-        gardenerImage: "https://i.pravatar.cc/150?img=1", // In a real app, this would be the current user's image
-        parentId: replyTo?.id || null,
-        content: newComment,
-        score: 0,
-        createdAt: new Date().toISOString(),
+      const commentData: CreateCommentDto = {
+        postId: Number(postId),
+        content: newComment.trim(),
+        parentId: replyTo?.id ? Number(replyTo.id) : undefined,
       };
 
-      setComments([...comments, newCommentObj]);
+      // Call API to create comment
+      const createdComment = await communityService.createComment(commentData);
+
+      // Update local state with the new comment
+      setComments((prevComments) => [...prevComments, createdComment as any]);
+
+      // Reset form
       setNewComment("");
       setReplyTo(null);
+    } catch (err) {
+      console.error("Failed to submit comment:", err);
+      Alert.alert("Error", "Failed to submit your comment. Please try again.");
+    } finally {
       setSubmitting(false);
-    }, 500);
+    }
   };
 
   const renderComment = ({ item }: { item: Comment }) => {
+    // Helper to safely get user display name
+    const getDisplayName = (comment: Comment) => {
+      if (comment.userData) {
+        const { firstName, lastName } = comment.userData;
+        if (firstName || lastName) {
+          return `${firstName || ""} ${lastName || ""}`.trim();
+        }
+      }
+      return "Anonymous User";
+    };
+
+    // Helper to safely get profile image
+    const getProfileImage = (comment: Comment) => {
+      return (
+        comment.userData?.profilePicture || "https://via.placeholder.com/40"
+      );
+    };
+
     return (
       <View
         style={[styles.commentContainer, { backgroundColor: theme.cardAlt }]}
       >
         <View style={styles.commentHeader}>
           <Image
-            source={{ uri: item.gardenerImage }}
+            source={{ uri: getProfileImage(item) }}
             style={styles.userImage}
           />
           <View>
             <Text style={[styles.userName, { color: theme.text }]}>
-              {item.gardenerName}
+              {getDisplayName(item)}
             </Text>
             <Text style={[styles.commentDate, { color: theme.textSecondary }]}>
               {formatDate(item.createdAt)}
@@ -287,7 +245,9 @@ export default function PostDetailScreen() {
         <View style={styles.commentActions}>
           <View style={styles.voteContainer}>
             <TouchableOpacity
-              onPress={() => handleVote(VoteTargetType.COMMENT, item.id, 1)}
+              onPress={() =>
+                handleVote(VoteTargetType.COMMENT, item.id.toString(), 1)
+              }
               style={[
                 styles.voteButton,
                 item.userVote === 1 && {
@@ -309,7 +269,9 @@ export default function PostDetailScreen() {
             </Text>
 
             <TouchableOpacity
-              onPress={() => handleVote(VoteTargetType.COMMENT, item.id, -1)}
+              onPress={() =>
+                handleVote(VoteTargetType.COMMENT, item.id.toString(), -1)
+              }
               style={[
                 styles.voteButton,
                 item.userVote === -1 && { backgroundColor: theme.error + "20" },
@@ -350,12 +312,12 @@ export default function PostDetailScreen() {
               >
                 <View style={styles.commentHeader}>
                   <Image
-                    source={{ uri: reply.gardenerImage }}
+                    source={{ uri: getProfileImage(reply) }}
                     style={styles.userImageSmall}
                   />
                   <View>
                     <Text style={[styles.userNameSmall, { color: theme.text }]}>
-                      {reply.gardenerName}
+                      {getDisplayName(reply)}
                     </Text>
                     <Text
                       style={[
@@ -376,7 +338,7 @@ export default function PostDetailScreen() {
                   <View style={styles.voteContainer}>
                     <TouchableOpacity
                       onPress={() =>
-                        handleVote(VoteTargetType.COMMENT, reply.id, 1)
+                        handleVote(VoteTargetType.COMMENT, reply.id.toString(), 1)
                       }
                       style={[
                         styles.voteButton,
@@ -404,7 +366,7 @@ export default function PostDetailScreen() {
 
                     <TouchableOpacity
                       onPress={() =>
-                        handleVote(VoteTargetType.COMMENT, reply.id, -1)
+                        handleVote(VoteTargetType.COMMENT, reply.id.toString(), -1)
                       }
                       style={[
                         styles.voteButton,
@@ -449,6 +411,27 @@ export default function PostDetailScreen() {
     );
   }
 
+  // Helper to safely get post user display name
+  const getPostDisplayName = () => {
+    if (post.userData) {
+      const { firstName, lastName } = post.userData;
+      if (firstName || lastName) {
+        return `${firstName || ""} ${lastName || ""}`.trim();
+      }
+    }
+    return "Anonymous User";
+  };
+
+  // Helper to safely get post garden name
+  const getPostGardenName = () => {
+    return post.garden?.name || "Unknown Garden";
+  };
+
+  // Helper to safely get post profile image
+  const getPostProfileImage = () => {
+    return post.userData?.profilePicture || "https://via.placeholder.com/40";
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
@@ -484,17 +467,17 @@ export default function PostDetailScreen() {
             <View style={styles.postHeader}>
               <View style={styles.userInfo}>
                 <Image
-                  source={{ uri: post.gardenerImage }}
+                  source={{ uri: getPostProfileImage() }}
                   style={styles.userImage}
                 />
                 <View>
                   <Text style={[styles.userName, { color: theme.text }]}>
-                    {post.gardenerName}
+                    {getPostDisplayName()}
                   </Text>
                   <Text
                     style={[styles.gardenName, { color: theme.textSecondary }]}
                   >
-                    {post.gardenName} · {formatDate(post.createdAt)}
+                    {getPostGardenName()} · {formatDate(post.createdAt)}
                   </Text>
                 </View>
               </View>
@@ -507,12 +490,18 @@ export default function PostDetailScreen() {
               {post.content}
             </Text>
 
-            {post.images.length > 0 && (
+            {post.images && post.images.length > 0 && (
               <View style={styles.imagesContainer}>
                 {post.images.map((image, index) => (
                   <Image
                     key={index}
-                    source={{ uri: image }}
+                    source={{
+                      uri:
+                        typeof image === "string"
+                          ? image
+                          : (image as any).url ||
+                            "https://via.placeholder.com/300",
+                    }}
                     style={styles.postImage}
                     resizeMode="cover"
                   />
@@ -521,7 +510,7 @@ export default function PostDetailScreen() {
             )}
 
             <View style={styles.tagContainer}>
-              {post.tags.map((tag, index) => (
+              {(post.tags || []).map((tag: any, index) => (
                 <View
                   key={index}
                   style={[
@@ -530,7 +519,7 @@ export default function PostDetailScreen() {
                   ]}
                 >
                   <Text style={[styles.tagText, { color: theme.primary }]}>
-                    #{tag}
+                    #{typeof tag === "string" ? tag : tag.name || ""}
                   </Text>
                 </View>
               ))}
@@ -539,7 +528,9 @@ export default function PostDetailScreen() {
             <View style={styles.postActions}>
               <View style={styles.voteContainer}>
                 <TouchableOpacity
-                  onPress={() => handleVote(VoteTargetType.POST, post.id, 1)}
+                  onPress={() =>
+                    handleVote(VoteTargetType.POST, post.id.toString(), 1)
+                  }
                   style={[
                     styles.voteButton,
                     post.userVote === 1 && {
@@ -559,7 +550,9 @@ export default function PostDetailScreen() {
                   {post.total_vote}
                 </Text>
                 <TouchableOpacity
-                  onPress={() => handleVote(VoteTargetType.POST, post.id, -1)}
+                  onPress={() =>
+                    handleVote(VoteTargetType.POST, post.id.toString(), -1)
+                  }
                   style={[
                     styles.voteButton,
                     post.userVote === -1 && {
@@ -619,7 +612,12 @@ export default function PostDetailScreen() {
               ]}
             >
               <Text style={[styles.replyingText, { color: theme.text }]}>
-                Replying to {replyTo.gardenerName}
+                Replying to{" "}
+                {replyTo.userData
+                  ? `${replyTo.userData.firstName || ""} ${
+                      replyTo.userData.lastName || ""
+                    }`.trim()
+                  : "Anonymous User"}
               </Text>
               <TouchableOpacity onPress={() => setReplyTo(null)}>
                 <Ionicons name="close" size={18} color={theme.textSecondary} />

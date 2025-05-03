@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -14,259 +14,113 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useLocalSearchParams, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { userService } from "@/service/api";
+import { communityService } from "@/service/api";
+import { GardenerData } from "@/types/users";
 
-// Interfaces for types based on Prisma schema
-interface User {
-  id: string;
-  firstName: string;
-  lastName: string;
-  profilePicture: string | null;
-  email: string;
-  username: string;
-  bio: string | null;
-  createdAt: string;
-}
-
-interface ExperienceLevel {
-  id: string;
-  level: number;
-  title: string;
-  icon: string;
-}
-
-interface Gardener {
-  userId: string;
-  user: User;
-  experiencePoints: number;
-  experienceLevel: ExperienceLevel;
-  _count: {
-    gardens: number;
-    posts: number;
-    follow: number; // followers
-    following: number; // following
-  };
-  isFollowing?: boolean; // Whether the current user follows this gardener
-}
-
-interface Garden {
-  id: string;
+// Simplified local type for garden since it's not in API yet
+type Garden = {
+  id: number;
   name: string;
   plantName?: string;
   plantGrowStage?: string;
   type: string;
-}
-
-interface Tag {
-  name: string;
-}
-
-interface PostTag {
-  tagId: string;
-  tag: Tag;
-}
-
-interface PostImage {
-  url: string;
-}
-
-interface Post {
-  id: string;
-  title: string;
-  content: string;
-  createdAt: string;
-  total_vote: number;
-  tags: PostTag[];
-  images: PostImage[];
-  garden?: Garden | null;
-  _count: {
-    comments: number;
-  };
-}
-
-// Mock data for gardener profile
-const MOCK_GARDENER: Gardener = {
-  userId: "1",
-  user: {
-    id: "1",
-    firstName: "John",
-    lastName: "Garden",
-    profilePicture: "https://i.pravatar.cc/150?img=11",
-    email: "john.garden@example.com",
-    username: "garden_master",
-    bio: "Passionate gardener with 5 years of experience. I specialize in organic vegetables and herbs. Love sharing tips and learning from the community!",
-    createdAt: "2024-01-15T00:00:00Z",
-  },
-  experiencePoints: 1250,
-  experienceLevel: {
-    id: "3",
-    level: 3,
-    title: "Experienced Gardener",
-    icon: "🌱",
-  },
-  _count: {
-    gardens: 3,
-    posts: 12,
-    follow: 48, // followers
-    following: 32, // following
-  },
-  isFollowing: false,
 };
-
-// Mock data for gardens
-const MOCK_GARDENS: Garden[] = [
-  {
-    id: "1",
-    name: "Backyard Garden",
-    plantName: "Tomatoes",
-    plantGrowStage: "Fruiting",
-    type: "OUTDOOR",
-  },
-  {
-    id: "2",
-    name: "Kitchen Herbs",
-    plantName: "Basil, Mint, Parsley",
-    plantGrowStage: "Vegetative",
-    type: "INDOOR",
-  },
-  {
-    id: "3",
-    name: "Flower Bed",
-    plantName: "Roses, Tulips",
-    plantGrowStage: "Flowering",
-    type: "OUTDOOR",
-  },
-];
-
-// Mock data for posts
-const MOCK_POSTS: Post[] = [
-  {
-    id: "1",
-    title: "My tomatoes are thriving!",
-    content:
-      "I've been using a new organic fertilizer and my tomatoes have never looked better. Has anyone else tried it?",
-    createdAt: "2025-04-20T10:00:00Z",
-    total_vote: 15,
-    tags: [
-      { tagId: "1", tag: { name: "Tomatoes" } },
-      { tagId: "2", tag: { name: "Organic" } },
-      { tagId: "3", tag: { name: "Success" } },
-    ],
-    images: [{ url: "https://picsum.photos/500/300?random=1" }],
-    garden: MOCK_GARDENS[0],
-    _count: {
-      comments: 5,
-    },
-  },
-  {
-    id: "4",
-    title: "New herb garden setup",
-    content:
-      "Just set up my indoor herb garden. Using LED grow lights and a hydroponic system. Looking forward to fresh herbs year-round!",
-    createdAt: "2025-04-15T14:25:00Z",
-    total_vote: 28,
-    tags: [
-      { tagId: "9", tag: { name: "Herbs" } },
-      { tagId: "10", tag: { name: "Indoor" } },
-      { tagId: "11", tag: { name: "Hydroponics" } },
-    ],
-    images: [
-      { url: "https://picsum.photos/500/300?random=5" },
-      { url: "https://picsum.photos/500/300?random=6" },
-    ],
-    garden: MOCK_GARDENS[1],
-    _count: {
-      comments: 7,
-    },
-  },
-  {
-    id: "5",
-    title: "Rose pruning tips",
-    content:
-      "Here's how I prune my roses for maximum blooms. The key is making clean cuts at a 45-degree angle just above an outward-facing bud.",
-    createdAt: "2025-04-10T09:12:00Z",
-    total_vote: 32,
-    tags: [
-      { tagId: "12", tag: { name: "Roses" } },
-      { tagId: "13", tag: { name: "Pruning" } },
-      { tagId: "14", tag: { name: "Tips" } },
-    ],
-    images: [{ url: "https://picsum.photos/500/300?random=7" }],
-    garden: MOCK_GARDENS[2],
-    _count: {
-      comments: 9,
-    },
-  },
-];
 
 export default function GardenerProfileScreen() {
   const theme = useAppTheme();
-  const { id } = useLocalSearchParams();
-  const [gardener, setGardener] = useState<Gardener | null>(null);
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const [gardener, setGardener] = useState<any | null>(null);
+  const [posts, setPosts] = useState<any[]>([]);
   const [gardens, setGardens] = useState<Garden[]>([]);
-  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("posts"); // "posts", "gardens", "about"
   const [refreshing, setRefreshing] = useState(false);
+  const [following, setFollowing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"posts" | "gardens">("posts");
 
-  useEffect(() => {
-    // In a real app, these would be API calls
-    fetchProfile();
+  // Fetch gardener profile data
+  const fetchProfile = useCallback(async () => {
+    if (!id) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch gardener profile
+      const gardenerData = await userService.getGardenerProfile(id);
+      setGardener(gardenerData);
+
+      // Fetch gardener's posts
+      const postsData = await communityService.getPosts({
+        gardenerId: Number(id),
+      });
+      setPosts(postsData);
+
+      // Check if the current user is following this gardener
+      try {
+        const followers = await communityService.getFollowers(id);
+        // The API would need to tell us if we're following
+        // This might require checking if our user ID is in the followers list
+        // For now, we'll leave it as false
+        setFollowing(false);
+      } catch (followErr) {
+        console.error("Could not check follow status:", followErr);
+      }
+
+      // Fetch gardens (this would need a separate API endpoint)
+      // For now, we'll leave this with an empty array
+      setGardens([]);
+    } catch (err) {
+      console.error("Failed to load profile:", err);
+      setError("Failed to load profile. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
-  const fetchProfile = () => {
-    // Simulate API calls
-    setTimeout(() => {
-      setGardener(MOCK_GARDENER);
-      setGardens(MOCK_GARDENS);
-      setPosts(MOCK_POSTS);
-      setLoading(false);
-    }, 1000);
-  };
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    // Simulate data refresh
+  useEffect(() => {
     fetchProfile();
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
-  };
+  }, [fetchProfile]);
 
-  const handleFollow = () => {
-    if (!gardener) return;
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchProfile();
+    setRefreshing(false);
+  }, [fetchProfile]);
 
-    // In a real app, this would be an API call to toggle follow status
-    setGardener({
-      ...gardener,
-      isFollowing: !gardener.isFollowing,
-      _count: {
-        ...gardener._count,
-        follow: gardener.isFollowing
-          ? gardener._count.follow - 1
-          : gardener._count.follow + 1,
-      },
-    });
-  };
+  const handleFollow = useCallback(async () => {
+    if (!id) return;
+
+    try {
+      if (following) {
+        await communityService.unfollowUser(id);
+        setFollowing(false);
+      } else {
+        await communityService.followUser(id);
+        setFollowing(true);
+      }
+    } catch (err) {
+      console.error("Failed to follow/unfollow:", err);
+    }
+  }, [following, id]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
+    return date.toLocaleDateString("vi-VN", {
       year: "numeric",
       month: "long",
-      day: "numeric",
     });
   };
 
   const formatNumber = (number: number) => {
-    if (number >= 1000000) {
-      return (number / 1000000).toFixed(1) + "M";
-    } else if (number >= 1000) {
-      return (number / 1000).toFixed(1) + "K";
+    if (number >= 1000) {
+      return `${(number / 1000).toFixed(1)}k`;
     }
     return number.toString();
   };
 
-  const renderPostItem = ({ item }: { item: Post }) => (
+  const renderPostItem = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={[styles.postCard, { backgroundColor: theme.card }]}
       onPress={() => router.push(`/(modules)/community/${item.id}`)}
@@ -304,7 +158,7 @@ export default function GardenerProfileScreen() {
       )}
 
       <View style={styles.tagContainer}>
-        {item.tags.map((tagObj, index) => (
+        {item.tags.map((tagObj: any, index: number) => (
           <View
             key={index}
             style={[styles.tagBadge, { backgroundColor: theme.primary + "20" }]}
@@ -622,28 +476,6 @@ export default function GardenerProfileScreen() {
               Gardens
             </Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.tabButton,
-              activeTab === "about" && [
-                styles.activeTab,
-                { borderBottomColor: theme.primary },
-              ],
-            ]}
-            onPress={() => setActiveTab("about")}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === "about"
-                  ? { color: theme.primary }
-                  : { color: theme.textSecondary },
-              ]}
-            >
-              About
-            </Text>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.tabContent}>
@@ -695,69 +527,6 @@ export default function GardenerProfileScreen() {
                 </View>
               )}
             </>
-          )}
-
-          {activeTab === "about" && (
-            <View
-              style={[styles.aboutContainer, { backgroundColor: theme.card }]}
-            >
-              <View style={styles.aboutRow}>
-                <Ionicons
-                  name="calendar-outline"
-                  size={18}
-                  color={theme.textSecondary}
-                  style={styles.aboutIcon}
-                />
-                <View>
-                  <Text
-                    style={[styles.aboutLabel, { color: theme.textSecondary }]}
-                  >
-                    Joined
-                  </Text>
-                  <Text style={[styles.aboutValue, { color: theme.text }]}>
-                    {formatDate(gardener.user.createdAt)}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.aboutRow}>
-                <Ionicons
-                  name="trophy-outline"
-                  size={18}
-                  color={theme.textSecondary}
-                  style={styles.aboutIcon}
-                />
-                <View>
-                  <Text
-                    style={[styles.aboutLabel, { color: theme.textSecondary }]}
-                  >
-                    Experience Points
-                  </Text>
-                  <Text style={[styles.aboutValue, { color: theme.text }]}>
-                    {gardener.experiencePoints} XP
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.aboutRow}>
-                <Ionicons
-                  name="mail-outline"
-                  size={18}
-                  color={theme.textSecondary}
-                  style={styles.aboutIcon}
-                />
-                <View>
-                  <Text
-                    style={[styles.aboutLabel, { color: theme.textSecondary }]}
-                  >
-                    Email
-                  </Text>
-                  <Text style={[styles.aboutValue, { color: theme.text }]}>
-                    {gardener.user.email}
-                  </Text>
-                </View>
-              </View>
-            </View>
           )}
         </View>
       </ScrollView>
@@ -1057,24 +826,5 @@ const styles = StyleSheet.create({
   plantText: {
     fontSize: 12,
     marginLeft: 6,
-  },
-  aboutContainer: {
-    borderRadius: 12,
-    padding: 16,
-  },
-  aboutRow: {
-    flexDirection: "row",
-    marginBottom: 16,
-  },
-  aboutIcon: {
-    marginRight: 12,
-    marginTop: 2,
-  },
-  aboutLabel: {
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  aboutValue: {
-    fontSize: 16,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useEffect } from "react";
+import React, { useCallback, useRef, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Switch,
   Pressable,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useUser } from "@/contexts/UserContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -17,12 +18,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Ionicons,
   MaterialCommunityIcons,
-  FontAwesome5,
   MaterialIcons,
   Feather,
 } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { removeItem } from "@/utils/asyncStorage";
+import { userService } from "@/service/api";
 
 const CustomSwitch = ({
   value,
@@ -67,9 +68,33 @@ export default function ProfileScreen() {
     effectiveColorScheme,
   } = useTheme();
 
+  const [loading, setLoading] = useState(false);
+  const [experienceProgress, setExperienceProgress] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
   const darkModeInteractingRef = useRef(false);
   const systemThemeInteractingRef = useRef(false);
   const lastSwitchTimeRef = useRef(0);
+
+  // Fetch user's experience progress
+  useEffect(() => {
+    const fetchExperienceProgress = async () => {
+      if (!user || !user.isGardener) return;
+
+      try {
+        setLoading(true);
+        const progress = await userService.getExperienceProgress();
+        setExperienceProgress(progress);
+      } catch (err) {
+        console.error("Failed to fetch experience progress:", err);
+        setError("Could not load experience data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchExperienceProgress();
+  }, [user]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -87,7 +112,8 @@ export default function ProfileScreen() {
       if (now - lastSwitchTimeRef.current < 500) return;
       lastSwitchTimeRef.current = now;
 
-      if (typeof setTheme !== "function" || typeof isDarkMode === "undefined") return;
+      if (typeof setTheme !== "function" || typeof isDarkMode === "undefined")
+        return;
 
       if ((value && !isDarkMode) || (!value && isDarkMode)) {
         setTheme(value ? "dark" : "light");
@@ -102,7 +128,7 @@ export default function ProfileScreen() {
       systemThemeInteractingRef.current = true;
       const now = Date.now();
       if (now - lastSwitchTimeRef.current < 500) return;
-       lastSwitchTimeRef.current = now;
+      lastSwitchTimeRef.current = now;
 
       if (useSystemTheme && themeMode !== "system") {
         setTheme("system");
@@ -112,6 +138,10 @@ export default function ProfileScreen() {
     },
     [themeMode, effectiveColorScheme, setTheme]
   );
+
+  const handleUpdateProfile = useCallback(async () => {
+    router.push("/(modules)/profile/edit");
+  }, []);
 
   const handleSignOut = async () => {
     try {
@@ -145,13 +175,21 @@ export default function ProfileScreen() {
   };
 
   const progressToNextLevel = () => {
-    if (!user?.gardener) return 0;
-    return 75;
+    if (experienceProgress) {
+      return experienceProgress.percentToNextLevel;
+    } else if (user && user.isGardener) {
+      // Fallback to a default value if we don't have experience progress
+      return 75;
+    }
+    return 0;
   };
 
   return (
     <SafeAreaView
-      style={[styles.container, { backgroundColor: appTheme.backgroundSecondary }]}
+      style={[
+        styles.container,
+        { backgroundColor: appTheme.backgroundSecondary },
+      ]}
       edges={["bottom"]}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -172,8 +210,8 @@ export default function ProfileScreen() {
               ]}
             >
               <Text style={[styles.levelText, { color: appTheme.primary }]}>
-                {user?.gardener?.experienceLevel?.icon || "🌱"}{" "}
-                {user?.gardener?.experienceLevel?.level || 1}
+                {user?.experienceLevel?.icon || "🌱"}{" "}
+                {user?.experienceLevel?.level || 1}
               </Text>
             </View>
           </View>
@@ -181,9 +219,11 @@ export default function ProfileScreen() {
           <Text style={styles.profileName}>
             {user ? `${user.firstName} ${user.lastName}` : "Garden Enthusiast"}
           </Text>
-          <Text style={styles.profileRole}>{user?.roleName || "GARDENER"}</Text>
+          <Text style={styles.profileRole}>
+            {user?.role?.name || "GARDENER"}
+          </Text>
 
-          {user?.gardener && (
+          {user?.isGardener && (
             <View style={styles.experienceContainer}>
               <View style={styles.experienceBar}>
                 <View
@@ -194,8 +234,8 @@ export default function ProfileScreen() {
                 />
               </View>
               <Text style={styles.experienceText}>
-                {user.gardener.experienceLevel?.title || "Novice Gardener"} •{" "}
-                {user.gardener.experiencePoints} XP
+                {user.experienceLevel?.title || "Novice Gardener"} •{" "}
+                {user.experiencePoints} XP
               </Text>
             </View>
           )}
@@ -210,10 +250,16 @@ export default function ProfileScreen() {
 
           <View style={styles.infoRow}>
             <View style={styles.infoIcon}>
-              <Ionicons name="mail-outline" size={20} color={appTheme.primary} />
+              <Ionicons
+                name="mail-outline"
+                size={20}
+                color={appTheme.primary}
+              />
             </View>
             <View style={styles.infoContent}>
-              <Text style={[styles.infoLabel, { color: appTheme.textSecondary }]}>
+              <Text
+                style={[styles.infoLabel, { color: appTheme.textSecondary }]}
+              >
                 Email
               </Text>
               <Text style={[styles.infoValue, { color: appTheme.text }]}>
@@ -224,10 +270,16 @@ export default function ProfileScreen() {
 
           <View style={styles.infoRow}>
             <View style={styles.infoIcon}>
-              <Ionicons name="call-outline" size={20} color={appTheme.primary} />
+              <Ionicons
+                name="call-outline"
+                size={20}
+                color={appTheme.primary}
+              />
             </View>
             <View style={styles.infoContent}>
-              <Text style={[styles.infoLabel, { color: appTheme.textSecondary }]}>
+              <Text
+                style={[styles.infoLabel, { color: appTheme.textSecondary }]}
+              >
                 Phone
               </Text>
               <Text style={[styles.infoValue, { color: appTheme.text }]}>
@@ -245,7 +297,9 @@ export default function ProfileScreen() {
               />
             </View>
             <View style={styles.infoContent}>
-              <Text style={[styles.infoLabel, { color: appTheme.textSecondary }]}>
+              <Text
+                style={[styles.infoLabel, { color: appTheme.textSecondary }]}
+              >
                 Date of Birth
               </Text>
               <Text style={[styles.infoValue, { color: appTheme.text }]}>
@@ -265,7 +319,9 @@ export default function ProfileScreen() {
               />
             </View>
             <View style={styles.infoContent}>
-              <Text style={[styles.infoLabel, { color: appTheme.textSecondary }]}>
+              <Text
+                style={[styles.infoLabel, { color: appTheme.textSecondary }]}
+              >
                 Address
               </Text>
               <Text style={[styles.infoValue, { color: appTheme.text }]}>
@@ -285,7 +341,9 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.statsContainer, { backgroundColor: appTheme.card }]}>
+        <View
+          style={[styles.statsContainer, { backgroundColor: appTheme.card }]}
+        >
           <Text style={[styles.sectionTitle, { color: appTheme.text }]}>
             Gardener Statistics
           </Text>
@@ -304,8 +362,12 @@ export default function ProfileScreen() {
                   color={appTheme.primary}
                 />
               </View>
-              <Text style={[styles.statValue, { color: appTheme.text }]}>{user?.gardener?.gardens?.length ?? 0}</Text>
-              <Text style={[styles.statLabel, { color: appTheme.textSecondary }]}>
+              <Text style={[styles.statValue, { color: appTheme.text }]}>
+                {(user as any)?.gardens?.length ?? 0}
+              </Text>
+              <Text
+                style={[styles.statLabel, { color: appTheme.textSecondary }]}
+              >
                 Gardens
               </Text>
             </View>
@@ -323,8 +385,12 @@ export default function ProfileScreen() {
                   color={appTheme.primary}
                 />
               </View>
-              <Text style={[styles.statValue, { color: appTheme.text }]}>{user?.gardener?.plants?.length ?? 0}</Text>
-              <Text style={[styles.statLabel, { color: appTheme.textSecondary }]}>
+              <Text style={[styles.statValue, { color: appTheme.text }]}>
+                {(user as any)?.gardener?.plants?.length ?? 0}
+              </Text>
+              <Text
+                style={[styles.statLabel, { color: appTheme.textSecondary }]}
+              >
                 Plants
               </Text>
             </View>
@@ -342,15 +408,21 @@ export default function ProfileScreen() {
                   color={appTheme.primary}
                 />
               </View>
-              <Text style={[styles.statValue, { color: appTheme.text }]}>{user?.gardener?.completedTasks ?? 0}</Text>
-              <Text style={[styles.statLabel, { color: appTheme.textSecondary }]}>
+              <Text style={[styles.statValue, { color: appTheme.text }]}>
+                {(user as any)?.gardener?.completedTasks ?? 0}
+              </Text>
+              <Text
+                style={[styles.statLabel, { color: appTheme.textSecondary }]}
+              >
                 Tasks Completed
               </Text>
             </View>
           </View>
         </View>
 
-        <View style={[styles.settingsSection, { backgroundColor: appTheme.card }]}>
+        <View
+          style={[styles.settingsSection, { backgroundColor: appTheme.card }]}
+        >
           <Text style={[styles.sectionTitle, { color: appTheme.text }]}>
             Settings & More
           </Text>
@@ -433,31 +505,31 @@ export default function ProfileScreen() {
         </View>
 
         <View style={[styles.dangerZone, { backgroundColor: appTheme.card }]}>
-            <Text style={[styles.sectionTitle, { color: appTheme.error }]}>
-              Danger Zone
-            </Text>
-            <TouchableOpacity style={styles.menuItem} onPress={resetOnboarding}>
+          <Text style={[styles.sectionTitle, { color: appTheme.error }]}>
+            Danger Zone
+          </Text>
+          <TouchableOpacity style={styles.menuItem} onPress={resetOnboarding}>
             <Ionicons
-                name="refresh-outline"
-                size={20}
-                color={appTheme.error}
-                style={styles.menuIcon}
+              name="refresh-outline"
+              size={20}
+              color={appTheme.error}
+              style={styles.menuIcon}
             />
             <Text style={[styles.menuText, { color: appTheme.error }]}>
-                Reset Onboarding
+              Reset Onboarding
             </Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={handleSignOut}>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.menuItem} onPress={handleSignOut}>
             <Ionicons
-                name="log-out-outline"
-                size={20}
-                color={appTheme.error}
-                style={styles.menuIcon}
+              name="log-out-outline"
+              size={20}
+              color={appTheme.error}
+              style={styles.menuIcon}
             />
             <Text style={[styles.menuText, { color: appTheme.error }]}>
-                Sign Out
+              Sign Out
             </Text>
-            </TouchableOpacity>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -575,7 +647,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
   },
-   editDetailsButton: {
+  editDetailsButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -652,7 +724,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
+    borderBottomColor: "#EEEEEE",
   },
   menuIcon: {
     width: 30,

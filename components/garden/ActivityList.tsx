@@ -8,28 +8,7 @@ import {
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
-
-// ActivityType enum - matches the one defined in app/(modules)/gardens/[id].tsx
-export enum ActivityType {
-  WATERING = "WATERING",
-  FERTILIZING = "FERTILIZING",
-  PRUNING = "PRUNING",
-  HARVESTING = "HARVESTING",
-  PLANTING = "PLANTING",
-}
-
-// Interface for the GardenActivity type
-export interface GardenActivity {
-  id: number;
-  gardenId: number;
-  gardenerId: number;
-  activityType: ActivityType;
-  timestamp: string;
-  details: string;
-  notes: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import { ActivityType, GardenActivity } from "@/types";
 
 // Props for the ActivityList component
 interface ActivityListProps {

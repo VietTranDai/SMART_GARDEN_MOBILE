@@ -1,25 +1,30 @@
+// src/api/client.ts
+
+// ─── Module augmentation để thêm method refreshToken ─────────────────────
 import axios, {
   AxiosInstance,
   AxiosRequestConfig,
   AxiosResponse,
   AxiosError,
 } from "axios";
+
+declare module "axios" {
+  interface AxiosInstance {
+    refreshToken: () => Promise<string | null>;
+  }
+}
+
+// ─── Imports và Types ──────────────────────────────────────────────────────
 import { getItem, removeItem, setItem } from "@/utils/asyncStorage";
-import { AUTH_KEY, type LoginData } from "@/modules/auth/types/auth";
+import { AUTH_KEY, type LoginData } from "@/types/users/auth.types";
 import { AUTH_ENDPOINTS } from "./endpoints";
 import env from "@/config/environment";
 
-/**
- * API Client Configuration
- *
- * Configured Axios instance with:
- * - Base URL from .env using react-native-dotenv
- * - Authentication token handling with auto refresh
- * - Error handling with automatic logout
- * - Request/response debugging
- */
+interface RefreshableRequest extends AxiosRequestConfig {
+  _retry?: boolean;
+}
 
-// Create API request configuration
+// ─── Config cơ bản cho Axios ──────────────────────────────────────────────
 const apiConfig: AxiosRequestConfig = {
   baseURL: `${env.apiUrl}/${env.apiVersion}`,
   timeout: env.apiTimeout,
@@ -27,143 +32,215 @@ const apiConfig: AxiosRequestConfig = {
     "Content-Type": "application/json",
     Accept: "application/json",
   },
-  withCredentials: true, // Enable cookies for refresh token
 };
 
-// Create API instance
 const apiClient: AxiosInstance = axios.create(apiConfig);
 
-// Flag to prevent multiple refresh requests
+// ─── Queue & trạng thái refresh ───────────────────────────────────────────
 let isRefreshing = false;
-// Queue of requests to retry after token refresh
 let refreshSubscribers: Array<(token: string) => void> = [];
 
-// Function to add request to retry queue
-const subscribeTokenRefresh = (callback: (token: string) => void) => {
-  refreshSubscribers.push(callback);
+const subscribeTokenRefresh = (cb: (token: string) => void) => {
+  refreshSubscribers.push(cb);
 };
 
-// Function to retry requests with new token
 const onTokenRefreshed = (token: string) => {
-  refreshSubscribers.forEach((callback) => callback(token));
+  refreshSubscribers.forEach((cb) => cb(token));
   refreshSubscribers = [];
 };
 
-// Function to refresh token
-const refreshToken = async (): Promise<string | null> => {
+const onRefreshedError = (err: any) => {
+  refreshSubscribers.forEach((cb) =>
+    cb(Promise.reject(err) as unknown as string)
+  );
+  refreshSubscribers = [];
+};
+
+// ─── Hàm refresh token nội bộ ─────────────────────────────────────────────
+const refreshTokenInternal = async (): Promise<string | null> => {
   try {
-    // Refresh token is handled by httpOnly cookie, so no need to send it
+    const authData = await getItem<LoginData>(AUTH_KEY);
+    if (!authData?.refresh_token) throw new Error("No refresh token stored");
+
+    // Gọi thẳng không qua interceptor để tránh vòng lặp
     const response = await axios.post(
       `${env.apiUrl}/${env.apiVersion}${AUTH_ENDPOINTS.REFRESH}`,
       {},
-      { withCredentials: true }
+      {
+        timeout: 10000, // timeout riêng cho refresh: 10s
+        headers: {
+          Authorization: `Bearer ${authData.refresh_token}`,
+        },
+      }
     );
 
-    // Get the new access token
-    const { access_token } = response.data;
-
-    // Update stored token
-    const authData = await getItem<LoginData>(AUTH_KEY);
-    if (authData) {
-      await setItem(AUTH_KEY, { ...authData, access_token });
-    }
+    const { access_token, refresh_token } = response.data;
+    await setItem(AUTH_KEY, {
+      ...authData,
+      access_token,
+      refresh_token,
+    });
 
     return access_token;
-  } catch (error) {
-    // Failed to refresh token, logout user
+  } catch (err) {
+    // refresh thất bại → clear auth + queue error
     await removeItem(AUTH_KEY);
+    onRefreshedError(err);
     return null;
   }
 };
 
-// Request interceptor - adds auth token to requests
-apiClient.interceptors.request.use(async (config) => {
-  // Add logging in debug mode
-  if (env.apiDebug) {
-    console.log(
-      `API Request: ${config.method?.toUpperCase()} ${config.url}`,
-      config.data || {}
-    );
-  }
+apiClient.refreshToken = refreshTokenInternal;
 
-  // Add authentication token if available
-  const data = await getItem<LoginData>(AUTH_KEY);
-  if (data?.access_token) {
-    config.headers.Authorization = `Bearer ${data.access_token}`;
-  }
-  return config;
-});
-
-// Response interceptor - handles errors and token refresh
-apiClient.interceptors.response.use(
-  (response: AxiosResponse) => {
-    // Log response in debug mode
+// ─── Request interceptor ─────────────────────────────────────────────────
+apiClient.interceptors.request.use(
+  async (config) => {
     if (env.apiDebug) {
-      console.log(`API Response: ${response.status}`, response.data);
+      console.log(
+        `→ ${config.method?.toUpperCase()} ${config.url}`,
+        config.data || ""
+      );
     }
-    return response;
+    const data = await getItem<LoginData>(AUTH_KEY);
+    if (data?.access_token) {
+      config.headers.Authorization = `Bearer ${data.access_token}`;
+    }
+    return config;
+  },
+  (err) => Promise.reject(err)
+);
+
+// ─── Response interceptor ────────────────────────────────────────────────
+apiClient.interceptors.response.use(
+  (res: AxiosResponse) => {
+    if (env.apiDebug) {
+      console.log(`← ${res.status} ${res.config.url}`, res.data);
+    }
+    return res;
   },
   async (error: AxiosError) => {
-    const originalRequest: any = error.config;
+    const original = error.config as RefreshableRequest;
     const status = error.response?.status;
 
-    // Token expired, try to refresh if not already refreshing
-    if (status === 401 && !originalRequest._retry && !isRefreshing) {
-      originalRequest._retry = true;
+    // Ensure headers exist on the original request config
+    if (!original.headers) {
+      original.headers = {};
+    }
+
+    // 1) Trường hợp 401 lần đầu: trigger refresh
+    if (status === 401 && !original._retry && !isRefreshing) {
+      original._retry = true;
       isRefreshing = true;
 
       try {
-        // Attempt to refresh token
-        const newToken = await refreshToken();
+        const newToken = await refreshTokenInternal();
+        isRefreshing = false;
 
         if (newToken) {
-          // Update Authorization header with new token
-          originalRequest.headers.Authorization = `Bearer ${newToken}`;
-          // Notify subscribers that token has been refreshed
+          // notify các request chờ
           onTokenRefreshed(newToken);
-          isRefreshing = false;
-          // Retry original request
-          return apiClient(originalRequest);
-        } else {
-          // Token refresh failed, redirect to login
-          isRefreshing = false;
-          return Promise.reject("Phiên đăng nhập hết hạn");
+          // retry request gốc
+          original.headers.Authorization = `Bearer ${newToken}`;
+          return apiClient(original);
         }
-      } catch (refreshError) {
+      } catch {
         isRefreshing = false;
-        return Promise.reject("Phiên đăng nhập hết hạn");
       }
+
+      // nếu tới đây tức refresh null hoặc có lỗi:
+      return Promise.reject(new Error("Phiên đăng nhập đã hết hạn"));
     }
 
-    // Handle case where a request failed during token refresh
-    else if (status === 401 && isRefreshing) {
-      // Queue request to be retried later
-      return new Promise((resolve) => {
-        subscribeTokenRefresh((token: string) => {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          resolve(apiClient(originalRequest));
+    // 2) Trường hợp 401 trong khi đang refresh: queue lại chờ
+    if (status === 401 && isRefreshing) {
+      return new Promise((resolve, reject) => {
+        subscribeTokenRefresh((token) => {
+          // nếu token là Promise.reject, chuyển thành reject
+          if (typeof token !== "string") {
+            return reject(token);
+          }
+          // Ensure headers exist before assigning
+          if (!original.headers) {
+            original.headers = {};
+          }
+          original.headers.Authorization = `Bearer ${token}`;
+          resolve(apiClient(original));
         });
       });
     }
 
-    // Handle other auth errors
-    else if (status === 401 || status === 403) {
-      // Remove token and reject
+    // 3) 401/403 khác → logout
+    if (status === 401 || status === 403) {
       await removeItem(AUTH_KEY);
-      return Promise.reject(
+      const msg =
         status === 401
-          ? "Phiên đăng nhập hết hạn"
-          : "Bạn không có quyền truy cập"
+          ? "Phiên đăng nhập đã hết hạn"
+          : "Bạn không có quyền truy cập";
+      return Promise.reject(new Error(msg));
+    }
+
+    // 4) Các lỗi khác
+    if (env.apiDebug) {
+      console.error(
+        "×",
+        error.config?.url,
+        error.response?.data || error.message
       );
     }
-
-    // Log errors in debug mode
-    if (env.apiDebug) {
-      console.error("API Error:", error.response?.data || error.message);
-    }
-
     return Promise.reject(error);
   }
 );
+
+// apiClient.interceptors.request.use(
+//   async (config) => {
+//     // in ra giá trị của env.apiDebug để test
+//     console.log("[LOGGER] apiDebug =", env.apiDebug);
+
+//     const start = Date.now();
+//     (config as any).metadata = { start };
+
+//     // bỏ guard tạm thời để chắc chắn log chạy
+//     console.groupCollapsed(
+//       `→ [Request] ${config.method?.toUpperCase()} ${config.baseURL}${
+//         config.url
+//       }`
+//     );
+//     console.log("Headers trước:", config.headers);
+//     console.log("Body      :", config.data);
+//     console.groupEnd();
+
+//     const data = await getItem<LoginData>(AUTH_KEY);
+//     if (data?.access_token) {
+//       config.headers.Authorization = `Bearer ${data.access_token}`;
+//     }
+//     return config;
+//   },
+//   (err) => {
+//     console.error("[Request Error]", err);
+//     return Promise.reject(err);
+//   }
+// );
+
+// apiClient.interceptors.response.use(
+//   (res) => {
+//     const meta = (res.config as any).metadata;
+//     const took = meta ? Date.now() - meta.start + " ms" : "";
+//     console.groupCollapsed(
+//       `← [Response] ${res.status} ${res.config.url} ${took}`
+//     );
+//     console.log("Data    :", res.data);
+//     console.groupEnd();
+//     return res;
+//   },
+//   (error) => {
+//     console.error(
+//       "[Response Error]",
+//       error.response?.status,
+//       error.config?.url,
+//       error.message
+//     );
+//     return Promise.reject(error);
+//   }
+// );
 
 export default apiClient;

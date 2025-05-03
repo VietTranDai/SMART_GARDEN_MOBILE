@@ -11,7 +11,7 @@ import {
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { ActivityType } from "@/constants/database"; // Import enum ActivityType
+import { ActivityType } from "@/types"; // Import enum ActivityType
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 export default function CreateActivityScreen() {
@@ -41,8 +41,6 @@ export default function CreateActivityScreen() {
         return "Trồng cây";
       case ActivityType.PEST_CONTROL:
         return "Kiểm soát sâu bệnh";
-      case ActivityType.SOIL_PREPARATION:
-        return "Chuẩn bị đất";
       case ActivityType.WEEDING:
         return "Nhổ cỏ";
       case ActivityType.OTHER:
@@ -65,8 +63,6 @@ export default function CreateActivityScreen() {
         return "shovel";
       case ActivityType.PEST_CONTROL:
         return "bug";
-      case ActivityType.SOIL_PREPARATION:
-        return "recycle";
       case ActivityType.WEEDING:
         return "grass";
       case ActivityType.OTHER:

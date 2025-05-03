@@ -1,13 +1,8 @@
-import React, { useEffect, ErrorInfo } from "react";
-import {
-  Stack,
-  router,
-  useSegments,
-  useRootNavigationState,
-} from "expo-router";
+import React, { useEffect, ErrorInfo, useState } from "react";
+import { Stack, router, useSegments } from "expo-router";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen"; // Fixed import
-import { getItem, setItem } from "@/utils/asyncStorage"; // Import setItem
+import { getItem } from "@/utils/asyncStorage"; // Import setItem
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -23,6 +18,8 @@ try {
       shouldShowAlert: true,
       shouldPlaySound: false,
       shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
     }),
   });
 } catch (error) {
@@ -30,27 +27,7 @@ try {
 }
 
 // Keep the splash screen visible while we fetch resources
-SplashScreen.preventAutoHideAsync();
-
-// Error handler function for expo-router routes
-function errorHandler(error: Error) {
-  console.error("Navigation error:", error);
-  // You could do more here like logging to a service
-  return (
-    <View style={styles.errorContainer}>
-      <Text style={styles.errorTitle}>Đã xảy ra lỗi</Text>
-      <Text style={styles.errorMessage}>
-        {error.message || "Đã xảy ra lỗi không mong muốn"}
-      </Text>
-      <TouchableOpacity
-        style={styles.errorButton}
-        onPress={() => router.replace("/(modules)/home")}
-      >
-        <Text style={styles.errorButtonText}>Về trang chủ</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
+SplashScreen.preventAutoHideAsync().catch(console.error);
 
 // Global Error Boundary Component
 class ErrorBoundary extends React.Component<
@@ -99,23 +76,19 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-// Internal component to handle protected routes
-function RootLayoutNavigator() {
+// Simple component to handle navigation functionality later
+function AppNavigator() {
   const segments = useSegments();
   const { user, isLoading } = useUser();
-  const navigationState = useRootNavigationState();
 
   useEffect(() => {
-    if (!navigationState?.key) return;
+    if (isLoading) return;
 
     const inAuthGroup = segments[0] === "auth";
     const inOnboardingGroup = segments[0] === "onboarding";
 
-    if (isLoading) return;
-
     async function checkOnboarding() {
       try {
-        // Use the constant key here
         const onboardingCompleted = await getItem<string>(
           ONBOARDING_COMPLETED_KEY
         );
@@ -136,30 +109,16 @@ function RootLayoutNavigator() {
             router.replace("/auth");
           }
         }
-
-        SplashScreen.hideAsync();
       } catch (error) {
         console.error("Failed to check app state", error);
-        SplashScreen.hideAsync();
         router.replace("/auth");
       }
     }
 
     checkOnboarding();
-  }, [user, segments, navigationState?.key, isLoading]);
+  }, [user, segments, isLoading]);
 
-  // Only include routes that actually exist in the app
-  return (
-    <Stack>
-      <Stack.Screen name="(modules)" options={{ headerShown: false }} />
-      <Stack.Screen name="+not-found" />
-      <Stack.Screen name="plants/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="plants/create" options={{ headerShown: false }} />
-      <Stack.Screen name="plants/index" options={{ headerShown: false }} />
-      <Stack.Screen name="auth/index" options={{ headerShown: false }} />
-      <Stack.Screen name="onboarding/index" options={{ headerShown: false }} />
-    </Stack>
-  );
+  return null;
 }
 
 export default function RootLayout() {
@@ -171,11 +130,17 @@ export default function RootLayout() {
     "Inter-Bold": require("../assets/fonts/Inter-Bold.ttf"),
   });
 
-  if (fontError) {
-    console.error("Error loading fonts:", fontError);
-  }
+  const [appReady, setAppReady] = useState(false);
 
-  if (!fontsLoaded && !fontError) {
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      // Fonts are loaded (or failed), we can proceed
+      setAppReady(true);
+      SplashScreen.hideAsync().catch(console.error);
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!appReady) {
     return null;
   }
 
@@ -185,7 +150,26 @@ export default function RootLayout() {
         <ThemeProvider>
           <UserProvider>
             <SafeAreaProvider>
-              <RootLayoutNavigator />
+              <Stack>
+                <Stack.Screen
+                  name="(modules)"
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen name="+not-found" />
+                <Stack.Screen
+                  name="auth/index"
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                  name="onboarding/index"
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                  name="sensors/[id]"
+                  options={{ headerShown: false }}
+                />
+              </Stack>
+              <AppNavigator />
             </SafeAreaProvider>
           </UserProvider>
         </ThemeProvider>

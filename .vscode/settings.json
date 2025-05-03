@@ -1,0 +1,14 @@
+{
+  "java.compile.nullAnalysis.mode": "automatic",
+  "java.configuration.updateBuildConfiguration": "interactive",
+
+  "java.project.import.exclusions": ["node_modules"],
+
+  "files.exclude": {
+    "**/node_modules": true
+  },
+
+  "files.watcherExclude": {
+    "**/node_modules/**": true
+  }
+}

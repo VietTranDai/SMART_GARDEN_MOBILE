@@ -9,56 +9,8 @@ import {
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { Alert, AlertStatus, AlertType } from "@/types";
 
-export enum AlertType {
-  WEATHER = "WEATHER",
-  SENSOR_ERROR = "SENSOR_ERROR",
-  SYSTEM = "SYSTEM",
-  PLANT_CONDITION = "PLANT_CONDITION",
-  ACTIVITY = "ACTIVITY",
-  MAINTENANCE = "MAINTENANCE",
-  SECURITY = "SECURITY",
-  OTHER = "OTHER",
-  MOISTURE = "MOISTURE",
-  TEMPERATURE = "TEMPERATURE",
-  PEST = "PEST",
-  WATERING = "WATERING",
-  LIGHT = "LIGHT",
-  HUMIDITY = "HUMIDITY",
-  NUTRIENT = "NUTRIENT",
-}
-
-export enum AlertStatus {
-  PENDING = "PENDING",
-  IN_PROGRESS = "IN_PROGRESS",
-  RESOLVED = "RESOLVED",
-  IGNORED = "IGNORED",
-  ESCALATED = "ESCALATED",
-  ACTIVE = "ACTIVE",
-}
-
-export enum NotificationMethod {
-  EMAIL = "EMAIL",
-  SMS = "SMS",
-  PUSH = "PUSH",
-  IN_APP = "IN_APP",
-  NONE = "NONE",
-}
-
-export interface Alert {
-  id: string;
-  gardenId: string;
-  title: string;
-  message: string;
-  type: AlertType;
-  status: AlertStatus;
-  priority: number;
-  timestamp: string;
-  suggestion?: string;
-  notificationMethod: NotificationMethod;
-  createdAt: string;
-  updatedAt: string;
-}
 
 interface AlertsListProps {
   alerts: Alert[];
@@ -147,8 +99,6 @@ export default function AlertsList({
         return "Đã bỏ qua";
       case AlertStatus.ESCALATED:
         return "Đã chuyển cấp";
-      case AlertStatus.ACTIVE: // Assuming ACTIVE is similar to PENDING for display
-        return "Đang hoạt động";
       default:
         return String(status);
     }
@@ -170,7 +120,7 @@ export default function AlertsList({
               styles.actionButton,
               { backgroundColor: theme.success + "20" },
             ]}
-            onPress={() => onResolveAlert(alert.id)}
+            onPress={() => onResolveAlert(alert.id.toString())}
           >
             <FontAwesome5 name="check" size={12} color={theme.success} />
             <Text style={[styles.actionText, { color: theme.success }]}>
@@ -185,7 +135,7 @@ export default function AlertsList({
               styles.actionButton,
               { backgroundColor: theme.textSecondary + "20" },
             ]}
-            onPress={() => onIgnoreAlert(alert.id)}
+            onPress={() => onIgnoreAlert(alert.id.toString())}
           >
             <FontAwesome5 name="times" size={12} color={theme.textSecondary} />
             <Text style={[styles.actionText, { color: theme.textSecondary }]}>
@@ -445,58 +395,3 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
-
-export const sampleAlerts: Alert[] = [
-  {
-    id: "1",
-    gardenId: "garden1",
-    title: "Low Soil Moisture",
-    message: "The soil moisture in zone 1 is below the recommended threshold.",
-    type: AlertType.MOISTURE,
-    status: AlertStatus.ACTIVE,
-    priority: 1,
-    timestamp: new Date().toISOString(),
-    notificationMethod: NotificationMethod.EMAIL,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    gardenId: "garden1",
-    title: "Temperature Warning",
-    message: "The temperature is expected to drop below freezing tonight.",
-    type: AlertType.TEMPERATURE,
-    status: AlertStatus.ACTIVE,
-    priority: 2,
-    timestamp: new Date().toISOString(),
-    notificationMethod: NotificationMethod.PUSH,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "3",
-    gardenId: "garden1",
-    title: "Pest Detection",
-    message: "Possible pest infestation detected in zone 2.",
-    type: AlertType.PEST,
-    status: AlertStatus.RESOLVED,
-    priority: 1,
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    notificationMethod: NotificationMethod.SMS,
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "4",
-    gardenId: "garden1",
-    title: "Watering Schedule",
-    message: "Your tomatoes are due for watering today.",
-    type: AlertType.WATERING,
-    status: AlertStatus.IGNORED,
-    priority: 3,
-    timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    notificationMethod: NotificationMethod.IN_APP,
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];

@@ -18,82 +18,31 @@ import {
   FontAwesome5,
 } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { GardenStatus, GardenType } from "@/constants/database";
-
-// --- Mock Data & Types (Aligned with Schema) ---
-// Interface matching Prisma Garden model fields relevant for list display
-interface GardenListItem {
-  id: number; // or string if your API uses string IDs
-  gardenKey: string;
-  name: string;
-  type: GardenType;
-  status: GardenStatus;
-  plantName?: string;
-  plantGrowStage?: string;
-  city?: string; // Example location field
-  district?: string;
-  thumbnail?: string; // Using thumbnail instead of 'image'
-  // Add other fields if needed for display, e.g., alert count
-  alertCount?: number;
-}
-
-// Updated Mock Generator
-const generateMockGardens = (count: number): GardenListItem[] => {
-  const gardens: GardenListItem[] = [];
-  const gardenTypes = Object.values(GardenType);
-  const gardenStatuses = Object.values(GardenStatus);
-  const plantNames = [
-    "Cà chua",
-    "Rau thơm",
-    "Rau hỗn hợp",
-    "Hoa hồng",
-    "Dâu tây",
-  ];
-  const cities = ["TP. HCM", "Hà Nội", "Đà Nẵng"];
-  const districts = ["Quận 1", "Thủ Đức", "Bình Thạnh", "Hai Bà Trưng"];
-  const images = [
-    "https://via.placeholder.com/200x120/87CEEB/000000?text=Vườn+Rau",
-    "https://via.placeholder.com/200x120/FFC0CB/000000?text=Vườn+Hoa",
-    "https://via.placeholder.com/200x120/98FB98/000000?text=Vườn+Thảo+Mộc",
-    "https://via.placeholder.com/200x120/E6E6FA/000000?text=Vườn+Chung",
-    "https://via.placeholder.com/200x120/FFE4E1/000000?text=Vườn+Dâu",
-  ];
-
-  for (let i = 1; i <= count; i++) {
-    const type = gardenTypes[i % gardenTypes.length];
-    const status = gardenStatuses[i % gardenStatuses.length];
-    const plant = plantNames[i % plantNames.length];
-
-    gardens.push({
-      id: i,
-      gardenKey: `VUON_${String(i).padStart(4, "0")}`,
-      name: `Vườn ${i} - ${plant}`,
-      type: type,
-      status: status,
-      plantName: plant,
-      plantGrowStage: ["Ra hoa", "Đang lớn", "Nảy mầm", "Thu hoạch"][i % 4],
-      city: cities[i % cities.length],
-      district: districts[i % districts.length],
-      thumbnail: images[i % images.length],
-      alertCount: Math.random() > 0.7 ? Math.floor(Math.random() * 3) + 1 : 0, // ~30% chance of alerts
-    });
-  }
-  return gardens;
-};
+import { GardenStatus, GardenType } from "@/types";
+import { gardenService } from "@/service/api";
+import { Garden } from "@/types/gardens/garden.types";
 
 export default function GardensScreen() {
   const theme = useAppTheme();
-  const [gardens, setGardens] = useState<GardenListItem[]>([]);
+  const [gardens, setGardens] = useState<Garden[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const fetchGardens = useCallback(async () => {
     setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setGardens(generateMockGardens(7)); // Generate 7 mock gardens
-    setLoading(false);
+    setError(null);
+    try {
+      const gardenData = await gardenService.getGardens();
+      setGardens(gardenData);
+    } catch (err) {
+      console.error("Failed to load gardens:", err);
+      setError("Không thể tải danh sách vườn. Vui lòng thử lại sau.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -165,24 +114,27 @@ export default function GardensScreen() {
     }
   };
 
-  // --- Render Logic (Use fields from GardenListItem) ---
+  // Get garden location display text
+  const getLocationText = (garden: Garden): string => {
+    const parts = [];
+    if (garden.district) parts.push(garden.district);
+    if (garden.city) parts.push(garden.city);
+    return parts.length > 0 ? parts.join(", ") : "Chưa có địa chỉ";
+  };
 
-  const renderGardenItem = ({ item }: { item: GardenListItem }) => (
+  // --- Render Logic (Use fields from Garden) ---
+  const renderGardenItem = ({ item }: { item: Garden }) => (
     <TouchableOpacity
       style={styles.gardenCard}
       onPress={() => router.push(`/(modules)/gardens/${item.id}`)}
     >
       <Image
-        source={{ uri: item.thumbnail }}
+        source={{ uri: `/gardens/${item.id}/thumbnail` }}
         style={styles.gardenThumbnail}
         resizeMode="cover"
         defaultSource={require("@/assets/images/icon.png")}
       />
-      {item.alertCount && item.alertCount > 0 && (
-        <View style={styles.alertBadge}>
-          <Text style={styles.alertBadgeText}>{item.alertCount}</Text>
-        </View>
-      )}
+      {/* Show alert badge if available from backend in the future */}
       <View
         style={[
           styles.statusBadge,
@@ -212,42 +164,86 @@ export default function GardensScreen() {
               size={14}
               color={theme.textSecondary}
             />
-            <Text style={styles.gardenMetaText}>
-              {item.district || item.city || "N/A"}
+            <Text style={styles.gardenMetaText} numberOfLines={1}>
+              {getLocationText(item)}
             </Text>
           </View>
         </View>
-        {(item.plantName || item.plantGrowStage) && (
-          <Text style={styles.gardenPlantInfo} numberOfLines={1}>
-            {/* Explicitly render plantName or null */}
-            {item.plantName ? item.plantName : null}
-            {/* Conditionally render separator and stage */}
-            {item.plantName && item.plantGrowStage ? " • " : null}
-            {item.plantGrowStage ? item.plantGrowStage : null}
-          </Text>
-        )}
+        <View style={styles.gardenMetaRow}>
+          {item.plantName && (
+            <View style={styles.gardenMetaItem}>
+              <Feather name="target" size={14} color={theme.textSecondary} />
+              <Text style={styles.gardenMetaText}>{item.plantName}</Text>
+            </View>
+          )}
+          {item.plantGrowStage && (
+            <View style={styles.gardenMetaItem}>
+              <FontAwesome5
+                name="seedling"
+                size={13}
+                color={theme.textSecondary}
+              />
+              <Text style={styles.gardenMetaText}>{item.plantGrowStage}</Text>
+            </View>
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   );
 
-  if (loading && !refreshing) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.primary} />
-      </View>
-    );
-  }
-
   return (
-    <>
-      <Stack.Screen options={{ title: "Quản lý Vườn" }} />
-      <SafeAreaView style={styles.container} edges={["bottom"]}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <Stack.Screen
+        options={{
+          title: "Khu vườn của tôi",
+          headerRight: () => (
+            <TouchableOpacity
+              style={styles.createButton}
+              onPress={() => router.push("/(modules)/gardens/create")}
+            >
+              <Ionicons name="add-outline" size={24} color="white" />
+            </TouchableOpacity>
+          ),
+        }}
+      />
+
+      {loading && !refreshing ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={styles.loadingText}>Đang tải khu vườn...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color={theme.error} />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchGardens}>
+            <Text style={styles.retryButtonText}>Thử lại</Text>
+          </TouchableOpacity>
+        </View>
+      ) : gardens.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <MaterialCommunityIcons
+            name="sprout"
+            size={64}
+            color={theme.textTertiary}
+          />
+          <Text style={styles.emptyTitle}>Chưa có khu vườn nào</Text>
+          <Text style={styles.emptyText}>
+            Bạn chưa có khu vườn nào. Hãy tạo khu vườn đầu tiên của bạn ngay!
+          </Text>
+          <TouchableOpacity
+            style={styles.createGardenButton}
+            onPress={() => router.push("/(modules)/gardens/create")}
+          >
+            <Text style={styles.createGardenButtonText}>Tạo khu vườn</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
         <FlatList
           data={gardens}
           renderItem={renderGardenItem}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.gardenList}
-          numColumns={1}
+          contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -257,37 +253,9 @@ export default function GardensScreen() {
               tintColor={theme.primary}
             />
           }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <FontAwesome5
-                name="seedling"
-                size={48}
-                color={theme.textTertiary}
-              />
-              <Text style={styles.emptyText}>
-                Chưa có khu vườn nào được tạo.
-              </Text>
-              <TouchableOpacity
-                style={styles.createButtonEmpty}
-                onPress={() => router.push("/(modules)/gardens/create")}
-              >
-                <Ionicons name="add" size={20} color={theme.card} />
-                <Text style={styles.createButtonText}>
-                  Tạo khu vườn đầu tiên
-                </Text>
-              </TouchableOpacity>
-            </View>
-          }
         />
-      </SafeAreaView>
-
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => router.push("/(modules)/gardens/create")}
-      >
-        <Ionicons name="add" size={30} color={theme.card} />
-      </TouchableOpacity>
-    </>
+      )}
+    </SafeAreaView>
   );
 }
 
@@ -433,5 +401,65 @@ const createStyles = (theme: any) =>
       justifyContent: "center",
       alignItems: "center",
       elevation: 5,
+    },
+    loadingText: {
+      color: theme.text,
+      fontSize: 16,
+      fontFamily: "Inter-Regular",
+      marginTop: 16,
+    },
+    errorContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 32,
+      marginTop: 40,
+      minHeight: 300,
+    },
+    errorText: {
+      color: theme.error,
+      fontSize: 16,
+      fontFamily: "Inter-Regular",
+      textAlign: "center",
+      marginTop: 16,
+      marginBottom: 24,
+    },
+    retryButton: {
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      borderRadius: 25,
+      backgroundColor: theme.primary,
+      elevation: 2,
+    },
+    retryButtonText: {
+      color: theme.card,
+      fontSize: 16,
+      fontFamily: "Inter-Medium",
+    },
+    createGardenButton: {
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      borderRadius: 25,
+      backgroundColor: theme.primary,
+      elevation: 2,
+    },
+    createGardenButtonText: {
+      color: theme.card,
+      fontSize: 16,
+      fontFamily: "Inter-Medium",
+    },
+    emptyTitle: {
+      fontSize: 20,
+      fontFamily: "Inter-SemiBold",
+      color: theme.text,
+      marginBottom: 16,
+    },
+    listContent: {
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 80,
+    },
+    createButton: {
+      padding: 12,
     },
   });

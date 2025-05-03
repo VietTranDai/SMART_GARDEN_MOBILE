@@ -14,6 +14,7 @@ import { useUser } from "@/contexts/UserContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useTheme } from "@/contexts/ThemeContext";
+import apiClient from "@/service/apiClient";
 
 export default function ModuleLayout() {
   const theme = useAppTheme();
@@ -27,9 +28,14 @@ export default function ModuleLayout() {
     // Fetch notification count from backend
     const fetchNotificationCount = async () => {
       if (user) {
-        // Simulated API call
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        setNotificationCount(3); // Example: 3 unread notifications
+        try {
+          // Replace simulated API call with real notification count API
+          const response = await apiClient.get("/user/notification-count");
+          setNotificationCount(response.data.count);
+        } catch (error) {
+          console.error("Failed to fetch notification count:", error);
+          setNotificationCount(0);
+        }
       }
     };
 
@@ -194,6 +200,7 @@ export default function ModuleLayout() {
           }}
         />
 
+        {/* Plants screens */}
         <Tabs.Screen
           name="plants/index"
           options={{
@@ -202,6 +209,23 @@ export default function ModuleLayout() {
           }}
         />
 
+        <Tabs.Screen
+          name="plants/[id]"
+          options={{
+            href: null,
+            headerTitle: "Chi tiết cây trồng",
+          }}
+        />
+
+        <Tabs.Screen
+          name="plants/create"
+          options={{
+            href: null,
+            headerTitle: "Thêm cây trồng",
+          }}
+        />
+
+        {/* Other screens */}
         <Tabs.Screen
           name="profile/[id]"
           options={{

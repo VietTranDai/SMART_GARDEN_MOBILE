@@ -1,210 +1,38 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
+  FlatList,
   TouchableOpacity,
   Image,
   RefreshControl,
-  FlatList,
   Platform,
-  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAppTheme } from "@/hooks/useAppTheme";
-import { useUser } from "@/contexts/UserContext";
 import { router } from "expo-router";
+import { useUser } from "@/contexts/UserContext";
+import { useAppTheme } from "@/hooks/useAppTheme";
 import {
   Ionicons,
   MaterialIcons,
   MaterialCommunityIcons,
-  FontAwesome5,
 } from "@expo/vector-icons";
 
-// --- Re-add Mock Data Definitions ---
+import { AlertStatus } from "@/types";
 
-// Corresponds to the 'Garden' interface used in HomeScreen
-const GARDENS_MOCK_DATA: Garden[] = [
-  {
-    id: "1", // Garden ID
-    name: "Vườn rau sân thượng",
-    cropName: "Cà chua, Húng quế", // Corresponds to plantName
-    cropStage: "Đang ra quả", // Corresponds to plantGrowStage
-    thumbnail: "https://via.placeholder.com/280x120/ADD8E6/000000?text=Vườn+1", // Placeholder image
-    location: "Quận Bình Thạnh", // Simplified location from schema (e.g., city/district)
-    alerts: 1, // Example alert count
-    sensors: {
-      // Simplified sensor overview for the card
-      temperature: 28.5,
-      humidity: 62,
-      soilMoisture: 55, // Added based on schema
-    },
-    lastActivity: "Tưới nước (1 giờ trước)", // Example activity summary
-  },
-  {
-    id: "2",
-    name: "Vườn hoa ban công",
-    cropName: "Hoa hồng, Hoa giấy",
-    cropStage: "Đang nở rộ",
-    thumbnail: "https://via.placeholder.com/280x120/FFB6C1/000000?text=Vườn+2",
-    location: "Quận 1",
-    alerts: 0,
-    sensors: {
-      temperature: 26.1,
-      humidity: 58,
-      // soilMoisture: 60, // Optional
-    },
-    lastActivity: "Bón phân (Hôm qua)",
-  },
-  {
-    id: "3",
-    name: "Vườn thảo mộc cửa sổ",
-    cropName: "Hương thảo, Bạc hà",
-    cropStage: "Đang lớn",
-    thumbnail: "https://via.placeholder.com/280x120/90EE90/000000?text=Vườn+3",
-    location: "Quận Thủ Đức",
-    alerts: 0,
-    sensors: {
-      temperature: 27.0,
-      humidity: 60,
-      soilMoisture: 65,
-    },
-    lastActivity: "Tỉa lá (2 ngày trước)",
-  },
-];
+// Import services and types from API services
+import { gardenService, sensorService, weatherService } from "@/service/api";
 
-// Corresponds to the 'SensorData' interface used in HomeScreen
-const SENSORS_MOCK_DATA: SensorData[] = [
-  // Garden 1 Sensors
-  {
-    id: "sensor-1-temp", // Unique reading ID or sensor ID
-    gardenId: "1",
-    gardenName: "Vườn rau sân thượng", // Not in schema, added for component
-    type: "TEMPERATURE", // Use SensorType Enum values from schema
-    icon: "thermometer", // Corresponding icon name
-    value: 28.5,
-    unit: "°C",
-    status: "normal",
-    timestamp: new Date(Date.now() - 300000).toISOString(), // 5 mins ago
-  },
-  {
-    id: "sensor-1-hum",
-    gardenId: "1",
-    gardenName: "Vườn rau sân thượng",
-    type: "HUMIDITY",
-    icon: "water-percent",
-    value: 62,
-    unit: "%",
-    status: "normal",
-    timestamp: new Date(Date.now() - 300000).toISOString(),
-  },
-  {
-    id: "sensor-1-soil",
-    gardenId: "1",
-    gardenName: "Vườn rau sân thượng",
-    type: "SOIL_MOISTURE",
-    icon: "water",
-    value: 55,
-    unit: "%",
-    status: "warning", // Example status
-    timestamp: new Date(Date.now() - 300000).toISOString(),
-  },
-  {
-    id: "sensor-1-light",
-    gardenId: "1",
-    gardenName: "Vườn rau sân thượng",
-    type: "LIGHT",
-    icon: "white-balance-sunny",
-    value: 15000, // Example Lux value
-    unit: " lux", // Example unit
-    status: "normal",
-    timestamp: new Date(Date.now() - 300000).toISOString(),
-  },
-  // Garden 2 Sensors
-  {
-    id: "sensor-2-temp",
-    gardenId: "2",
-    gardenName: "Vườn hoa ban công",
-    type: "TEMPERATURE",
-    icon: "thermometer",
-    value: 26.1,
-    unit: "°C",
-    status: "normal",
-    timestamp: new Date(Date.now() - 600000).toISOString(), // 10 mins ago
-  },
-  {
-    id: "sensor-2-hum",
-    gardenId: "2",
-    gardenName: "Vườn hoa ban công",
-    type: "HUMIDITY",
-    icon: "water-percent",
-    value: 58,
-    unit: "%",
-    status: "normal",
-    timestamp: new Date(Date.now() - 600000).toISOString(),
-  },
-  // Garden 3 Sensors
-  {
-    id: "sensor-3-temp",
-    gardenId: "3",
-    gardenName: "Vườn thảo mộc cửa sổ",
-    type: "TEMPERATURE",
-    icon: "thermometer",
-    value: 27.0,
-    unit: "°C",
-    status: "normal",
-    timestamp: new Date(Date.now() - 120000).toISOString(), // 2 mins ago
-  },
-  {
-    id: "sensor-3-soil",
-    gardenId: "3",
-    gardenName: "Vườn thảo mộc cửa sổ",
-    type: "SOIL_MOISTURE",
-    icon: "water",
-    value: 65,
-    unit: "%",
-    status: "normal",
-    timestamp: new Date(Date.now() - 120000).toISOString(),
-  },
-];
-
-// Corresponds to the Tip structure needed by component
-const TIP_MOCK_DATA = {
-  id: "cach-tuoi-nuoc-hieu-qua",
-  title: "Tưới nước thông minh",
-  description:
-    "Kiểm tra độ ẩm đất trước khi tưới và tưới vào sáng sớm hoặc chiều mát để giảm bay hơi.",
-  image: "https://via.placeholder.com/300x150/E0FFFF/000000?text=Mẹo+Tưới+Nước", // Placeholder
-};
-
-// Keep existing interfaces (or import from a central types file if defined there)
-interface Garden {
-  id: string;
-  name: string;
-  cropName: string;
-  cropStage: string;
-  thumbnail: string;
-  location: string;
-  alerts: number;
-  sensors: {
-    temperature?: number;
-    humidity?: number;
-    soilMoisture?: number; // Add if needed by preview
-  };
-  lastActivity: string;
-}
-
-interface SensorData {
-  id: string;
-  gardenId: string;
-  gardenName: string;
-  type: string; // Consider using SensorType enum here if available/imported
-  icon: string;
-  value: number;
-  unit: string;
-  status: "normal" | "warning" | "critical";
-  timestamp: string;
-}
+// Import UI specific types
+import {
+  Alert,
+  Garden,
+  GardenUI,
+  SensorData,
+  SensorDataUI,
+} from "@/types/gardens";
+import { WeatherObservation } from "@/types";
 
 // Define Section Types
 enum SectionType {
@@ -213,7 +41,6 @@ enum SectionType {
   SENSORS = "SENSORS",
   QUICK_ACTIONS = "QUICK_ACTIONS",
   TIPS = "TIPS",
-  // Remove LOADING/ERROR types
 }
 
 // Structure for the main FlatList data
@@ -228,52 +55,261 @@ export default function HomeScreen() {
   const { user } = useUser();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  // --- Re-instate useState for mock data ---
+  // State for real API data
   const [refreshing, setRefreshing] = useState(false);
-  const [gardens, setGardens] = useState<Garden[]>(GARDENS_MOCK_DATA);
-  const [sensorData, setSensorData] = useState<SensorData[]>(SENSORS_MOCK_DATA);
-  const [selectedGardenId, setSelectedGardenId] = useState<string | null>(null); // Initialize as null
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [gardens, setGardens] = useState<GardenUI[]>([]);
+  const [sensorDataByType, setSensorDataByType] = useState<
+    Record<string, SensorData[]>
+  >({});
+  const [selectedGardenId, setSelectedGardenId] = useState<number | null>(null);
+  const [weatherData, setWeatherData] = useState<WeatherObservation | null>(
+    null
+  );
+  const [gardenAlerts, setGardenAlerts] = useState<Record<number, Alert[]>>({});
 
-  // --- Effect to set initial selected garden ID ---
-  useEffect(() => {
-    // Set the initial garden only if it hasn't been set yet and mock data exists
-    if (selectedGardenId === null && gardens && gardens.length > 0) {
-      console.log("Setting initial selected garden (mock):", gardens[0].id);
-      setSelectedGardenId(gardens[0].id);
+  // Fetch garden data
+  const fetchGardens = useCallback(async () => {
+    try {
+      const gardensData = await gardenService.getGardens();
+
+      // Convert API gardens to UI format
+      const uiGardens: GardenUI[] = gardensData.map((garden) => ({
+        id: garden.id,
+        name: garden.name,
+        type: garden.type,
+        status: garden.status,
+        cropName: garden.plantName || "Không xác định",
+        cropStage: garden.plantGrowStage || "Không xác định",
+        thumbnail: `/gardens/${garden.id}/thumbnail`, // Placeholder URL for garden image
+        location: getLocationString(garden),
+        alerts: 0, // Will be updated when alerts are fetched
+        sensors: {}, // Will be updated when sensor data is fetched
+        lastActivity: new Date(garden.updatedAt || "").toLocaleString("vi-VN"),
+      }));
+
+      setGardens(uiGardens);
+
+      // Set initial selected garden if none selected
+      if (selectedGardenId === null && uiGardens.length > 0) {
+        setSelectedGardenId(uiGardens[0].id);
+      }
+    } catch (err) {
+      console.error("Failed to load gardens:", err);
+      setError("Không thể tải danh sách vườn. Vui lòng thử lại sau.");
     }
-    // This effect should primarily react to the 'gardens' array populating.
-  }, [gardens]); // Remove selectedGardenId from dependency array
+  }, [selectedGardenId]);
 
-  // Remove TanStack Query Hook Usage
-  // const gardensQuery = useUserGardens();
-  // const sensorsQuery = useGardenLatestSensors(selectedGardenId);
-  // const tipsQuery = useCareTips();
+  // Fetch sensor data for selected garden
+  const fetchSensorData = useCallback(async () => {
+    if (!selectedGardenId) return;
 
-  // Remove Effect related to query hooks
-  // useEffect(() => { ... }, []);
+    try {
+      const data = await sensorService.getGardenSensorData(selectedGardenId);
+      setSensorDataByType(data);
+    } catch (err) {
+      console.error("Failed to load sensor data:", err);
+      // We don't set error state here as it would override other errors
+    }
+  }, [selectedGardenId]);
 
-  // --- Restore Refresh Logic with Mock Data ---
-  const onRefresh = useCallback(() => {
+  // Fetch weather data for selected garden
+  const fetchWeatherData = useCallback(async () => {
+    if (!selectedGardenId) return;
+
+    try {
+      const data = await weatherService.getCurrentWeather(selectedGardenId);
+      setWeatherData(data);
+    } catch (err) {
+      console.error("Failed to load weather data:", err);
+    }
+  }, [selectedGardenId]);
+
+  // Fetch alerts for all gardens
+  const fetchAlerts = useCallback(async () => {
+    try {
+      const alertsData = await weatherService.getAlerts({
+        status: AlertStatus.PENDING,
+      });
+
+      // Group alerts by garden ID
+      const alertsByGarden: Record<number, Alert[]> = {};
+      alertsData.forEach((alert) => {
+        if (!alertsByGarden[alert.gardenId]) {
+          alertsByGarden[alert.gardenId] = [];
+        }
+        alertsByGarden[alert.gardenId].push(alert);
+      });
+
+      setGardenAlerts(alertsByGarden);
+
+      // Update garden data with alert counts
+      setGardens((prevGardens) =>
+        prevGardens.map((garden) => ({
+          ...garden,
+          alerts: alertsByGarden[garden.id]?.length || 0,
+        }))
+      );
+    } catch (err) {
+      console.error("Failed to load alerts:", err);
+    }
+  }, []);
+
+  // Main data fetching function
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      await Promise.all([fetchGardens(), fetchAlerts()]);
+
+      // These depend on selectedGardenId which might be set after fetchGardens
+      if (selectedGardenId) {
+        await Promise.all([fetchSensorData(), fetchWeatherData()]);
+      }
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    fetchGardens,
+    fetchSensorData,
+    fetchWeatherData,
+    fetchAlerts,
+    selectedGardenId,
+  ]);
+
+  // Effect to fetch data on component mount
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Effect to fetch garden-specific data when selectedGardenId changes
+  useEffect(() => {
+    if (selectedGardenId) {
+      Promise.all([fetchSensorData(), fetchWeatherData()]);
+    }
+  }, [selectedGardenId, fetchSensorData, fetchWeatherData]);
+
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    // Simulate data refresh
-    console.log("Refreshing data with mocks...");
-    setTimeout(() => {
-      setGardens(GARDENS_MOCK_DATA); // Reset with mock data
-      setSensorData(SENSORS_MOCK_DATA);
-      setSelectedGardenId(GARDENS_MOCK_DATA[0]?.id || null);
-      setRefreshing(false);
-      console.log("Mock refresh complete.");
-    }, 1500);
-  }, []); // No dependencies needed for mock refresh
+    await fetchData();
+    setRefreshing(false);
+  }, [fetchData]);
 
-  // Filter sensor data based on local state
-  const filteredSensorData = useMemo(() => {
-    return selectedGardenId
-      ? sensorData.filter((sensor) => sensor.gardenId === selectedGardenId)
-      : [];
-  }, [sensorData, selectedGardenId]);
+  const getLocationString = (garden: Garden) => {
+    const parts = [];
+    if (garden.district) parts.push(garden.district);
+    if (garden.city) parts.push(garden.city);
+    return parts.length > 0 ? parts.join(", ") : "Chưa có địa chỉ";
+  };
 
-  // --- Simplify Sections Definition ---
+  // Transform sensor data for UI display
+  const getSensorDisplayData = useMemo((): SensorDataUI[] => {
+    if (!selectedGardenId || !sensorDataByType) return [];
+
+    const result: SensorDataUI[] = [];
+    const selectedGarden = gardens.find((g) => g.id === selectedGardenId);
+
+    // Process temperature sensors
+    if (sensorDataByType["TEMPERATURE"]?.length) {
+      const latest = sensorDataByType["TEMPERATURE"][0];
+      result.push({
+        id: `temp-${latest.id}`,
+        gardenId: selectedGardenId,
+        gardenName: selectedGarden?.name || "",
+        type: "TEMPERATURE",
+        icon: "thermometer",
+        value: latest.value,
+        unit: "°C",
+        status: getSensorStatus(latest.value, "TEMPERATURE"),
+        timestamp: latest.timestamp,
+      });
+    }
+
+    // Process humidity sensors
+    if (sensorDataByType["HUMIDITY"]?.length) {
+      const latest = sensorDataByType["HUMIDITY"][0];
+      result.push({
+        id: `humidity-${latest.id}`,
+        gardenId: selectedGardenId,
+        gardenName: selectedGarden?.name || "",
+        type: "HUMIDITY",
+        icon: "water-percent",
+        value: latest.value,
+        unit: "%",
+        status: getSensorStatus(latest.value, "HUMIDITY"),
+        timestamp: latest.timestamp,
+      });
+    }
+
+    // Process soil moisture sensors
+    if (sensorDataByType["SOIL_MOISTURE"]?.length) {
+      const latest = sensorDataByType["SOIL_MOISTURE"][0];
+      result.push({
+        id: `soil-${latest.id}`,
+        gardenId: selectedGardenId,
+        gardenName: selectedGarden?.name || "",
+        type: "SOIL_MOISTURE",
+        icon: "water",
+        value: latest.value,
+        unit: "%",
+        status: getSensorStatus(latest.value, "SOIL_MOISTURE"),
+        timestamp: latest.timestamp,
+      });
+    }
+
+    // Process light sensors
+    if (sensorDataByType["LIGHT"]?.length) {
+      const latest = sensorDataByType["LIGHT"][0];
+      result.push({
+        id: `light-${latest.id}`,
+        gardenId: selectedGardenId,
+        gardenName: selectedGarden?.name || "",
+        type: "LIGHT",
+        icon: "weather-sunny",
+        value: latest.value,
+        unit: "lux",
+        status: getSensorStatus(latest.value, "LIGHT"),
+        timestamp: latest.timestamp,
+      });
+    }
+
+    return result;
+  }, [selectedGardenId, sensorDataByType, gardens]);
+
+  // Helper to determine sensor status
+  const getSensorStatus = (
+    value: number,
+    type: string
+  ): "normal" | "warning" | "critical" => {
+    // These thresholds should be customized based on plant requirements and garden type
+    switch (type) {
+      case "TEMPERATURE":
+        if (value < 10 || value > 35) return "critical";
+        if (value < 15 || value > 30) return "warning";
+        return "normal";
+      case "HUMIDITY":
+        if (value < 20 || value > 90) return "critical";
+        if (value < 30 || value > 80) return "warning";
+        return "normal";
+      case "SOIL_MOISTURE":
+        if (value < 10 || value > 90) return "critical";
+        if (value < 20 || value > 80) return "warning";
+        return "normal";
+      case "LIGHT":
+        if (value < 1000 || value > 100000) return "critical";
+        if (value < 5000 || value > 80000) return "warning";
+        return "normal";
+      default:
+        return "normal";
+    }
+  };
+
+  // Generate sections for the home screen
   const sections: Section[] = useMemo(() => {
     const constructedSections: Section[] = [];
 
@@ -289,7 +325,7 @@ export default function HomeScreen() {
       constructedSections.push({
         type: SectionType.SENSORS,
         key: "sensors",
-        data: filteredSensorData,
+        data: getSensorDisplayData,
       });
     } else {
       // Add a placeholder/prompt section if no garden selected
@@ -304,14 +340,22 @@ export default function HomeScreen() {
       type: SectionType.QUICK_ACTIONS,
       key: "quick_actions",
     });
-    constructedSections.push({
-      type: SectionType.TIPS,
-      key: "tips",
-      data: TIP_MOCK_DATA,
-    }); // Pass single tip object
+
+    // Only add tips section if we have weather data
+    if (weatherData) {
+      constructedSections.push({
+        type: SectionType.TIPS,
+        key: "tips",
+        data: {
+          title: "Dự báo thời tiết",
+          content: `Hiện tại: ${weatherData.temp}°C, ${weatherData.weatherDesc}`,
+          imageUrl: `https://openweathermap.org/img/wn/${weatherData.iconCode}@2x.png`,
+        },
+      });
+    }
 
     return constructedSections;
-  }, [gardens, filteredSensorData, selectedGardenId]);
+  }, [gardens, selectedGardenId, getSensorDisplayData, weatherData]);
 
   // --- Render Functions (largely the same, but ensure they use state variables) ---
   const getGreeting = () => {
@@ -321,7 +365,7 @@ export default function HomeScreen() {
     return "Chào buổi tối";
   };
 
-  const renderGardenItem = ({ item }: { item: Garden }) => (
+  const renderGardenItem = ({ item }: { item: GardenUI }) => (
     <TouchableOpacity
       style={[
         styles.gardenCard,
@@ -404,7 +448,7 @@ export default function HomeScreen() {
     </TouchableOpacity>
   );
 
-  const renderSensorItem = ({ item }: { item: SensorData }) => {
+  const renderSensorItem = ({ item }: { item: SensorDataUI }) => {
     // --- Sensor Name, Color, Icon Logic (Map from schema types) ---
     let sensorName: string;
     // Use schema types (adjust if SensorType enum imported)
@@ -447,30 +491,121 @@ export default function HomeScreen() {
     };
 
     const getSensorIcon = (type: string, iconName: string) => {
-      // Logic based on icon name provided in mock data
-      // This assumes mock data provides appropriate icon names
-      if (
-        iconName === "thermometer" ||
-        iconName === "water-percent" ||
-        iconName === "water" ||
-        iconName === "white-balance-sunny" ||
-        iconName === "waves" ||
-        iconName === "weather-pouring"
-      ) {
+      // Determine icon based on sensor type if iconName is not provided
+      if (!iconName) {
+        switch (type.toUpperCase()) {
+          case "TEMPERATURE":
+            return (
+              <MaterialCommunityIcons
+                name="thermometer"
+                size={24}
+                color={theme.textSecondary}
+              />
+            );
+          case "HUMIDITY":
+            return (
+              <MaterialCommunityIcons
+                name="water-percent"
+                size={24}
+                color={theme.textSecondary}
+              />
+            );
+          case "SOIL_MOISTURE":
+            return (
+              <MaterialCommunityIcons
+                name="water"
+                size={24}
+                color={theme.textSecondary}
+              />
+            );
+          case "LIGHT":
+            return (
+              <MaterialCommunityIcons
+                name="white-balance-sunny"
+                size={24}
+                color={theme.textSecondary}
+              />
+            );
+          case "WATER_LEVEL":
+            return (
+              <MaterialCommunityIcons
+                name="water-outline"
+                size={24}
+                color={theme.textSecondary}
+              />
+            );
+          case "RAINFALL":
+            return (
+              <MaterialCommunityIcons
+                name="weather-pouring"
+                size={24}
+                color={theme.textSecondary}
+              />
+            );
+          case "SOIL_PH":
+            return (
+              <MaterialCommunityIcons
+                name="flask-outline"
+                size={24}
+                color={theme.textSecondary}
+              />
+            );
+          default:
+            return (
+              <MaterialCommunityIcons
+                name="help-circle-outline"
+                size={24}
+                color={theme.textSecondary}
+              />
+            );
+        }
+      }
+
+      // Use provided iconName if available
+      if (iconName === "thermometer") {
         return (
           <MaterialCommunityIcons
-            name={iconName as any}
+            name="thermometer"
             size={24}
-            color={theme.primary}
+            color={theme.textSecondary}
           />
         );
-      } else if (iconName === "flask-outline") {
-        return (
-          <Ionicons name="flask-outline" size={24} color={theme.primary} />
-        );
-      } else {
-        return <Ionicons name="leaf-outline" size={24} color={theme.primary} />;
       }
+      if (iconName === "water-percent") {
+        return (
+          <MaterialCommunityIcons
+            name="water-percent"
+            size={24}
+            color={theme.textSecondary}
+          />
+        );
+      }
+      if (iconName === "water") {
+        return (
+          <MaterialCommunityIcons
+            name="water"
+            size={24}
+            color={theme.textSecondary}
+          />
+        );
+      }
+      if (iconName === "white-balance-sunny") {
+        return (
+          <MaterialCommunityIcons
+            name="white-balance-sunny"
+            size={24}
+            color={theme.textSecondary}
+          />
+        );
+      }
+      // Default icon
+      return (
+        <MaterialCommunityIcons
+          name="gauge"
+          size={24}
+          color={theme.textSecondary}
+        />
+      );
     };
 
     return (
@@ -780,7 +915,7 @@ export default function HomeScreen() {
         );
 
       case SectionType.TIPS:
-        const tip = section.data; // Data is the single tip object (TIP_MOCK_DATA)
+        const tip = section.data; // Weather forecast data
         if (!tip) return null;
         return (
           <View style={styles.section}>
@@ -797,7 +932,7 @@ export default function HomeScreen() {
               onPress={() => router.push(`/tips/${tip.id}`)} // Use tip id
             >
               <Image
-                source={{ uri: tip.image }}
+                source={{ uri: tip.image || tip.imageUrl }}
                 style={styles.tipImage}
                 defaultSource={require("@/assets/images/icon.png")} // Keep placeholder
               />
@@ -812,7 +947,7 @@ export default function HomeScreen() {
                   ]}
                   numberOfLines={2}
                 >
-                  {tip.description}
+                  {tip.description || tip.content}
                 </Text>
                 <Text style={[styles.tipLink, { color: theme.primary }]}>
                   Đọc thêm

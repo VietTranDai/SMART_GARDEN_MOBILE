@@ -12,60 +12,9 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { TaskStatus } from "@/constants/database"; // Assuming TaskStatus is here
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
-
-interface WateringScheduleItem {
-  id: number;
-  gardenId: number;
-  scheduledAt: string;
-  amount: number; // in Liters
-  status: TaskStatus;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Mock data generation function
-const generateMockWateringSchedule = (
-  gardenId: string
-): WateringScheduleItem[] => {
-  const schedules = [];
-  const now = new Date();
-  const statuses: TaskStatus[] = [
-    TaskStatus.PENDING,
-    TaskStatus.COMPLETED,
-    TaskStatus.SKIPPED,
-    TaskStatus.PENDING,
-    TaskStatus.COMPLETED,
-  ];
-  const numSchedules = Math.floor(Math.random() * 8) + 5; // 5-12 schedules
-
-  for (let i = 0; i < numSchedules; i++) {
-    const scheduledTime = new Date(now);
-    // Spread schedules over the next 7 days and past 3 days
-    const dayOffset = Math.floor(Math.random() * 10) - 3; // -3 to +6 days from now
-    scheduledTime.setDate(now.getDate() + dayOffset);
-    scheduledTime.setHours(Math.floor(Math.random() * 12) + 6, 0, 0, 0); // Schedule between 6 AM and 6 PM
-
-    schedules.push({
-      id: i + 1,
-      gardenId: parseInt(gardenId),
-      scheduledAt: scheduledTime.toISOString(),
-      amount: Math.round(Math.random() * 5 + 5), // 5-10 liters
-      status: statuses[i % statuses.length],
-      createdAt: new Date(
-        now.getTime() - Math.random() * 1000 * 60 * 60 * 24 * 5
-      ).toISOString(), // Created in last 5 days
-      updatedAt: new Date().toISOString(),
-    });
-  }
-  // Sort schedules by date ascending
-  schedules.sort(
-    (a, b) =>
-      new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
-  );
-  return schedules;
-};
+import { TaskStatus, WateringScheduleItem } from "@/types";
+import { taskService, gardenService } from "@/service/api";
 
 export default function GardenScheduleScreen() {
   const theme = useAppTheme();
@@ -76,6 +25,8 @@ export default function GardenScheduleScreen() {
   const [schedule, setSchedule] = useState<WateringScheduleItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [garden, setGarden] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Helper function to display Vietnamese Task/Alert status
   const getStatusText = (status: TaskStatus): string => {
@@ -106,12 +57,21 @@ export default function GardenScheduleScreen() {
   const loadSchedule = useCallback(async () => {
     if (!gardenId) return;
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    setError(null);
+
     try {
-      const mockSchedule = generateMockWateringSchedule(gardenId);
-      setSchedule(mockSchedule);
+      // Get garden details for the name
+      const gardenData = await gardenService.getGardenById(gardenId);
+      setGarden(gardenData);
+
+      // Get watering schedules for this garden
+      const scheduleData = await taskService.getGardenWateringSchedules(
+        gardenId
+      );
+      setSchedule(scheduleData as WateringScheduleItem[]);
     } catch (error) {
       console.error("Failed to load schedule:", error);
+      setError("Không thể tải lịch tưới. Vui lòng thử lại sau.");
     } finally {
       setIsLoading(false);
     }
@@ -128,49 +88,111 @@ export default function GardenScheduleScreen() {
   }, [loadSchedule]);
 
   const handleAddNewSchedule = () => {
-    // TODO: Navigate to a new screen or show a modal to add schedule
-    Alert.alert(
-      "Chức năng đang phát triển",
-      "Tạo lịch tưới mới sẽ được thêm vào sau."
-    );
+    // Navigate to the schedule creation screen
+    router.push({
+      pathname: "/(modules)/gardens/schedule",
+      params: { id: gardenId },
+    });
   };
 
-  const renderScheduleItem = ({ item }: { item: WateringScheduleItem }) => (
-    <View style={styles.itemContainer}>
-      <MaterialIcons
-        name="water-drop"
-        size={24}
-        color={getStatusColor(item.status)}
-      />
-      <View style={styles.itemDetails}>
-        <Text style={styles.itemDateTime}>
-          {new Date(item.scheduledAt).toLocaleTimeString("vi-VN", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}{" "}
-          -{" "}
-          {new Date(item.scheduledAt).toLocaleDateString("vi-VN", {
-            weekday: "short",
-            day: "2-digit",
-            month: "2-digit",
-          })}
-        </Text>
-        <Text style={styles.itemAmount}>{item.amount} Lít nước</Text>
+  const handleUpdateScheduleStatus = async (
+    id: number,
+    newStatus: TaskStatus
+  ) => {
+    try {
+      if (newStatus === TaskStatus.COMPLETED) {
+        await taskService.completeWateringSchedule(id.toString());
+      } else if (newStatus === TaskStatus.SKIPPED) {
+        await taskService.skipWateringSchedule(id.toString());
+      }
+
+      // Update local state
+      setSchedule((prevSchedule) =>
+        prevSchedule.map((item) =>
+          item.id === id ? { ...item, status: newStatus } : item
+        )
+      );
+    } catch (error) {
+      console.error(`Failed to update schedule status:`, error);
+      Alert.alert("Lỗi", "Không thể cập nhật trạng thái lịch tưới.");
+    }
+  };
+
+  const renderScheduleItem = ({ item }: { item: WateringScheduleItem }) => {
+    const isPending = item.status === TaskStatus.PENDING;
+    const isPast = new Date(item.scheduledAt) < new Date();
+
+    return (
+      <View style={styles.itemContainer}>
+        <MaterialIcons
+          name="water-drop"
+          size={24}
+          color={getStatusColor(item.status)}
+        />
+        <View style={styles.itemDetails}>
+          <Text style={styles.itemDateTime}>
+            {new Date(item.scheduledAt).toLocaleTimeString("vi-VN", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}{" "}
+            -{" "}
+            {new Date(item.scheduledAt).toLocaleDateString("vi-VN", {
+              weekday: "short",
+              day: "2-digit",
+              month: "2-digit",
+            })}
+          </Text>
+          <Text style={styles.itemAmount}>{item.amount} Lít nước</Text>
+        </View>
+
+        <View style={styles.itemActions}>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: getStatusColor(item.status) + "20" },
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusText,
+                { color: getStatusColor(item.status) },
+              ]}
+            >
+              {getStatusText(item.status)}
+            </Text>
+          </View>
+
+          {isPending && !isPast && (
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  { backgroundColor: theme.success + "20" },
+                ]}
+                onPress={() =>
+                  handleUpdateScheduleStatus(item.id, TaskStatus.COMPLETED)
+                }
+              >
+                <MaterialIcons name="check" size={16} color={theme.success} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  { backgroundColor: theme.warning + "20" },
+                ]}
+                onPress={() =>
+                  handleUpdateScheduleStatus(item.id, TaskStatus.SKIPPED)
+                }
+              >
+                <MaterialIcons name="close" size={16} color={theme.warning} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </View>
-      <View
-        style={[
-          styles.statusBadge,
-          { backgroundColor: getStatusColor(item.status) + "20" },
-        ]}
-      >
-        <Text
-          style={[styles.statusText, { color: getStatusColor(item.status) }]}
-        >
-          {getStatusText(item.status)}
-        </Text>
-      </View>
-    </View>
-  );
+    );
+  };
 
   const renderEmptyComponent = () => (
     <View style={styles.emptyContainer}>
@@ -191,19 +213,37 @@ export default function GardenScheduleScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: `Lịch tưới Vườn ${gardenId}` }} />
+      <Stack.Screen
+        options={{
+          title: garden?.name
+            ? `Lịch tưới - ${garden.name}`
+            : `Lịch tưới Vườn ${gardenId}`,
+        }}
+      />
 
       {isLoading && schedule.length === 0 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.loadingText}>Đang tải lịch tưới...</Text>
         </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <MaterialCommunityIcons
+            name="alert-circle-outline"
+            size={60}
+            color={theme.error}
+          />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadSchedule}>
+            <Text style={styles.retryButtonText}>Thử lại</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           data={schedule}
           renderItem={renderScheduleItem}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContentContainer}
+          contentContainerStyle={styles.listContent}
           ListEmptyComponent={renderEmptyComponent}
           refreshControl={
             <RefreshControl
@@ -215,14 +255,11 @@ export default function GardenScheduleScreen() {
           }
         />
       )}
+
       {/* Floating Action Button to add new schedule */}
-      {!isLoading && (
+      {!isLoading && !error && (
         <TouchableOpacity style={styles.fab} onPress={handleAddNewSchedule}>
-          <MaterialCommunityIcons
-            name="calendar-plus"
-            size={24}
-            color={theme.card}
-          />
+          <MaterialCommunityIcons name="plus" size={24} color={theme.card} />
         </TouchableOpacity>
       )}
     </SafeAreaView>
@@ -241,25 +278,51 @@ const createStyles = (theme: any) =>
       alignItems: "center",
     },
     loadingText: {
-      marginTop: 10,
+      marginTop: 16,
       fontSize: 16,
       color: theme.textSecondary,
+      fontFamily: "Inter-Regular",
     },
-    listContentContainer: {
+    errorContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 24,
+    },
+    errorText: {
+      marginTop: 16,
+      fontSize: 16,
+      color: theme.text,
+      fontFamily: "Inter-Medium",
+      textAlign: "center",
+    },
+    retryButton: {
+      marginTop: 24,
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      backgroundColor: theme.primary,
+      borderRadius: 8,
+    },
+    retryButtonText: {
+      color: theme.card,
+      fontSize: 16,
+      fontFamily: "Inter-SemiBold",
+    },
+    listContent: {
       padding: 16,
-      paddingBottom: 80, // Add padding for FAB
+      paddingBottom: 80, // Space for FAB
     },
     itemContainer: {
       flexDirection: "row",
       alignItems: "center",
-      backgroundColor: theme.card,
       padding: 16,
-      borderRadius: 8,
+      backgroundColor: theme.card,
+      borderRadius: 12,
       marginBottom: 12,
-      elevation: 1,
+      elevation: 2,
       shadowColor: theme.shadow,
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
+      shadowOpacity: 0.1,
       shadowRadius: 2,
     },
     itemDetails: {
@@ -277,58 +340,71 @@ const createStyles = (theme: any) =>
       fontFamily: "Inter-Regular",
       color: theme.textSecondary,
     },
+    itemActions: {
+      alignItems: "flex-end",
+    },
     statusBadge: {
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-      borderRadius: 12,
-      marginLeft: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+      borderRadius: 16,
+      alignItems: "center",
+      marginBottom: 8,
     },
     statusText: {
-      fontSize: 13,
-      fontFamily: "Inter-SemiBold",
-      textTransform: "capitalize",
+      fontSize: 12,
+      fontFamily: "Inter-Medium",
+    },
+    actionButtons: {
+      flexDirection: "row",
+    },
+    actionButton: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      justifyContent: "center",
+      alignItems: "center",
+      marginLeft: 8,
     },
     emptyContainer: {
       flex: 1,
       justifyContent: "center",
       alignItems: "center",
-      marginTop: 50,
-      paddingHorizontal: 30,
+      padding: 24,
+      marginTop: 40,
     },
     emptyText: {
       fontSize: 18,
-      fontFamily: "Inter-SemiBold",
-      color: theme.textSecondary,
+      color: theme.text,
       marginTop: 16,
+      marginBottom: 24,
       textAlign: "center",
+      fontFamily: "Inter-Regular",
     },
     addButtonEmpty: {
-      marginTop: 24,
       backgroundColor: theme.primary,
       paddingVertical: 12,
-      paddingHorizontal: 24,
+      paddingHorizontal: 20,
       borderRadius: 8,
     },
     addButtonEmptyText: {
       color: theme.card,
       fontSize: 16,
-      fontFamily: "Inter-Medium",
+      fontFamily: "Inter-SemiBold",
     },
     fab: {
       position: "absolute",
-      margin: 16,
-      right: 10,
-      bottom: 20,
-      backgroundColor: theme.primary,
+      bottom: 24,
+      right: 24,
       width: 56,
       height: 56,
       borderRadius: 28,
+      backgroundColor: theme.primary,
       justifyContent: "center",
       alignItems: "center",
-      elevation: 8,
+      elevation: 4,
       shadowColor: theme.shadow,
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.3,
-      shadowRadius: 4,
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
     },
   });

@@ -3,94 +3,19 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   ActivityIndicator,
   TouchableOpacity,
   RefreshControl,
   ScrollView,
+  Alert,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import ActivityList, {
-  GardenActivity as ActivityListItemType,
-} from "@/components/garden/ActivityList";
-import { ActivityType } from "@/constants/database";
+import ActivityList from "@/components/garden/ActivityList";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-
-// Define problematic types based on previous errors/context
-const problematicActivityTypes = [
-  ActivityType.PEST_CONTROL,
-  ActivityType.SOIL_PREPARATION,
-  ActivityType.WEEDING,
-  ActivityType.OTHER,
-];
-
-// Mock data generation function (similar to the one in garden detail)
-const generateMockActivities = (gardenId: string): ActivityListItemType[] => {
-  const activityTypes = Object.values(ActivityType).filter(
-    (t) => !problematicActivityTypes.includes(t)
-  ); // Filter out problematic types
-  const activities = [];
-  const now = new Date();
-  const numActivities = Math.floor(Math.random() * 15) + 10; // Generate 10-24 activities
-
-  const getActivityTypeText = (actType: ActivityType): string => {
-    switch (actType) {
-      case ActivityType.WATERING:
-        return "Tưới nước";
-      case ActivityType.FERTILIZING:
-        return "Bón phân";
-      case ActivityType.PRUNING:
-        return "Cắt tỉa";
-      case ActivityType.HARVESTING:
-        return "Thu hoạch";
-      case ActivityType.PLANTING:
-        return "Trồng cây";
-      // Comment out or remove types causing issues if filtering above is not enough
-      // case ActivityType.PEST_CONTROL:
-      //   return "Kiểm soát sâu bệnh";
-      // case ActivityType.SOIL_PREPARATION:
-      //   return "Chuẩn bị đất";
-      // case ActivityType.WEEDING:
-      //   return "Nhổ cỏ";
-      // case ActivityType.OTHER:
-      // default:
-      default: // Default remains for any unexpected types
-        return "Khác";
-    }
-  };
-
-  for (let i = 0; i < numActivities; i++) {
-    const activityTime = new Date(now);
-    // Spread activities over the last 30 days
-    activityTime.setDate(now.getDate() - Math.floor(Math.random() * 30));
-    activityTime.setHours(8 + Math.floor(Math.random() * 10)); // Random hour between 8 AM and 6 PM
-    const type =
-      activityTypes[Math.floor(Math.random() * activityTypes.length)];
-
-    activities.push({
-      id: i + 1,
-      gardenId: parseInt(gardenId),
-      gardenerId: 1, // Assume gardener ID 1
-      activityType: type,
-      timestamp: activityTime.toISOString(),
-      details: `${getActivityTypeText(type)} cho vườn ${gardenId}.`,
-      notes:
-        Math.random() > 0.3
-          ? `Ghi chú hoạt động #${i + 1}. Lorem ipsum dolor sit amet.`
-          : null, // Add some notes randomly
-      createdAt: activityTime.toISOString(),
-      updatedAt: activityTime.toISOString(),
-    });
-  }
-  // Sort activities by timestamp descending (most recent first)
-  activities.sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-  );
-  // Use type assertion to bypass enum mismatch error - TODO: Unify ActivityType definitions later
-  return activities as ActivityListItemType[];
-};
+import { GardenActivity } from "@/types";
+import { taskService, gardenService } from "@/service/api";
 
 export default function GardenActivityHistoryScreen() {
   const theme = useAppTheme();
@@ -98,22 +23,29 @@ export default function GardenActivityHistoryScreen() {
   const { id: gardenId } = useLocalSearchParams<{ id: string }>(); // Get gardenId from route '[id]'
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const [activities, setActivities] = useState<ActivityListItemType[]>([]);
+  const [activities, setActivities] = useState<GardenActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [garden, setGarden] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const loadActivities = useCallback(async () => {
     if (!gardenId) return;
     console.log("Loading activities for garden:", gardenId);
     setIsLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 700));
+    setError(null);
+
     try {
-      const mockActivities = generateMockActivities(gardenId);
-      setActivities(mockActivities);
+      // Get garden details for the name
+      const gardenData = await gardenService.getGardenById(gardenId);
+      setGarden(gardenData);
+
+      // Get activities for this garden
+      const activitiesData = await taskService.getActivitiesByGarden(gardenId);
+      setActivities(activitiesData);
     } catch (error) {
       console.error("Failed to load activities:", error);
-      // Handle error display
+      setError("Không thể tải hoạt động. Vui lòng thử lại sau.");
     } finally {
       setIsLoading(false);
     }
@@ -150,13 +82,31 @@ export default function GardenActivityHistoryScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
-      {/* Use gardenId in the title, maybe fetch garden name later */}
-      <Stack.Screen options={{ title: `Lịch sử hoạt động Vườn ${gardenId}` }} />
+      {/* Display garden name if available */}
+      <Stack.Screen
+        options={{
+          title: garden?.name
+            ? `Lịch sử hoạt động - ${garden.name}`
+            : `Lịch sử hoạt động Vườn ${gardenId}`,
+        }}
+      />
 
       {isLoading && activities.length === 0 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.loadingText}>Đang tải hoạt động...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <MaterialCommunityIcons
+            name="alert-circle-outline"
+            size={60}
+            color={theme.error}
+          />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadActivities}>
+            <Text style={styles.retryButtonText}>Thử lại</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <ScrollView
@@ -180,7 +130,7 @@ export default function GardenActivityHistoryScreen() {
       )}
 
       {/* Floating Action Button to add new activity */}
-      {!isLoading && (
+      {!isLoading && !error && (
         <TouchableOpacity
           style={styles.fab}
           onPress={() =>
@@ -206,66 +156,83 @@ const createStyles = (theme: any) =>
       alignItems: "center",
     },
     loadingText: {
-      marginTop: 10,
+      marginTop: 16,
       fontSize: 16,
       color: theme.textSecondary,
+      fontFamily: "Inter-Regular",
+    },
+    errorContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 24,
+    },
+    errorText: {
+      marginTop: 16,
+      fontSize: 16,
+      color: theme.text,
+      fontFamily: "Inter-Medium",
+      textAlign: "center",
+    },
+    retryButton: {
+      marginTop: 24,
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      backgroundColor: theme.primary,
+      borderRadius: 8,
+    },
+    retryButtonText: {
+      color: theme.card,
+      fontSize: 16,
+      fontFamily: "Inter-SemiBold",
+    },
+    scrollView: {
+      flex: 1,
     },
     listContentContainer: {
-      padding: 16,
-      paddingBottom: 80, // Add padding for FAB
-    },
-    headerTitle: {
-      fontSize: 24,
-      fontFamily: "Inter-Bold",
-      color: theme.text,
-      marginBottom: 16,
-      paddingHorizontal: 16, // Match list padding
-      paddingTop: 16,
+      flexGrow: 1,
+      paddingBottom: 80, // Extra space for FAB
     },
     emptyContainer: {
       flex: 1,
       justifyContent: "center",
       alignItems: "center",
-      marginTop: 50, // Adjust as needed
-      paddingHorizontal: 30,
+      padding: 24,
+      marginTop: 40,
     },
     emptyText: {
       fontSize: 18,
-      fontFamily: "Inter-SemiBold",
-      color: theme.textSecondary,
+      color: theme.text,
       marginTop: 16,
+      marginBottom: 24,
       textAlign: "center",
+      fontFamily: "Inter-Regular",
     },
     addButtonEmpty: {
-      marginTop: 24,
       backgroundColor: theme.primary,
       paddingVertical: 12,
-      paddingHorizontal: 24,
+      paddingHorizontal: 20,
       borderRadius: 8,
     },
     addButtonEmptyText: {
       color: theme.card,
       fontSize: 16,
-      fontFamily: "Inter-Medium",
+      fontFamily: "Inter-SemiBold",
     },
     fab: {
       position: "absolute",
-      margin: 16,
-      right: 10,
-      bottom: 20,
-      backgroundColor: theme.primary,
+      bottom: 24,
+      right: 24,
       width: 56,
       height: 56,
       borderRadius: 28,
+      backgroundColor: theme.primary,
       justifyContent: "center",
       alignItems: "center",
-      elevation: 8,
+      elevation: 4,
       shadowColor: theme.shadow,
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.3,
-      shadowRadius: 4,
-    },
-    scrollView: {
-      flex: 1,
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
     },
   });

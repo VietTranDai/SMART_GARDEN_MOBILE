@@ -28,27 +28,22 @@ export default function AuthScreen() {
   const [errorMessage, setErrorMessage] = useState("");
 
   const styles = useMemo(() => createStyles(theme), [theme]);
-
   const { signIn } = useUser();
 
   const handleSignIn = async () => {
     if (!username || !password) {
-      setErrorMessage("Please enter both username and password");
+      setErrorMessage("Vui lòng nhập tên đăng nhập và mật khẩu");
       return;
     }
-
-    setIsLoading(true);
     setErrorMessage("");
-
+    setIsLoading(true);
     try {
-      // Simulate network request
       await new Promise((resolve) => setTimeout(resolve, 1500));
-
       await signIn({ username, password });
-      // The navigation will be handled in the root layout
     } catch (error) {
-      console.error("Sign in failed:", error);
-      setErrorMessage("Invalid username or password. Please try again.");
+      setErrorMessage(
+        "Tên đăng nhập hoặc mật khẩu không đúng. Vui lòng thử lại."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -57,101 +52,131 @@ export default function AuthScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style={isDarkMode ? "light" : "dark"} />
+      {/* Loading Overlay */}
+      {isLoading && (
+        <View style={styles.loadingOverlay} pointerEvents="auto">
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      )}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardAvoidingView}
       >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <View style={styles.logoContainer}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+          scrollEnabled={!isLoading}
+        >
+          <View
+            style={styles.logoContainer}
+            pointerEvents={isLoading ? "none" : "auto"}
+          >
             <Image
-              source={require('@/assets/images/hcmut.png')}
+              source={require("@/assets/images/hcmut.png")}
               style={styles.logo}
               resizeMode="contain"
             />
-            <Text style={styles.title}>Smart Farm</Text>
-            <Text style={styles.subtitle}>Welcome back!</Text>
+            <Text style={styles.title}>Khu vườn thông minh</Text>
+            <Text style={styles.subtitle}>Chào mừng bạn trở lại!</Text>
           </View>
 
-          <View style={styles.formContainer}>
+          <View
+            style={styles.formCard}
+            pointerEvents={isLoading ? "none" : "auto"}
+          >
             {errorMessage ? (
               <Text style={styles.errorText}>{errorMessage}</Text>
             ) : null}
 
-            {/* Username Input */}
-            <Text style={styles.label}>Username</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="person-outline"
-                size={20}
-                color={theme.textSecondary}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your username"
-                placeholderTextColor={theme.inputPlaceholder}
-                value={username}
-                onChangeText={setUsername}
-                autoCapitalize="none"
-                keyboardType="default"
-                textContentType="username"
-              />
-            </View>
-
-            {/* Password Input */}
-            <Text style={styles.label}>Password</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="lock-closed-outline"
-                size={20}
-                color={theme.textSecondary}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your password"
-                placeholderTextColor={theme.inputPlaceholder}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                textContentType="password"
-              />
-              <TouchableOpacity
-                onPress={() => setShowPassword(!showPassword)}
-                style={styles.showPasswordButton}
-              >
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Tên đăng nhập</Text>
+              <View style={styles.inputContainer}>
                 <Ionicons
-                  name={showPassword ? "eye-off-outline" : "eye-outline"}
-                  size={24}
+                  name="person-outline"
+                  size={20}
                   color={theme.textSecondary}
+                  style={styles.inputIcon}
                 />
-              </TouchableOpacity>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Nhập tên đăng nhập"
+                  placeholderTextColor={theme.inputPlaceholder}
+                  value={username}
+                  onChangeText={setUsername}
+                  autoCapitalize="none"
+                  keyboardType="default"
+                  textContentType="username"
+                  editable={!isLoading}
+                />
+              </View>
             </View>
 
-            <TouchableOpacity style={styles.forgotPasswordButton}>
-              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Mật khẩu</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={20}
+                  color={theme.textSecondary}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Nhập mật khẩu"
+                  placeholderTextColor={theme.inputPlaceholder}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  textContentType="password"
+                  editable={!isLoading}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.showPasswordButton}
+                  disabled={isLoading}
+                >
+                  <Ionicons
+                    name={showPassword ? "eye-off-outline" : "eye-outline"}
+                    size={24}
+                    color={theme.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.forgotPasswordButton,
+                isLoading && styles.disabledButton,
+              ]}
+              disabled={isLoading}
+            >
+              <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.signInButton}
+              style={[
+                styles.signInButton,
+                isLoading && styles.signInButtonDisabled,
+              ]}
               onPress={handleSignIn}
               disabled={isLoading}
+              activeOpacity={0.8}
             >
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text style={styles.signInButtonText}>Sign In</Text>
-              )}
+              <Text style={styles.signInButtonText}>Đăng nhập</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.footerContainer}>
+          <View
+            style={styles.footerContainer}
+            pointerEvents={isLoading ? "none" : "auto"}
+          >
             <Text style={styles.footerText}>
-              Don't have an account? Contact your administrator at{" "}
+              Bạn chưa có tài khoản? Liên hệ quản trị viên qua{" "}
               <Text
                 style={styles.linkText}
                 onPress={() => {
-                  console.log("Link to mailto:viet.trankhmtbk22@hcmut.edu.vn");
+                  console.log("mailto:viet.trankhmtbk22@hcmut.edu.vn");
                 }}
               >
                 viet.trankhmtbk22@hcmut.edu.vn
@@ -168,105 +193,127 @@ const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
+      backgroundColor: theme.background,
+      position: "relative",
+    },
+    loadingOverlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0,0,0,0.3)",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 10,
     },
     keyboardAvoidingView: {
       flex: 1,
     },
     scrollContainer: {
       flexGrow: 1,
-      paddingHorizontal: 24,
-      paddingBottom: 40,
+      padding: 24,
+      justifyContent: "center",
     },
     logoContainer: {
       alignItems: "center",
-      marginTop: 40,
-      marginBottom: 40,
+      marginBottom: 32,
     },
     logo: {
-      width: 100,
-      height: 100,
-      marginBottom: 20,
+      width: 120,
+      height: 120,
+      marginBottom: 16,
     },
     title: {
-      fontSize: 28,
-      fontWeight: "bold",
-      marginBottom: 8,
+      fontSize: 32,
       fontFamily: "Inter-Bold",
+      color: theme.primary,
     },
     subtitle: {
-      fontSize: 16,
-      textAlign: "center",
+      fontSize: 18,
       fontFamily: "Inter-Regular",
+      color: theme.textSecondary,
+      marginTop: 4,
     },
-    formContainer: {
-      width: "100%",
+    formCard: {
+      backgroundColor: theme.cardBackground,
+      borderRadius: 2,
+      borderWidth: 1,
+      borderColor: theme.border,
+      padding: 16,
+      marginBottom: 24,
+      elevation: 2,
     },
-    errorText: {
-      color: "#D32F2F",
-      marginBottom: 20,
-      fontSize: 14,
-      fontFamily: "Inter-Regular",
-      textAlign: "center",
+    inputGroup: {
+      marginBottom: 16,
     },
     label: {
-      fontSize: 16,
-      marginBottom: 8,
+      fontSize: 14,
       fontFamily: "Inter-Medium",
       color: theme.text,
+      marginBottom: 8,
     },
     inputContainer: {
       flexDirection: "row",
       alignItems: "center",
-      borderWidth: 1,
-      borderRadius: 10,
-      height: 55,
-      marginBottom: 20,
       backgroundColor: theme.inputBackground,
+      borderRadius: 10,
+      borderWidth: 1,
       borderColor: theme.border,
+      height: 48,
+      paddingHorizontal: 16,
     },
     inputIcon: {
-      marginLeft: 16,
+      marginRight: 8,
     },
     input: {
       flex: 1,
-      paddingHorizontal: 8,
       fontSize: 16,
       fontFamily: "Inter-Regular",
-      height: "100%",
       color: theme.text,
     },
     showPasswordButton: {
-      padding: 16,
+      padding: 8,
     },
     forgotPasswordButton: {
       alignSelf: "flex-end",
-      marginBottom: 24,
+      marginBottom: 16,
     },
     forgotPasswordText: {
       fontSize: 14,
       fontFamily: "Inter-Medium",
       color: theme.primary,
     },
+    disabledButton: {
+      opacity: 0.6,
+    },
     signInButton: {
-      paddingVertical: 16,
+      backgroundColor: theme.primary,
+      paddingVertical: 14,
       borderRadius: 10,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.primary,
+      marginTop: 8,
+    },
+    signInButtonDisabled: {
+      backgroundColor: theme.disabled,
     },
     signInButtonText: {
       fontSize: 16,
-      fontWeight: "bold",
       fontFamily: "Inter-Bold",
-      color: "#FFFFFF",
+      color: "#FFF",
+    },
+    errorText: {
+      color: "#D32F2F",
+      textAlign: "center",
+      marginBottom: 12,
+      fontFamily: "Inter-Regular",
     },
     footerContainer: {
-      marginTop: 40,
       alignItems: "center",
     },
     footerText: {
       fontSize: 14,
-      textAlign: "center",
       fontFamily: "Inter-Regular",
       color: theme.textSecondary,
     },

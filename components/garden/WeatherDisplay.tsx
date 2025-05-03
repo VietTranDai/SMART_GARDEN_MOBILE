@@ -1,37 +1,19 @@
 import React from "react";
 import { View, Text, StyleSheet, ScrollView, Image } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-
-// Types based on Prisma schema
-interface WeatherData {
-  temp: number;
-  feelsLike: number;
-  humidity: number;
-  pressure: number;
-  windSpeed: number;
-  windDeg: number;
-  cloudiness: number;
-  weatherMain: string;
-  weatherDesc: string;
-  iconCode: string;
-  observedAt: string;
-}
-
-interface ForecastItem {
-  forecastFor: string;
-  temp: number;
-  weatherMain: string;
-  weatherDesc: string;
-  iconCode: string;
-  pop: number; // Probability of precipitation
-}
+import { useAppTheme } from "@/hooks/useAppTheme";
+import {
+  WeatherMain,
+  WeatherObservation,
+  HourlyForecast,
+  DailyForecast,
+} from "@/types";
 
 interface WeatherDisplayProps {
-  currentWeather: WeatherData;
-  hourlyForecast: ForecastItem[];
-  dailyForecast: ForecastItem[];
+  currentWeather: WeatherObservation;
+  hourlyForecast: HourlyForecast[];
+  dailyForecast: DailyForecast[];
 }
 
 export default function WeatherDisplay({
@@ -41,12 +23,11 @@ export default function WeatherDisplay({
 }: WeatherDisplayProps) {
   const theme = useAppTheme();
 
-  const getWeatherIcon = (iconCode: string) => {
-    return `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
-  };
+  const getWeatherIcon = (iconCode: string) =>
+    `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
 
-  const getWindDirection = (degrees: number) => {
-    const directions = [
+  const getWindDirection = (deg: number) => {
+    const dirs = [
       "B",
       "BĐB",
       "ĐB",
@@ -64,30 +45,26 @@ export default function WeatherDisplay({
       "TB",
       "NTB",
     ];
-    const index = Math.round(degrees / 22.5) % 16;
-    return directions[index];
+    return dirs[Math.round(deg / 22.5) % 16];
   };
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("vi-VN", {
+  const formatTime = (iso: string) =>
+    new Date(iso).toLocaleTimeString("vi-VN", {
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
     });
-  };
 
-  const formatDay = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("vi-VN", {
+  const formatDay = (iso: string) =>
+    new Date(iso).toLocaleDateString("vi-VN", {
       weekday: "short",
       month: "numeric",
       day: "numeric",
     });
-  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.card }]}>
+      {/* --- Hiện tại --- */}
       <View style={styles.currentWeatherContainer}>
         <View style={styles.mainWeatherInfo}>
           <Image
@@ -147,7 +124,7 @@ export default function WeatherDisplay({
                 { color: theme.textSecondary },
               ]}
             >
-              {currentWeather.cloudiness}%
+              {currentWeather.clouds}%
             </Text>
           </View>
 
@@ -169,6 +146,7 @@ export default function WeatherDisplay({
         </View>
       </View>
 
+      {/* --- Dự báo hàng giờ --- */}
       <View style={styles.forecastSection}>
         <Text style={[styles.forecastTitle, { color: theme.text }]}>
           Dự báo hàng giờ
@@ -178,9 +156,9 @@ export default function WeatherDisplay({
           showsHorizontalScrollIndicator={false}
           style={styles.horizontalScroll}
         >
-          {hourlyForecast.map((item, index) => (
+          {hourlyForecast.map((item, idx) => (
             <View
-              key={index}
+              key={idx}
               style={[styles.hourlyItem, { borderColor: theme.border }]}
             >
               <Text style={[styles.hourlyTime, { color: theme.text }]}>
@@ -206,19 +184,20 @@ export default function WeatherDisplay({
         </ScrollView>
       </View>
 
+      {/* --- Dự báo 5 ngày --- */}
       <View style={styles.forecastSection}>
         <Text style={[styles.forecastTitle, { color: theme.text }]}>
           Dự báo 5 ngày
         </Text>
         <View style={styles.dailyForecastContainer}>
-          {dailyForecast.map((item, index) => (
+          {dailyForecast.map((item, idx) => (
             <View
-              key={index}
+              key={idx}
               style={[
                 styles.dailyItem,
                 {
                   borderBottomColor:
-                    index < dailyForecast.length - 1
+                    idx < dailyForecast.length - 1
                       ? theme.divider
                       : "transparent",
                 },
@@ -227,12 +206,10 @@ export default function WeatherDisplay({
               <Text style={[styles.dayName, { color: theme.text }]}>
                 {formatDay(item.forecastFor)}
               </Text>
-              <View style={styles.dailyIconContainer}>
-                <Image
-                  source={{ uri: getWeatherIcon(item.iconCode) }}
-                  style={styles.dailyIcon}
-                />
-              </View>
+              <Image
+                source={{ uri: getWeatherIcon(item.iconCode) }}
+                style={styles.dailyIcon}
+              />
               <Text style={[styles.dailyDesc, { color: theme.textSecondary }]}>
                 {item.weatherDesc.charAt(0).toUpperCase() +
                   item.weatherDesc.slice(1)}
@@ -246,7 +223,7 @@ export default function WeatherDisplay({
                 </Text>
               </View>
               <Text style={[styles.dailyTemp, { color: theme.text }]}>
-                {Math.round(item.temp)}°C
+                {Math.round(item.tempDay)}°C
               </Text>
             </View>
           ))}
@@ -358,13 +335,10 @@ const styles = StyleSheet.create({
     flex: 1.5,
     fontSize: 14,
   },
-  dailyIconContainer: {
-    flex: 0.75,
-    alignItems: "center",
-  },
   dailyIcon: {
     width: 40,
     height: 40,
+    marginHorizontal: 8,
   },
   dailyDesc: {
     flex: 2,

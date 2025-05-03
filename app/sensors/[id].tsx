@@ -170,6 +170,7 @@ export default function SensorDetailScreen() {
       new Date(reading.timestamp).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
+        hour12: false,
       })
     ) || [];
   // Show fewer labels if too many
@@ -255,7 +256,7 @@ export default function SensorDetailScreen() {
                   },
                 ],
               }}
-              width={screenWidth - 40} // from react-native
+              width={screenWidth - 40} // Increase width slightly
               height={220}
               yAxisLabel=""
               yAxisSuffix={sensorDetails.unit}
@@ -281,7 +282,7 @@ export default function SensorDetailScreen() {
                   strokeDasharray: "", // Solid lines
                 },
               }}
-              verticalLabelRotation={30} // Rotate labels to prevent overlap
+              verticalLabelRotation={0} // Increase rotation angle
               bezier // Smooth line
               style={styles.chartStyle}
             />
