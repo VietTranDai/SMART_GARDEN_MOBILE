@@ -16,7 +16,7 @@ class GardenService {
    */
   async getGardens(): Promise<Garden[]> {
     const response = await apiClient.get(GARDEN_ENDPOINTS.LIST);
-    return response.data;
+    return response.data.data;
   }
 
   /**
@@ -26,7 +26,7 @@ class GardenService {
    */
   async getGardenById(id: number | string): Promise<Garden> {
     const response = await apiClient.get(GARDEN_ENDPOINTS.DETAIL(id));
-    return response.data;
+    return response.data.data;
   }
 
   /**
@@ -36,7 +36,7 @@ class GardenService {
    */
   async createGarden(gardenData: CreateGardenDto): Promise<Garden> {
     const response = await apiClient.post(GARDEN_ENDPOINTS.CREATE, gardenData);
-    return response.data;
+    return response.data.data;
   }
 
   /**
@@ -53,7 +53,7 @@ class GardenService {
       GARDEN_ENDPOINTS.UPDATE(id),
       gardenData
     );
-    return response.data;
+    return response.data.data;
   }
 
   /**

@@ -8,10 +8,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import {Stack, useLocalSearchParams, useRouter} from "expo-router";
-import React, {useCallback, useEffect, useMemo, useState} from "react";
-import {Feather, FontAwesome5, MaterialIcons,} from "@expo/vector-icons";
-import {useAppTheme} from "@/hooks/useAppTheme";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Feather, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
+import { useAppTheme } from "@/hooks/useAppTheme";
 
 // Import custom components
 import WeatherDisplay from "@/components/garden/WeatherDisplay";
@@ -25,9 +25,14 @@ import gardenService from "@/service/api/garden.service";
 import weatherService from "@/service/api/weather.service";
 import sensorService from "@/service/api/sensor.service";
 import taskService from "@/service/api/task.service";
+import activityService from "@/service/api/activity.service";
 
 // Import weather types directly from the weather types file
-import {DailyForecast, HourlyForecast, WeatherObservation} from "@/types/weather/weather.types";
+import {
+  DailyForecast,
+  HourlyForecast,
+  WeatherObservation,
+} from "@/types/weather/weather.types";
 
 // Import enums and potentially types from the central database constants/types file
 import {
@@ -40,8 +45,7 @@ import {
   TaskStatus,
   WateringScheduleItem,
 } from "@/types";
-import {apiClient} from "@/service";
-
+import { apiClient } from "@/service";
 
 enum DetailSectionType {
   STATUS = "STATUS",
@@ -69,26 +73,29 @@ export default function GardenDetailScreen() {
 
   // State for garden data
   const [garden, setGarden] = useState<Garden | null>(null);
-  const [currentWeather, setCurrentWeather] = useState<WeatherObservation | null>(null);
+  const [currentWeather, setCurrentWeather] =
+    useState<WeatherObservation | null>(null);
   const [hourlyForecast, setHourlyForecast] = useState<HourlyForecast[]>([]);
   const [dailyForecast, setDailyForecast] = useState<DailyForecast[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [wateringSchedule, setWateringSchedule] = useState<WateringScheduleItem[]>([]);
+  const [wateringSchedule, setWateringSchedule] = useState<
+    WateringScheduleItem[]
+  >([]);
   const [activities, setActivities] = useState<GardenActivity[]>([]);
   const [sensors, setSensors] = useState<Sensor[]>([]);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Load garden data using API calls
   const loadGardenData = useCallback(async (gardenId: string) => {
     if (!gardenId) return;
     setIsLoading(true);
     setError(null);
-    
+
     try {
       // Load garden details
       const gardenData = await gardenService.getGardenById(gardenId);
       setGarden(gardenData);
-      
+
       // Load weather data
       try {
         const weatherData = await weatherService.getCurrentWeather(gardenId);
@@ -97,7 +104,7 @@ export default function GardenDetailScreen() {
         console.error("Failed to load weather data:", error);
         setCurrentWeather(null);
       }
-      
+
       // Load hourly forecast
       try {
         const hourlyData = await weatherService.getHourlyForecast(gardenId);
@@ -106,7 +113,7 @@ export default function GardenDetailScreen() {
         console.error("Failed to load hourly forecast:", error);
         setHourlyForecast([]);
       }
-      
+
       // Load daily forecast
       try {
         const dailyData = await weatherService.getDailyForecast(gardenId);
@@ -115,7 +122,7 @@ export default function GardenDetailScreen() {
         console.error("Failed to load daily forecast:", error);
         setDailyForecast([]);
       }
-      
+
       // Load sensors
       try {
         const sensorData = await sensorService.getSensorsByGarden(gardenId);
@@ -124,7 +131,7 @@ export default function GardenDetailScreen() {
         console.error("Failed to load sensor data:", error);
         setSensors([]);
       }
-      
+
       // Load alerts
       try {
         const alertData = await weatherService.getAlertsByGarden(gardenId);
@@ -133,25 +140,26 @@ export default function GardenDetailScreen() {
         console.error("Failed to load alerts:", error);
         setAlerts([]);
       }
-      
+
       // Load watering schedule
       try {
-        const response = await apiClient.get(`/gardens/${gardenId}/watering-schedule`);
+        const response = await apiClient.get(
+          `/gardens/${gardenId}/watering-schedule`
+        );
         setWateringSchedule(response.data);
       } catch (error) {
         console.error("Failed to load watering schedule:", error);
         setWateringSchedule([]);
       }
-      
+
       // Load activities
       try {
-        const response = await taskService.getActivitiesByGarden(gardenId);
+        const response = await activityService.getActivitiesByGarden(gardenId);
         setActivities(response);
       } catch (error) {
         console.error("Failed to load activities:", error);
         setActivities([]);
       }
-      
     } catch (error) {
       console.error("Failed to load garden data:", error);
       setError("Failed to load garden data. Please try again.");
@@ -163,7 +171,7 @@ export default function GardenDetailScreen() {
 
   useEffect(() => {
     if (id) {
-      loadGardenData(id).then(r => console.log(r));
+      loadGardenData(id).then((r) => console.log(r));
     }
   }, [id, loadGardenData]);
 
@@ -192,12 +200,12 @@ export default function GardenDetailScreen() {
       // Show error toast or message
     }
   };
-  
+
   const handleIgnoreAlert = async (alertId: number) => {
     try {
       // Assuming there's an API endpoint to ignore alerts
       await apiClient.post(`/alerts/${alertId}/ignore`);
-      
+
       setAlerts((prevAlerts) =>
         prevAlerts.filter((alert) => alert.id !== alertId)
       );
@@ -367,7 +375,9 @@ export default function GardenDetailScreen() {
                 dailyForecast={item.dailyForecast}
               />
             ) : (
-              <Text style={styles.noDataText}>Đang tải dữ liệu thời tiết...</Text>
+              <Text style={styles.noDataText}>
+                Đang tải dữ liệu thời tiết...
+              </Text>
             )}
           </View>
         );
@@ -375,8 +385,12 @@ export default function GardenDetailScreen() {
         return (
           <AlertsList
             alerts={item}
-            onResolveAlert={(alertId: string) => handleResolveAlert(Number(alertId))}
-            onIgnoreAlert={(alertId: string) => handleIgnoreAlert(Number(alertId))}
+            onResolveAlert={(alertId: string) =>
+              handleResolveAlert(Number(alertId))
+            }
+            onIgnoreAlert={(alertId: string) =>
+              handleIgnoreAlert(Number(alertId))
+            }
           />
         );
       case DetailSectionType.SCHEDULE:
@@ -616,10 +630,13 @@ export default function GardenDetailScreen() {
         <TouchableOpacity
           onPress={() => {
             if (id) {
-              loadGardenData(id).then(r => console.log(r));
+              loadGardenData(id).then((r) => console.log(r));
             }
           }}
-          style={[styles.backButtonOnError, { marginTop: 10, backgroundColor: theme.secondary }]}
+          style={[
+            styles.backButtonOnError,
+            { marginTop: 10, backgroundColor: theme.secondary },
+          ]}
         >
           <Text style={styles.backButtonText}>Thử lại</Text>
         </TouchableOpacity>
@@ -635,8 +652,8 @@ export default function GardenDetailScreen() {
         keyExtractor={(item, index) => {
           // Ensure a unique string key even if item.id is missing/invalid
           return typeof item?.id === "string" || typeof item?.id === "number"
-              ? item.id.toString()
-              : `idx-${index}`;
+            ? item.id.toString()
+            : `idx-${index}`;
         }}
         renderItem={renderSectionItem}
         renderSectionHeader={renderSectionHeader}

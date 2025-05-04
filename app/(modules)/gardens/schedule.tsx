@@ -16,7 +16,7 @@ import {
 import { Stack, useRouter, useGlobalSearchParams } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { taskService, gardenService } from "@/service/api";
+import { taskService, gardenService, wateringService } from "@/service/api";
 import { Garden, WateringSchedule, TaskStatus } from "@/types";
 
 // Comment out DateTimePicker import until package is properly installed
@@ -56,7 +56,7 @@ export default function WateringScheduleScreen() {
       setGarden(gardenData);
 
       // Fetch watering schedules
-      const schedulesData = await taskService.getGardenWateringSchedules(
+      const schedulesData = await wateringService.getGardenWateringSchedules(
         gardenId
       );
       setSchedules(schedulesData);
@@ -103,10 +103,13 @@ export default function WateringScheduleScreen() {
     try {
       const gardenId = typeof id === "string" ? id : id.toString();
 
-      const newSchedule = await taskService.createWateringSchedule(gardenId, {
-        scheduledAt: scheduledAt.toISOString(),
-        amount: parseFloat(waterAmount),
-      });
+      const newSchedule = await wateringService.createWateringSchedule(
+        gardenId,
+        {
+          scheduledAt: scheduledAt.toISOString(),
+          amount: parseFloat(waterAmount),
+        }
+      );
 
       setSchedules((prev) => [newSchedule, ...prev]);
       setShowScheduleForm(false);
@@ -137,7 +140,9 @@ export default function WateringScheduleScreen() {
     try {
       const gardenId = typeof id === "string" ? id : id.toString();
 
-      const newSchedule = await taskService.generateAutomaticSchedule(gardenId);
+      const newSchedule = await wateringService.generateAutomaticSchedule(
+        gardenId
+      );
 
       setSchedules((prev) => [newSchedule, ...prev]);
 
@@ -170,7 +175,7 @@ export default function WateringScheduleScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await taskService.deleteWateringSchedule(scheduleId);
+              await wateringService.deleteWateringSchedule(scheduleId);
               setSchedules((prev) =>
                 prev.filter((schedule) => schedule.id !== scheduleId)
               );
@@ -193,9 +198,9 @@ export default function WateringScheduleScreen() {
   ) => {
     try {
       if (newStatus === TaskStatus.COMPLETED) {
-        await taskService.completeWateringSchedule(scheduleId);
+        await wateringService.completeWateringSchedule(scheduleId);
       } else if (newStatus === TaskStatus.SKIPPED) {
-        await taskService.skipWateringSchedule(scheduleId);
+        await wateringService.skipWateringSchedule(scheduleId);
       }
 
       // Update local state

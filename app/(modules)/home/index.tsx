@@ -8,6 +8,7 @@ import {
   Image,
   RefreshControl,
   Platform,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -17,22 +18,20 @@ import {
   Ionicons,
   MaterialIcons,
   MaterialCommunityIcons,
+  FontAwesome5,
 } from "@expo/vector-icons";
+import env from "@/config/environment";
 
-import { AlertStatus } from "@/types";
+// Import proper types from schema
+import { AlertStatus, AlertType } from "@/types/gardens/alert.types";
+import { Garden, GardenStatus, GardenType } from "@/types/gardens/garden.types";
+import { Sensor, SensorData, SensorType } from "@/types/gardens/sensor.types";
+import { WeatherObservation } from "@/types/weather/weather.types";
+import { Alert } from "@/types/gardens/alert.types";
 
-// Import services and types from API services
+// Import services
 import { gardenService, sensorService, weatherService } from "@/service/api";
-
-// Import UI specific types
-import {
-  Alert,
-  Garden,
-  GardenUI,
-  SensorData,
-  SensorDataUI,
-} from "@/types/gardens";
-import { WeatherObservation } from "@/types";
+import { API_URL } from "@env";
 
 // Define Section Types
 enum SectionType {
@@ -41,6 +40,7 @@ enum SectionType {
   SENSORS = "SENSORS",
   QUICK_ACTIONS = "QUICK_ACTIONS",
   TIPS = "TIPS",
+  WEATHER = "WEATHER",
 }
 
 // Structure for the main FlatList data
@@ -48,6 +48,31 @@ interface Section {
   type: SectionType;
   key: string;
   data?: any;
+}
+
+// Define a display interface for sensor data
+interface SensorDisplay {
+  id: string;
+  gardenId: number;
+  gardenName: string;
+  type: SensorType;
+  icon: string;
+  value: number;
+  unit: string;
+  status: "normal" | "warning" | "critical";
+  timestamp: string;
+}
+
+// Define a combined garden view interface
+interface GardenDisplay extends Garden {
+  alertCount: number;
+  sensorData: {
+    temperature?: number;
+    humidity?: number;
+    soilMoisture?: number;
+    light?: number;
+  };
+  location: string;
 }
 
 export default function HomeScreen() {
@@ -59,7 +84,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [gardens, setGardens] = useState<GardenUI[]>([]);
+  const [gardens, setGardens] = useState<GardenDisplay[]>([]);
   const [sensorDataByType, setSensorDataByType] = useState<
     Record<string, SensorData[]>
   >({});
@@ -74,26 +99,19 @@ export default function HomeScreen() {
     try {
       const gardensData = await gardenService.getGardens();
 
-      // Convert API gardens to UI format
-      const uiGardens: GardenUI[] = gardensData.map((garden) => ({
-        id: garden.id,
-        name: garden.name,
-        type: garden.type,
-        status: garden.status,
-        cropName: garden.plantName || "Không xác định",
-        cropStage: garden.plantGrowStage || "Không xác định",
-        thumbnail: `/gardens/${garden.id}/thumbnail`, // Placeholder URL for garden image
+      // Convert API gardens to display format with additional UI properties
+      const displayGardens: GardenDisplay[] = gardensData.map((garden) => ({
+        ...garden,
+        alertCount: 0, // Will be updated when alerts are fetched
+        sensorData: {}, // Will be updated when sensor data is fetched
         location: getLocationString(garden),
-        alerts: 0, // Will be updated when alerts are fetched
-        sensors: {}, // Will be updated when sensor data is fetched
-        lastActivity: new Date(garden.updatedAt || "").toLocaleString("vi-VN"),
       }));
 
-      setGardens(uiGardens);
+      setGardens(displayGardens);
 
       // Set initial selected garden if none selected
-      if (selectedGardenId === null && uiGardens.length > 0) {
-        setSelectedGardenId(uiGardens[0].id);
+      if (selectedGardenId === null && displayGardens.length > 0) {
+        setSelectedGardenId(displayGardens[0].id);
       }
     } catch (err) {
       console.error("Failed to load gardens:", err);
@@ -108,21 +126,29 @@ export default function HomeScreen() {
     try {
       const data = await sensorService.getGardenSensorData(selectedGardenId);
       setSensorDataByType(data);
+
+      // Update garden sensor data summaries
+      setGardens((prev) =>
+        prev.map((garden) => {
+          if (garden.id === selectedGardenId) {
+            // Extract the latest reading of each sensor type
+            const sensorSummary = {
+              temperature: data["TEMPERATURE"]?.[0]?.value,
+              humidity: data["HUMIDITY"]?.[0]?.value,
+              soilMoisture: data["SOIL_MOISTURE"]?.[0]?.value,
+              light: data["LIGHT"]?.[0]?.value,
+            };
+
+            return {
+              ...garden,
+              sensorData: sensorSummary,
+            };
+          }
+          return garden;
+        })
+      );
     } catch (err) {
       console.error("Failed to load sensor data:", err);
-      // We don't set error state here as it would override other errors
-    }
-  }, [selectedGardenId]);
-
-  // Fetch weather data for selected garden
-  const fetchWeatherData = useCallback(async () => {
-    if (!selectedGardenId) return;
-
-    try {
-      const data = await weatherService.getCurrentWeather(selectedGardenId);
-      setWeatherData(data);
-    } catch (err) {
-      console.error("Failed to load weather data:", err);
     }
   }, [selectedGardenId]);
 
@@ -148,7 +174,7 @@ export default function HomeScreen() {
       setGardens((prevGardens) =>
         prevGardens.map((garden) => ({
           ...garden,
-          alerts: alertsByGarden[garden.id]?.length || 0,
+          alertCount: alertsByGarden[garden.id]?.length || 0,
         }))
       );
     } catch (err) {
@@ -156,15 +182,28 @@ export default function HomeScreen() {
     }
   }, []);
 
+  // Fetch weather data for selected garden
+  const fetchWeatherData = useCallback(async () => {
+    if (!selectedGardenId) return;
+
+    try {
+      const data = await weatherService.getCurrentWeather(selectedGardenId);
+      setWeatherData(data);
+    } catch (err) {
+      console.error("Failed to load weather data:", err);
+    }
+  }, [selectedGardenId]);
+
   // Main data fetching function
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
+      // First fetch gardens and alerts (they don't depend on selectedGardenId)
       await Promise.all([fetchGardens(), fetchAlerts()]);
 
-      // These depend on selectedGardenId which might be set after fetchGardens
+      // Then fetch data that depends on selectedGardenId
       if (selectedGardenId) {
         await Promise.all([fetchSensorData(), fetchWeatherData()]);
       }
@@ -207,105 +246,114 @@ export default function HomeScreen() {
     return parts.length > 0 ? parts.join(", ") : "Chưa có địa chỉ";
   };
 
+  // Helper to determine sensor status
+  const getSensorStatus = (
+    value: number,
+    type: SensorType
+  ): "normal" | "warning" | "critical" => {
+    // Improved thresholds based on plant science
+    switch (type) {
+      case SensorType.TEMPERATURE:
+        if (value < 5 || value > 40) return "critical";
+        if (value < 15 || value > 32) return "warning";
+        return "normal";
+      case SensorType.HUMIDITY:
+        if (value < 20 || value > 90) return "critical";
+        if (value < 30 || value > 80) return "warning";
+        return "normal";
+      case SensorType.SOIL_MOISTURE:
+        if (value < 10 || value > 90) return "critical";
+        if (value < 20 || value > 80) return "warning";
+        return "normal";
+      case SensorType.LIGHT:
+        if (value < 1000 || value > 100000) return "critical";
+        if (value < 5000 || value > 80000) return "warning";
+        return "normal";
+      case SensorType.SOIL_PH:
+        if (value < 4 || value > 9) return "critical";
+        if (value < 5.5 || value > 7.5) return "warning";
+        return "normal";
+      default:
+        return "normal";
+    }
+  };
+
   // Transform sensor data for UI display
-  const getSensorDisplayData = useMemo((): SensorDataUI[] => {
+  const getSensorDisplayData = useMemo((): SensorDisplay[] => {
     if (!selectedGardenId || !sensorDataByType) return [];
 
-    const result: SensorDataUI[] = [];
+    const result: SensorDisplay[] = [];
     const selectedGarden = gardens.find((g) => g.id === selectedGardenId);
 
-    // Process temperature sensors
-    if (sensorDataByType["TEMPERATURE"]?.length) {
-      const latest = sensorDataByType["TEMPERATURE"][0];
-      result.push({
-        id: `temp-${latest.id}`,
-        gardenId: selectedGardenId,
-        gardenName: selectedGarden?.name || "",
-        type: "TEMPERATURE",
-        icon: "thermometer",
-        value: latest.value,
-        unit: "°C",
-        status: getSensorStatus(latest.value, "TEMPERATURE"),
-        timestamp: latest.timestamp,
-      });
-    }
+    // Process different sensor types
+    Object.entries(sensorDataByType).forEach(([typeKey, sensorReadings]) => {
+      if (sensorReadings?.length) {
+        const latest = sensorReadings[0];
+        const sensorType = typeKey as SensorType;
 
-    // Process humidity sensors
-    if (sensorDataByType["HUMIDITY"]?.length) {
-      const latest = sensorDataByType["HUMIDITY"][0];
-      result.push({
-        id: `humidity-${latest.id}`,
-        gardenId: selectedGardenId,
-        gardenName: selectedGarden?.name || "",
-        type: "HUMIDITY",
-        icon: "water-percent",
-        value: latest.value,
-        unit: "%",
-        status: getSensorStatus(latest.value, "HUMIDITY"),
-        timestamp: latest.timestamp,
-      });
-    }
+        let unit = "";
+        switch (sensorType) {
+          case SensorType.TEMPERATURE:
+            unit = "°C";
+            break;
+          case SensorType.HUMIDITY:
+            unit = "%";
+            break;
+          case SensorType.SOIL_MOISTURE:
+            unit = "%";
+            break;
+          case SensorType.LIGHT:
+            unit = "lux";
+            break;
+          case SensorType.SOIL_PH:
+            unit = "pH";
+            break;
+          case SensorType.RAINFALL:
+            unit = "mm";
+            break;
+          case SensorType.WATER_LEVEL:
+            unit = "cm";
+            break;
+          default:
+            unit = "";
+        }
 
-    // Process soil moisture sensors
-    if (sensorDataByType["SOIL_MOISTURE"]?.length) {
-      const latest = sensorDataByType["SOIL_MOISTURE"][0];
-      result.push({
-        id: `soil-${latest.id}`,
-        gardenId: selectedGardenId,
-        gardenName: selectedGarden?.name || "",
-        type: "SOIL_MOISTURE",
-        icon: "water",
-        value: latest.value,
-        unit: "%",
-        status: getSensorStatus(latest.value, "SOIL_MOISTURE"),
-        timestamp: latest.timestamp,
-      });
-    }
-
-    // Process light sensors
-    if (sensorDataByType["LIGHT"]?.length) {
-      const latest = sensorDataByType["LIGHT"][0];
-      result.push({
-        id: `light-${latest.id}`,
-        gardenId: selectedGardenId,
-        gardenName: selectedGarden?.name || "",
-        type: "LIGHT",
-        icon: "weather-sunny",
-        value: latest.value,
-        unit: "lux",
-        status: getSensorStatus(latest.value, "LIGHT"),
-        timestamp: latest.timestamp,
-      });
-    }
+        result.push({
+          id: `${sensorType.toLowerCase()}-${latest.id}`,
+          gardenId: selectedGardenId,
+          gardenName: selectedGarden?.name || "",
+          type: sensorType,
+          icon: getSensorIconName(sensorType),
+          value: latest.value,
+          unit,
+          status: getSensorStatus(latest.value, sensorType),
+          timestamp: latest.timestamp,
+        });
+      }
+    });
 
     return result;
   }, [selectedGardenId, sensorDataByType, gardens]);
 
-  // Helper to determine sensor status
-  const getSensorStatus = (
-    value: number,
-    type: string
-  ): "normal" | "warning" | "critical" => {
-    // These thresholds should be customized based on plant requirements and garden type
-    switch (type) {
-      case "TEMPERATURE":
-        if (value < 10 || value > 35) return "critical";
-        if (value < 15 || value > 30) return "warning";
-        return "normal";
-      case "HUMIDITY":
-        if (value < 20 || value > 90) return "critical";
-        if (value < 30 || value > 80) return "warning";
-        return "normal";
-      case "SOIL_MOISTURE":
-        if (value < 10 || value > 90) return "critical";
-        if (value < 20 || value > 80) return "warning";
-        return "normal";
-      case "LIGHT":
-        if (value < 1000 || value > 100000) return "critical";
-        if (value < 5000 || value > 80000) return "warning";
-        return "normal";
+  // Helper to get the sensor icon name
+  const getSensorIconName = (sensorType: SensorType): string => {
+    switch (sensorType) {
+      case SensorType.TEMPERATURE:
+        return "thermometer";
+      case SensorType.HUMIDITY:
+        return "water-percent";
+      case SensorType.SOIL_MOISTURE:
+        return "water-outline";
+      case SensorType.LIGHT:
+        return "white-balance-sunny";
+      case SensorType.WATER_LEVEL:
+        return "water";
+      case SensorType.RAINFALL:
+        return "weather-pouring";
+      case SensorType.SOIL_PH:
+        return "flask-outline";
       default:
-        return "normal";
+        return "gauge";
     }
   };
 
@@ -314,6 +362,16 @@ export default function HomeScreen() {
     const constructedSections: Section[] = [];
 
     constructedSections.push({ type: SectionType.HEADER, key: "header" });
+
+    // Add weather section if data is available
+    if (weatherData) {
+      constructedSections.push({
+        type: SectionType.WEATHER,
+        key: "weather",
+        data: weatherData,
+      });
+    }
+
     constructedSections.push({
       type: SectionType.GARDENS,
       key: "gardens",
@@ -327,8 +385,8 @@ export default function HomeScreen() {
         key: "sensors",
         data: getSensorDisplayData,
       });
-    } else {
-      // Add a placeholder/prompt section if no garden selected
+    } else if (gardens.length > 0) {
+      // Add a placeholder/prompt section if no garden selected but gardens exist
       constructedSections.push({
         type: SectionType.SENSORS,
         key: "sensors-prompt",
@@ -347,8 +405,8 @@ export default function HomeScreen() {
         type: SectionType.TIPS,
         key: "tips",
         data: {
-          title: "Dự báo thời tiết",
-          content: `Hiện tại: ${weatherData.temp}°C, ${weatherData.weatherDesc}`,
+          title: "Lời khuyên dựa trên thời tiết",
+          content: getWeatherTip(weatherData),
           imageUrl: `https://openweathermap.org/img/wn/${weatherData.iconCode}@2x.png`,
         },
       });
@@ -357,15 +415,24 @@ export default function HomeScreen() {
     return constructedSections;
   }, [gardens, selectedGardenId, getSensorDisplayData, weatherData]);
 
-  // --- Render Functions (largely the same, but ensure they use state variables) ---
-  const getGreeting = () => {
-    const currentHour = new Date().getHours();
-    if (currentHour < 12) return "Chào buổi sáng";
-    if (currentHour < 18) return "Chào buổi chiều";
-    return "Chào buổi tối";
+  // Function to generate weather-based gardening tips
+  const getWeatherTip = (weather: WeatherObservation): string => {
+    if (weather.temp > 32) {
+      return "Nhiệt độ cao, hãy tưới thêm nước cho cây và tránh tưới vào buổi trưa.";
+    } else if (weather.temp < 15) {
+      return "Nhiệt độ thấp, hãy che chắn cho cây khỏi gió lạnh và hạn chế tưới nước.";
+    } else if (weather.humidity > 85) {
+      return "Độ ẩm cao, cẩn thận với nấm bệnh. Hạn chế phun nước lên lá cây.";
+    } else if (weather.humidity < 30) {
+      return "Độ ẩm thấp, hãy tưới nhẹ vào buổi sáng sớm hoặc chiều tối.";
+    } else if (weather.weatherMain === "RAIN") {
+      return "Đang có mưa, tránh bón phân để tránh rửa trôi dinh dưỡng.";
+    }
+    return `Thời tiết lý tưởng cho việc chăm sóc vườn. Nhiệt độ: ${weather.temp}°C, Độ ẩm: ${weather.humidity}%.`;
   };
 
-  const renderGardenItem = ({ item }: { item: GardenUI }) => (
+  // Render functions for list items
+  const renderGardenItem = ({ item }: { item: GardenDisplay }) => (
     <TouchableOpacity
       style={[
         styles.gardenCard,
@@ -375,14 +442,14 @@ export default function HomeScreen() {
             selectedGardenId === item.id ? theme.primary : theme.card,
         },
       ]}
-      onPress={() => setSelectedGardenId(item.id)} // Use state setter
+      onPress={() => setSelectedGardenId(item.id)}
       onLongPress={() => router.push(`/(modules)/gardens/${item.id}`)}
     >
       <Image
-        source={{ uri: item.thumbnail }} // Use thumbnail from data
+        source={{ uri: `${env.apiUrl}${item.profilePicture}` }}
         style={styles.gardenThumbnail}
         resizeMode="cover"
-        defaultSource={require("@/assets/images/icon.png")} // Keep placeholder
+        defaultSource={require("@/assets/images/icon.png")}
       />
       <View style={styles.gardenContent}>
         <View style={styles.gardenHeader}>
@@ -392,11 +459,17 @@ export default function HomeScreen() {
           >
             {item.name}
           </Text>
-          {item.alerts > 0 && (
+          {item.alertCount > 0 && (
             <View style={[styles.alertBadge, { backgroundColor: theme.error }]}>
-              <Text style={styles.alertBadgeText}>{item.alerts}</Text>
+              <Text style={styles.alertBadgeText}>{item.alertCount}</Text>
             </View>
           )}
+        </View>
+
+        <View style={styles.gardenTypeContainer}>
+          <Text style={[styles.gardenType, { color: theme.textSecondary }]}>
+            {getGardenTypeIcon(item.type)} {getGardenTypeLabel(item.type)}
+          </Text>
         </View>
 
         <Text style={[styles.gardenLocation, { color: theme.textSecondary }]}>
@@ -404,12 +477,18 @@ export default function HomeScreen() {
           {" " + item.location}
         </Text>
 
-        <Text style={[styles.gardenCrop, { color: theme.textSecondary }]}>
-          {item.cropName} • {item.cropStage}
-        </Text>
+        {item.plantName && (
+          <View style={styles.plantInfoContainer}>
+            <FontAwesome5 name="seedling" size={14} color={theme.success} />
+            <Text style={[styles.gardenCrop, { color: theme.textSecondary }]}>
+              {item.plantName}
+              {item.plantGrowStage && ` • ${item.plantGrowStage}`}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.sensorPreviewContainer}>
-          {item.sensors?.temperature != null && ( // Check for null/undefined
+          {item.sensorData?.temperature != null && (
             <View style={styles.sensorPreview}>
               <MaterialCommunityIcons
                 name="thermometer"
@@ -419,11 +498,11 @@ export default function HomeScreen() {
               <Text
                 style={[styles.sensorValue, { color: theme.textSecondary }]}
               >
-                {item.sensors.temperature}°C
+                {item.sensorData.temperature}°C
               </Text>
             </View>
           )}
-          {item.sensors?.humidity != null && (
+          {item.sensorData?.humidity != null && (
             <View style={styles.sensorPreview}>
               <MaterialCommunityIcons
                 name="water-percent"
@@ -433,7 +512,7 @@ export default function HomeScreen() {
               <Text
                 style={[styles.sensorValue, { color: theme.textSecondary }]}
               >
-                {item.sensors.humidity}%
+                {item.sensorData.humidity}%
               </Text>
             </View>
           )}
@@ -441,45 +520,25 @@ export default function HomeScreen() {
 
         <View style={styles.gardenFooter}>
           <Text style={[styles.lastActivity, { color: theme.textTertiary }]}>
-            {item.lastActivity}
+            {new Date(item.updatedAt || "").toLocaleString("vi-VN")}
           </Text>
         </View>
       </View>
     </TouchableOpacity>
   );
 
-  const renderSensorItem = ({ item }: { item: SensorDataUI }) => {
-    // --- Sensor Name, Color, Icon Logic (Map from schema types) ---
-    let sensorName: string;
-    // Use schema types (adjust if SensorType enum imported)
-    switch (item.type.toUpperCase()) {
-      case "TEMPERATURE":
-        sensorName = "Nhiệt độ";
-        break;
-      case "HUMIDITY":
-        sensorName = "Độ ẩm";
-        break;
-      case "SOIL_MOISTURE":
-        sensorName = "Độ ẩm đất";
-        break;
-      case "LIGHT":
-        sensorName = "Ánh sáng";
-        break;
-      case "WATER_LEVEL":
-        sensorName = "Mực nước";
-        break;
-      case "RAINFALL":
-        sensorName = "Lượng mưa";
-        break;
-      case "SOIL_PH":
-        sensorName = "Độ pH đất";
-        break;
-      default:
-        sensorName = item.type;
-    }
+  const renderSensorItem = ({ item }: { item: SensorDisplay }) => {
+    const sensorNameMap: Record<SensorType, string> = {
+      [SensorType.TEMPERATURE]: "Nhiệt độ",
+      [SensorType.HUMIDITY]: "Độ ẩm",
+      [SensorType.SOIL_MOISTURE]: "Độ ẩm đất",
+      [SensorType.LIGHT]: "Ánh sáng",
+      [SensorType.WATER_LEVEL]: "Mực nước",
+      [SensorType.RAINFALL]: "Lượng mưa",
+      [SensorType.SOIL_PH]: "Độ pH đất",
+    };
 
     const getStatusColor = (status: string) => {
-      // ... (status color logic remains same) ...
       switch (status) {
         case "critical":
           return theme.error;
@@ -490,148 +549,148 @@ export default function HomeScreen() {
       }
     };
 
-    const getSensorIcon = (type: string, iconName: string) => {
-      // Determine icon based on sensor type if iconName is not provided
-      if (!iconName) {
-        switch (type.toUpperCase()) {
-          case "TEMPERATURE":
-            return (
-              <MaterialCommunityIcons
-                name="thermometer"
-                size={24}
-                color={theme.textSecondary}
-              />
-            );
-          case "HUMIDITY":
-            return (
-              <MaterialCommunityIcons
-                name="water-percent"
-                size={24}
-                color={theme.textSecondary}
-              />
-            );
-          case "SOIL_MOISTURE":
-            return (
-              <MaterialCommunityIcons
-                name="water"
-                size={24}
-                color={theme.textSecondary}
-              />
-            );
-          case "LIGHT":
-            return (
-              <MaterialCommunityIcons
-                name="white-balance-sunny"
-                size={24}
-                color={theme.textSecondary}
-              />
-            );
-          case "WATER_LEVEL":
-            return (
-              <MaterialCommunityIcons
-                name="water-outline"
-                size={24}
-                color={theme.textSecondary}
-              />
-            );
-          case "RAINFALL":
-            return (
-              <MaterialCommunityIcons
-                name="weather-pouring"
-                size={24}
-                color={theme.textSecondary}
-              />
-            );
-          case "SOIL_PH":
-            return (
-              <MaterialCommunityIcons
-                name="flask-outline"
-                size={24}
-                color={theme.textSecondary}
-              />
-            );
-          default:
-            return (
-              <MaterialCommunityIcons
-                name="help-circle-outline"
-                size={24}
-                color={theme.textSecondary}
-              />
-            );
-        }
-      }
-
-      // Use provided iconName if available
-      if (iconName === "thermometer") {
-        return (
-          <MaterialCommunityIcons
-            name="thermometer"
-            size={24}
-            color={theme.textSecondary}
-          />
-        );
-      }
-      if (iconName === "water-percent") {
-        return (
-          <MaterialCommunityIcons
-            name="water-percent"
-            size={24}
-            color={theme.textSecondary}
-          />
-        );
-      }
-      if (iconName === "water") {
-        return (
-          <MaterialCommunityIcons
-            name="water"
-            size={24}
-            color={theme.textSecondary}
-          />
-        );
-      }
-      if (iconName === "white-balance-sunny") {
-        return (
-          <MaterialCommunityIcons
-            name="white-balance-sunny"
-            size={24}
-            color={theme.textSecondary}
-          />
-        );
-      }
-      // Default icon
-      return (
-        <MaterialCommunityIcons
-          name="gauge"
-          size={24}
-          color={theme.textSecondary}
-        />
-      );
-    };
-
     return (
       <TouchableOpacity
         style={[styles.sensorCard, { backgroundColor: theme.card }]}
         onPress={() => router.push(`/sensors/${item.id}`)}
       >
-        <View style={styles.sensorIconContainer}>
-          {getSensorIcon(item.type, item.icon)}
+        <View
+          style={[
+            styles.sensorIconContainer,
+            { backgroundColor: getStatusColor(item.status) + "20" },
+          ]}
+        >
+          {renderSensorIcon(item.type, item.icon, getStatusColor(item.status))}
         </View>
         <View style={styles.sensorInfo}>
           <Text style={[styles.sensorName, { color: theme.text }]}>
-            {sensorName}
+            {sensorNameMap[item.type] || item.type}
           </Text>
           <Text
             style={[
-              styles.sensorValueSmall,
+              styles.sensorValueLarge,
               { color: getStatusColor(item.status) },
             ]}
           >
-            {item.value}
+            {item.value.toFixed(1)}
             {item.unit}
+          </Text>
+          <Text style={[styles.sensorTimestamp, { color: theme.textTertiary }]}>
+            {formatTimestamp(item.timestamp)}
           </Text>
         </View>
       </TouchableOpacity>
     );
+  };
+
+  const renderSensorIcon = (
+    type: SensorType,
+    iconName: string,
+    color: string
+  ) => {
+    switch (iconName) {
+      case "thermometer":
+        return (
+          <MaterialCommunityIcons name="thermometer" size={28} color={color} />
+        );
+      case "water-percent":
+        return (
+          <MaterialCommunityIcons
+            name="water-percent"
+            size={28}
+            color={color}
+          />
+        );
+      case "water-outline":
+        return (
+          <MaterialCommunityIcons
+            name="water-outline"
+            size={28}
+            color={color}
+          />
+        );
+      case "white-balance-sunny":
+        return (
+          <MaterialCommunityIcons
+            name="white-balance-sunny"
+            size={28}
+            color={color}
+          />
+        );
+      case "water":
+        return <MaterialCommunityIcons name="water" size={28} color={color} />;
+      case "weather-pouring":
+        return (
+          <MaterialCommunityIcons
+            name="weather-pouring"
+            size={28}
+            color={color}
+          />
+        );
+      case "flask-outline":
+        return (
+          <MaterialCommunityIcons
+            name="flask-outline"
+            size={28}
+            color={color}
+          />
+        );
+      default:
+        return <MaterialCommunityIcons name="gauge" size={28} color={color} />;
+    }
+  };
+
+  // Helper functions
+  const getGardenTypeIcon = (type: GardenType) => {
+    switch (type) {
+      case GardenType.INDOOR:
+        return <MaterialCommunityIcons name="home" size={14} />;
+      case GardenType.OUTDOOR:
+        return <MaterialCommunityIcons name="tree" size={14} />;
+      case GardenType.BALCONY:
+        return <MaterialCommunityIcons name="balcony" size={14} />;
+      case GardenType.ROOFTOP:
+        return <MaterialCommunityIcons name="office-building" size={14} />;
+      case GardenType.WINDOW_SILL:
+        return (
+          <MaterialCommunityIcons name="window-closed-variant" size={14} />
+        );
+      default:
+        return <MaterialCommunityIcons name="flower" size={14} />;
+    }
+  };
+
+  const getGardenTypeLabel = (type: GardenType): string => {
+    switch (type) {
+      case GardenType.INDOOR:
+        return "Trong nhà";
+      case GardenType.OUTDOOR:
+        return "Ngoài trời";
+      case GardenType.BALCONY:
+        return "Ban công";
+      case GardenType.ROOFTOP:
+        return "Sân thượng";
+      case GardenType.WINDOW_SILL:
+        return "Bậu cửa sổ";
+      default:
+        return "Không xác định";
+    }
+  };
+
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // --- Render Functions for sections ---
+  const getGreeting = () => {
+    const currentHour = new Date().getHours();
+    if (currentHour < 12) return "Chào buổi sáng";
+    if (currentHour < 18) return "Chào buổi chiều";
+    return "Chào buổi tối";
   };
 
   // Render function for main sections
@@ -657,7 +716,105 @@ export default function HomeScreen() {
                 size={26}
                 color={theme.textSecondary}
               />
+              {Object.values(gardenAlerts).flat().length > 0 && (
+                <View
+                  style={[
+                    styles.notificationBadge,
+                    { backgroundColor: theme.error },
+                  ]}
+                />
+              )}
             </TouchableOpacity>
+          </View>
+        );
+
+      case SectionType.WEATHER:
+        const weather = section.data as WeatherObservation;
+        if (!weather) return null;
+
+        return (
+          <View style={styles.weatherContainer}>
+            <View
+              style={[styles.weatherCard, { backgroundColor: theme.cardAlt }]}
+            >
+              <View style={styles.weatherHeader}>
+                <Text style={[styles.weatherTitle, { color: theme.text }]}>
+                  Thời tiết hiện tại
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.push("/(modules)/weather/index")}
+                  style={styles.weatherMore}
+                >
+                  <Text style={{ color: theme.primary, fontSize: 14 }}>
+                    Chi tiết
+                  </Text>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={theme.primary}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.weatherContent}>
+                <View style={styles.weatherIconContainer}>
+                  <Image
+                    source={{
+                      uri: `https://openweathermap.org/img/wn/${weather.iconCode}@4x.png`,
+                    }}
+                    style={styles.weatherIcon}
+                  />
+                </View>
+
+                <View style={styles.weatherDataContainer}>
+                  <Text style={[styles.temperatureText, { color: theme.text }]}>
+                    {Math.round(weather.temp)}°C
+                  </Text>
+                  <Text
+                    style={[
+                      styles.weatherDescription,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    {weather.weatherDesc}
+                  </Text>
+
+                  <View style={styles.weatherDetailsRow}>
+                    <View style={styles.weatherDetail}>
+                      <MaterialCommunityIcons
+                        name="water-percent"
+                        size={16}
+                        color={theme.textSecondary}
+                      />
+                      <Text
+                        style={[
+                          styles.weatherDetailText,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        {weather.humidity}%
+                      </Text>
+                    </View>
+
+                    <View style={styles.weatherDetail}>
+                      <MaterialCommunityIcons
+                        name="weather-windy"
+                        size={16}
+                        color={theme.textSecondary}
+                      />
+                      <Text
+                        style={[
+                          styles.weatherDetailText,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        {Math.round(weather.windSpeed * 3.6)} km/h
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </View>
           </View>
         );
 
@@ -685,7 +842,7 @@ export default function HomeScreen() {
             </View>
             {section.data && section.data.length > 0 ? (
               <FlatList
-                data={section.data} // Use gardens from state
+                data={section.data}
                 renderItem={renderGardenItem}
                 keyExtractor={(item) => `garden-${item.id}`}
                 horizontal
@@ -739,9 +896,16 @@ export default function HomeScreen() {
                 </Text>
                 <TouchableOpacity
                   onPress={() => router.push("/(modules)/gardens/create")}
-                  style={styles.emptyStateButton}
+                  style={[
+                    styles.emptyStateButton,
+                    { backgroundColor: theme.primary },
+                  ]}
                 >
-                  <Text style={styles.emptyStateButtonText}>Tạo Vườn Mới</Text>
+                  <Text
+                    style={[styles.emptyStateButtonText, { color: theme.card }]}
+                  >
+                    Tạo Vườn Mới
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -749,18 +913,37 @@ export default function HomeScreen() {
         );
 
       case SectionType.SENSORS:
-        // Use section.data which is the filteredSensorData state variable
+        // Use section.data which is the sensor display data
         return (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>
                 Dữ liệu Cảm biến
               </Text>
+              {selectedGardenId && (
+                <TouchableOpacity
+                  style={styles.viewAllButton}
+                  onPress={() =>
+                    router.push(
+                      `/(modules)/gardens/${selectedGardenId}/sensors`
+                    )
+                  }
+                >
+                  <Text style={[styles.viewAllText, { color: theme.primary }]}>
+                    Xem chi tiết
+                  </Text>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={18}
+                    color={theme.primary}
+                  />
+                </TouchableOpacity>
+              )}
             </View>
             {selectedGardenId ? (
               section.data && section.data.length > 0 ? (
                 <FlatList
-                  data={section.data} // Use filteredSensorData from state
+                  data={section.data}
                   renderItem={renderSensorItem}
                   keyExtractor={(item) => `sensor-${item.id}`}
                   horizontal
@@ -790,6 +973,26 @@ export default function HomeScreen() {
                   >
                     Không có dữ liệu cảm biến cho vườn này.
                   </Text>
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.push(
+                        `/(modules)/gardens/${selectedGardenId}/add-sensor`
+                      )
+                    }
+                    style={[
+                      styles.emptyStateButton,
+                      { backgroundColor: theme.primary },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.emptyStateButtonText,
+                        { color: theme.card },
+                      ]}
+                    >
+                      Thêm Cảm Biến
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               )
             ) : (
@@ -820,15 +1023,19 @@ export default function HomeScreen() {
             <Text
               style={[
                 styles.sectionTitle,
-                { color: theme.text, marginBottom: 16 },
+                { color: theme.text, marginBottom: 16, paddingHorizontal: 20 },
               ]}
             >
               Tác vụ nhanh
             </Text>
             <View style={styles.quickActionsContainer}>
-              <View style={styles.quickActionsRow}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 20 }}
+              >
                 <TouchableOpacity
-                  style={styles.quickAction}
+                  style={[styles.quickAction, { backgroundColor: theme.card }]}
                   onPress={() => router.push("/(modules)/tasks/index")}
                 >
                   <View
@@ -847,8 +1054,9 @@ export default function HomeScreen() {
                     Công việc
                   </Text>
                 </TouchableOpacity>
+
                 <TouchableOpacity
-                  style={styles.quickAction}
+                  style={[styles.quickAction, { backgroundColor: theme.card }]}
                   onPress={() => router.push("/(modules)/gardens/create")}
                 >
                   <View
@@ -867,10 +1075,9 @@ export default function HomeScreen() {
                     Vườn mới
                   </Text>
                 </TouchableOpacity>
-              </View>
-              <View style={styles.quickActionsRow}>
+
                 <TouchableOpacity
-                  style={styles.quickAction}
+                  style={[styles.quickAction, { backgroundColor: theme.card }]}
                   onPress={() => router.push("/(modules)/community/new")}
                 >
                   <View
@@ -889,8 +1096,9 @@ export default function HomeScreen() {
                     Bài viết mới
                   </Text>
                 </TouchableOpacity>
+
                 <TouchableOpacity
-                  style={styles.quickAction}
+                  style={[styles.quickAction, { backgroundColor: theme.card }]}
                   onPress={() => console.log("Navigate to Scan Sensor")}
                 >
                   <View
@@ -909,51 +1117,73 @@ export default function HomeScreen() {
                     Quét cảm biến
                   </Text>
                 </TouchableOpacity>
-              </View>
+
+                <TouchableOpacity
+                  style={[styles.quickAction, { backgroundColor: theme.card }]}
+                  onPress={() => router.push("/(modules)/activities/create")}
+                >
+                  <View
+                    style={[
+                      styles.quickActionIconWrapper,
+                      { backgroundColor: theme.primary + "20" },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name="watering-can"
+                      size={24}
+                      color={theme.primary}
+                    />
+                  </View>
+                  <Text style={[styles.quickActionText, { color: theme.text }]}>
+                    Tạo hoạt động
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
             </View>
           </View>
         );
 
       case SectionType.TIPS:
-        const tip = section.data; // Weather forecast data
+        const tip = section.data;
         if (!tip) return null;
         return (
           <View style={styles.section}>
             <Text
               style={[
                 styles.sectionTitle,
-                { color: theme.text, marginBottom: 16 },
+                { color: theme.text, marginBottom: 16, paddingHorizontal: 20 },
               ]}
             >
               Mẹo chăm sóc
             </Text>
-            <TouchableOpacity
-              style={[styles.tipCard, { backgroundColor: theme.primaryLight }]}
-              onPress={() => router.push(`/tips/${tip.id}`)} // Use tip id
-            >
-              <Image
-                source={{ uri: tip.image || tip.imageUrl }}
-                style={styles.tipImage}
-                defaultSource={require("@/assets/images/icon.png")} // Keep placeholder
-              />
-              <View style={styles.tipContent}>
-                <Text style={[styles.tipTitle, { color: theme.primaryDark }]}>
-                  {tip.title}
-                </Text>
-                <Text
-                  style={[
-                    styles.tipDescription,
-                    { color: theme.textSecondary },
-                  ]}
-                  numberOfLines={2}
-                >
-                  {tip.description || tip.content}
-                </Text>
-                <Text style={[styles.tipLink, { color: theme.primary }]}>
-                  Đọc thêm
-                </Text>
-              </View>
-            </TouchableOpacity>
+            <View style={styles.tipContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.tipCard,
+                  { backgroundColor: theme.primaryLight },
+                ]}
+                onPress={() => router.push(`/weather`)}
+              >
+                <Image
+                  source={{ uri: tip.imageUrl }}
+                  style={styles.tipImage}
+                  resizeMode="contain"
+                />
+                <View style={styles.tipContent}>
+                  <Text style={[styles.tipTitle, { color: theme.primaryDark }]}>
+                    {tip.title}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.tipDescription,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    {tip.content}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
           </View>
         );
 
@@ -966,24 +1196,45 @@ export default function HomeScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
-      <FlatList
-        data={sections} // Use simplified sections array
-        renderItem={renderSection}
-        keyExtractor={(item) => item.key}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing} // Use local refreshing state
-            onRefresh={onRefresh} // Use mock refresh logic
-            colors={[theme.primary]}
-            tintColor={theme.primary}
-          />
-        }
-        ItemSeparatorComponent={() => (
-          <View style={styles.mainSectionSeparator} />
-        )}
-      />
+      {error ? (
+        <View style={styles.errorContainer}>
+          <MaterialIcons name="error-outline" size={48} color={theme.error} />
+          <Text style={[styles.errorText, { color: theme.error }]}>
+            {error}
+          </Text>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: theme.primary }]}
+            onPress={onRefresh}
+          >
+            <Text style={[styles.retryButtonText, { color: theme.card }]}>
+              Thử lại
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={sections}
+          renderItem={renderSection}
+          keyExtractor={(item) => item.key}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[theme.primary]}
+              tintColor={theme.primary}
+            />
+          }
+          ListFooterComponent={
+            <View style={styles.footer}>
+              <Text style={[styles.footerText, { color: theme.textTertiary }]}>
+                Phiên bản 1.0.0
+              </Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -1019,9 +1270,20 @@ const createStyles = (theme: any) =>
     },
     notificationButton: {
       padding: 8,
+      position: "relative",
+    },
+    notificationBadge: {
+      position: "absolute",
+      top: 10,
+      right: 10,
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: theme.error,
     },
     section: {
       backgroundColor: theme.background,
+      marginBottom: 8,
     },
     sectionHeader: {
       flexDirection: "row",
@@ -1030,9 +1292,7 @@ const createStyles = (theme: any) =>
       paddingHorizontal: 20,
       paddingTop: 10,
       paddingBottom: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.borderLight,
-      marginBottom: 16,
+      marginBottom: 8,
     },
     sectionTitle: {
       fontSize: 19,
@@ -1059,7 +1319,7 @@ const createStyles = (theme: any) =>
     },
     gardenCard: {
       width: 280,
-      borderRadius: 12,
+      borderRadius: 16,
       backgroundColor: theme.card,
       borderWidth: 1.5,
       elevation: 2,
@@ -1069,7 +1329,11 @@ const createStyles = (theme: any) =>
       shadowRadius: 2,
       overflow: "hidden",
     },
-    gardenThumbnail: { width: "100%", height: 120 },
+    gardenThumbnail: {
+      width: "100%",
+      height: 120,
+      backgroundColor: theme.cardAlt,
+    },
     gardenContent: { padding: 14 },
     gardenHeader: {
       flexDirection: "row",
@@ -1083,6 +1347,16 @@ const createStyles = (theme: any) =>
       color: theme.text,
       flex: 1,
     },
+    gardenTypeContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 6,
+    },
+    gardenType: {
+      fontSize: 13,
+      fontFamily: "Inter-Medium",
+      color: theme.textSecondary,
+    },
     alertBadge: {
       backgroundColor: theme.error,
       width: 20,
@@ -1092,21 +1366,38 @@ const createStyles = (theme: any) =>
       justifyContent: "center",
       marginLeft: 8,
     },
-    alertBadgeText: { color: theme.card, fontSize: 12, fontWeight: "bold" },
+    alertBadgeText: {
+      color: theme.card,
+      fontSize: 12,
+      fontWeight: "bold",
+      fontFamily: "Inter-Bold",
+    },
     gardenLocation: {
       fontSize: 13,
       fontFamily: "Inter-Regular",
       color: theme.textSecondary,
-      marginBottom: 5,
+      marginBottom: 8,
+    },
+    plantInfoContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 8,
+      gap: 6,
     },
     gardenCrop: {
       fontSize: 13,
       fontFamily: "Inter-Regular",
       color: theme.textSecondary,
-      marginBottom: 10,
     },
-    sensorPreviewContainer: { flexDirection: "row", marginBottom: 10, gap: 16 },
-    sensorPreview: { flexDirection: "row", alignItems: "center" },
+    sensorPreviewContainer: {
+      flexDirection: "row",
+      marginBottom: 10,
+      gap: 16,
+    },
+    sensorPreview: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
     sensorValue: {
       fontSize: 13,
       fontFamily: "Inter-Medium",
@@ -1117,7 +1408,7 @@ const createStyles = (theme: any) =>
       borderTopWidth: 1,
       borderTopColor: theme.borderLight,
       paddingTop: 10,
-      marginTop: 10,
+      marginTop: 6,
     },
     lastActivity: {
       fontSize: 12,
@@ -1126,8 +1417,8 @@ const createStyles = (theme: any) =>
     },
     addGardenCard: {
       width: 160,
-      height: 225,
-      borderRadius: 12,
+      height: 230,
+      borderRadius: 16,
       borderWidth: 1.5,
       borderStyle: "dashed",
       borderColor: theme.border,
@@ -1155,8 +1446,9 @@ const createStyles = (theme: any) =>
     },
     sensorCard: {
       width: 140,
-      borderRadius: 12,
-      padding: 14,
+      height: 160,
+      borderRadius: 16,
+      padding: 16,
       backgroundColor: theme.card,
       elevation: 2,
       shadowColor: theme.shadow,
@@ -1165,23 +1457,36 @@ const createStyles = (theme: any) =>
       shadowRadius: 2,
     },
     sensorIconContainer: {
-      marginBottom: 10,
-      alignSelf: "flex-start",
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: theme.primaryLight,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 12,
     },
-    sensorInfo: {},
+    sensorInfo: {
+      flex: 1,
+    },
     sensorName: {
-      fontSize: 15,
+      fontSize: 14,
       fontFamily: "Inter-SemiBold",
       color: theme.text,
-      marginBottom: 5,
+      marginBottom: 6,
     },
-    sensorValueSmall: {
-      fontSize: 18,
+    sensorValueLarge: {
+      fontSize: 22,
       fontFamily: "Inter-Bold",
+      marginBottom: 6,
+    },
+    sensorTimestamp: {
+      fontSize: 12,
+      fontFamily: "Inter-Regular",
+      marginTop: "auto",
     },
     emptyState: {
-      height: 150,
-      borderRadius: 12,
+      height: 170,
+      borderRadius: 16,
       justifyContent: "center",
       alignItems: "center",
       padding: 20,
@@ -1204,33 +1509,25 @@ const createStyles = (theme: any) =>
       borderRadius: 20,
     },
     emptyStateButtonText: {
-      color: theme.card,
       fontFamily: "Inter-SemiBold",
       fontSize: 14,
     },
     quickActionsContainer: {
-      paddingHorizontal: 20,
-      gap: 15,
-    },
-    quickActionsRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      gap: 15,
+      marginBottom: 16,
     },
     quickAction: {
-      flex: 1,
-      borderRadius: 12,
-      paddingVertical: 18,
-      paddingHorizontal: 10,
+      borderRadius: 16,
+      paddingVertical: 16,
+      paddingHorizontal: 16,
       alignItems: "center",
       backgroundColor: theme.card,
+      width: 110,
+      marginRight: 12,
       elevation: 2,
       shadowColor: theme.shadow,
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.08,
       shadowRadius: 3,
-      minHeight: 130,
-      justifyContent: "center",
     },
     quickActionIconWrapper: {
       width: 50,
@@ -1238,8 +1535,7 @@ const createStyles = (theme: any) =>
       borderRadius: 25,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.primary + "20",
-      marginBottom: 10,
+      marginBottom: 12,
     },
     quickActionText: {
       fontSize: 14,
@@ -1247,29 +1543,33 @@ const createStyles = (theme: any) =>
       color: theme.text,
       textAlign: "center",
     },
-    tipCard: {
-      borderRadius: 12,
-      overflow: "hidden",
-      backgroundColor: theme.card,
-      elevation: 3,
-      shadowColor: theme.shadow,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      marginHorizontal: 20,
+    tipContainer: {
+      paddingHorizontal: 20,
     },
-    tipImage: { width: "100%", height: 150 },
-    tipContent: { padding: 16 },
+    tipCard: {
+      borderRadius: 16,
+      overflow: "hidden",
+      backgroundColor: theme.primaryLight,
+      padding: 16,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    tipImage: {
+      width: 60,
+      height: 60,
+      marginRight: 14,
+    },
+    tipContent: {
+      flex: 1,
+    },
     tipTitle: {
-      fontSize: 17,
+      fontSize: 16,
       fontFamily: "Inter-SemiBold",
-      color: theme.text,
       marginBottom: 8,
     },
     tipDescription: {
       fontSize: 14,
       fontFamily: "Inter-Regular",
-      color: theme.textSecondary,
       lineHeight: 20,
     },
     tipLink: {
@@ -1279,8 +1579,98 @@ const createStyles = (theme: any) =>
       marginTop: 12,
       alignSelf: "flex-start",
     },
-    mainSectionSeparator: {
-      height: 10,
-      backgroundColor: theme.backgroundSecondary,
+    errorContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
+    },
+    errorText: {
+      fontSize: 16,
+      fontFamily: "Inter-Medium",
+      textAlign: "center",
+      marginTop: 16,
+      marginBottom: 24,
+    },
+    retryButton: {
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 24,
+    },
+    retryButtonText: {
+      fontSize: 16,
+      fontFamily: "Inter-SemiBold",
+    },
+    footer: {
+      paddingVertical: 20,
+      alignItems: "center",
+    },
+    footerText: {
+      fontSize: 12,
+      fontFamily: "Inter-Regular",
+    },
+    weatherContainer: {
+      paddingHorizontal: 20,
+      marginBottom: 16,
+    },
+    weatherCard: {
+      borderRadius: 16,
+      overflow: "hidden",
+      backgroundColor: theme.cardAlt,
+      padding: 16,
+    },
+    weatherHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    weatherMore: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    weatherContent: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    weatherIconContainer: {
+      marginRight: 16,
+    },
+    weatherIcon: {
+      width: 80,
+      height: 80,
+    },
+    weatherDataContainer: {
+      flex: 1,
+    },
+    temperatureText: {
+      fontSize: 36,
+      fontFamily: "Inter-Bold",
+      marginBottom: 4,
+    },
+    weatherDescription: {
+      fontSize: 16,
+      fontFamily: "Inter-Medium",
+      marginBottom: 12,
+      textTransform: "capitalize",
+    },
+    weatherDetailsRow: {
+      flexDirection: "row",
+      justifyContent: "flex-start",
+      gap: 16,
+    },
+    weatherDetail: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    weatherDetailText: {
+      fontSize: 14,
+      fontFamily: "Inter-Regular",
+    },
+    weatherTitle: {
+      fontSize: 17,
+      fontFamily: "Inter-SemiBold",
+      color: theme.text,
     },
   });

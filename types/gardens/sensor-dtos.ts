@@ -3,7 +3,7 @@
  *
  * Data Transfer Objects for sensor-related API requests and responses
  */
-import { SensorType } from "@/constants/database";
+import { SensorType } from "@/types/gardens/sensor.types";
 
 /**
  * DTO for creating a new sensor

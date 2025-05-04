@@ -1,22 +1,23 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
-import { UserData } from "@/types/users";
+import { AppUser } from "@/types/users";
+import { isGardener } from "@/types/users/user.types";
 import authService from "@/service/api/auth.service";
 import { LoginCredentials } from "@/types/users";
 import { userService } from "@/service/api";
 
 type UserContextType = {
-  user: UserData | null;
+  user: AppUser | null;
   isLoading: boolean;
   error: string | null;
   signIn: (credentials: LoginCredentials) => Promise<void>;
   signOut: () => Promise<void>;
-  updateUserProfile: (userData: Partial<UserData>) => Promise<void>;
+  updateUserProfile: (userData: Partial<AppUser>) => Promise<void>;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserData | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,7 +100,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   // Update user profile
   const updateUserProfile = async (
-    userData: Partial<UserData>
+    userData: Partial<AppUser>
   ): Promise<void> => {
     try {
       setIsLoading(true);
@@ -118,9 +119,26 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       });
 
       // Update the user state with the new data
-      setUser((prevUser) =>
-        prevUser ? { ...prevUser, ...updatedUser } : updatedUser
-      );
+      setUser((prevUser) => {
+        if (!prevUser) return null;
+
+        // Create updated user with base properties
+        const updatedUserData = {
+          ...prevUser,
+          ...updatedUser,
+        };
+
+        // If the user is a Gardener, preserve Gardener-specific properties
+        if (isGardener(prevUser)) {
+          return {
+            ...updatedUserData,
+            experiencePoints: prevUser.experiencePoints,
+            experienceLevel: prevUser.experienceLevel,
+          } as AppUser;
+        }
+
+        return updatedUserData as AppUser;
+      });
     } catch (error) {
       console.error("Profile update error:", error);
       setError("Failed to update profile");

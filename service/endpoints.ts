@@ -25,6 +25,8 @@ export const USER_ENDPOINTS = {
   CHANGE_PASSWORD: "/user/change-password",
   EXPERIENCE_LEVELS: "/experience-levels",
   GARDENER_PROFILE: (gardenerId: string | number) => `/gardeners/${gardenerId}`,
+  GARDENER_GARDENS: (gardenerId: string | number) =>
+    `/gardeners/${gardenerId}/gardens`,
   EXPERIENCE_PROGRESS: "/user/experience-progress",
   NOTIFICATION_COUNT: "/user/notification-count",
 };
@@ -74,40 +76,40 @@ export const SENSOR_ENDPOINTS = {
 // Task endpoints
 export const TASK_ENDPOINTS = {
   LIST: "/tasks",
-  TASKS: "/tasks",
   LIST_BY_GARDEN: (gardenId: string | number) => `/gardens/${gardenId}/tasks`,
-  TASKS_BY_GARDEN: (gardenId: string | number) => `/gardens/${gardenId}/tasks`,
   DETAIL: (taskId: string | number) => `/tasks/${taskId}`,
-  TASK_DETAIL: (taskId: string | number) => `/tasks/${taskId}`,
   CREATE: "/tasks",
   CREATE_FOR_GARDEN: (gardenId: string | number) =>
     `/gardens/${gardenId}/tasks`,
   UPDATE: (taskId: string | number) => `/tasks/${taskId}`,
   DELETE: (taskId: string | number) => `/tasks/${taskId}`,
   COMPLETE: (taskId: string | number) => `/tasks/${taskId}/complete`,
-  COMPLETE_TASK: (taskId: string | number) => `/tasks/${taskId}/complete`,
-  SKIP_TASK: (taskId: string | number) => `/tasks/${taskId}/skip`,
+  SKIP: (taskId: string | number) => `/tasks/${taskId}/skip`,
   UPLOAD_PHOTO: (taskId: string | number) => `/tasks/${taskId}/photo`,
+};
 
-  // Activity endpoints
-  ACTIVITIES: "/activities",
-  ACTIVITIES_BY_GARDEN: (gardenId: string | number) =>
+// Activity endpoints
+export const ACTIVITY_ENDPOINTS = {
+  LIST: "/activities",
+  LIST_BY_GARDEN: (gardenId: string | number) =>
     `/gardens/${gardenId}/activities`,
-  ACTIVITY_DETAIL: (activityId: string | number) => `/activities/${activityId}`,
-  EVALUATE_ACTIVITY: (activityId: string | number) =>
+  DETAIL: (activityId: string | number) => `/activities/${activityId}`,
+  CREATE: "/activities",
+  EVALUATE: (activityId: string | number) =>
     `/activities/${activityId}/evaluate`,
+};
 
-  // Watering schedule endpoints
-  WATERING_SCHEDULES: "/watering-schedules",
-  GARDEN_WATERING_SCHEDULES: (gardenId: string | number) =>
+// Watering schedule endpoints
+export const WATERING_ENDPOINTS = {
+  LIST: "/watering-schedules",
+  LIST_BY_GARDEN: (gardenId: string | number) =>
     `/gardens/${gardenId}/watering-schedules`,
-  WATERING_SCHEDULE_DETAIL: (scheduleId: string | number) =>
-    `/watering-schedules/${scheduleId}`,
-  COMPLETE_WATERING: (scheduleId: string | number) =>
+  DETAIL: (scheduleId: string | number) => `/watering-schedules/${scheduleId}`,
+  COMPLETE: (scheduleId: string | number) =>
     `/watering-schedules/${scheduleId}/complete`,
-  SKIP_WATERING: (scheduleId: string | number) =>
+  SKIP: (scheduleId: string | number) =>
     `/watering-schedules/${scheduleId}/skip`,
-  AUTO_GENERATE_SCHEDULE: (gardenId: string | number) =>
+  AUTO_GENERATE: (gardenId: string | number) =>
     `/gardens/${gardenId}/watering-schedules/auto`,
 };
 
@@ -148,22 +150,6 @@ export const WEATHER_ENDPOINTS = {
   RESOLVE_ALERT: (alertId: string | number) => `/alerts/${alertId}/resolve`,
 };
 
-// Course endpoints
-export const COURSE_ENDPOINTS = {
-  LIST: "/courses",
-  DETAIL: (id: string | number) => `/courses/${id}`,
-  ENROLL: (id: string | number) => `/courses/${id}/enroll`,
-};
-
-// Lesson endpoints
-export const LESSON_ENDPOINTS = {
-  LIST: (courseId: string | number) => `/courses/${courseId}/lessons`,
-  DETAIL: (courseId: string | number, lessonId: string | number) =>
-    `/courses/${courseId}/lessons/${lessonId}`,
-  COMPLETE: (courseId: string | number, lessonId: string | number) =>
-    `/courses/${courseId}/lessons/${lessonId}/complete`,
-};
-
 // Combine all endpoints for easier imports
 export default {
   AUTH: AUTH_ENDPOINTS,
@@ -172,8 +158,8 @@ export default {
   PLANT: PLANT_ENDPOINTS,
   SENSOR: SENSOR_ENDPOINTS,
   TASK: TASK_ENDPOINTS,
+  ACTIVITY: ACTIVITY_ENDPOINTS,
+  WATERING: WATERING_ENDPOINTS,
   COMMUNITY: COMMUNITY_ENDPOINTS,
   WEATHER: WEATHER_ENDPOINTS,
-  COURSE: COURSE_ENDPOINTS,
-  LESSON: LESSON_ENDPOINTS,
 };

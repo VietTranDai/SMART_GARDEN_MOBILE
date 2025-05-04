@@ -24,6 +24,7 @@ import {
 import { router } from "expo-router";
 import { removeItem } from "@/utils/asyncStorage";
 import { userService } from "@/service/api";
+import { isGardener } from "@/types/users/user.types";
 
 const CustomSwitch = ({
   value,
@@ -79,7 +80,7 @@ export default function ProfileScreen() {
   // Fetch user's experience progress
   useEffect(() => {
     const fetchExperienceProgress = async () => {
-      if (!user || !user.isGardener) return;
+      if (!user || !isGardener(user)) return;
 
       try {
         setLoading(true);
@@ -177,7 +178,7 @@ export default function ProfileScreen() {
   const progressToNextLevel = () => {
     if (experienceProgress) {
       return experienceProgress.percentToNextLevel;
-    } else if (user && user.isGardener) {
+    } else if (user && isGardener(user)) {
       // Fallback to a default value if we don't have experience progress
       return 75;
     }
@@ -210,8 +211,12 @@ export default function ProfileScreen() {
               ]}
             >
               <Text style={[styles.levelText, { color: appTheme.primary }]}>
-                {user?.experienceLevel?.icon || "🌱"}{" "}
-                {user?.experienceLevel?.level || 1}
+                {user && isGardener(user)
+                  ? user?.experienceLevel?.icon
+                  : "🌱"}{" "}
+                {user && isGardener(user)
+                  ? user?.experienceLevel?.level
+                  : 1}
               </Text>
             </View>
           </View>
@@ -223,7 +228,7 @@ export default function ProfileScreen() {
             {user?.role?.name || "GARDENER"}
           </Text>
 
-          {user?.isGardener && (
+          {user && isGardener(user) && (
             <View style={styles.experienceContainer}>
               <View style={styles.experienceBar}>
                 <View

@@ -3,7 +3,7 @@
  *
  * Type definitions for authentication-related data
  */
-import { UserData } from "./user.types";
+import { AppUser } from "./user.types";
 
 // Storage key for auth data
 export const AUTH_KEY = "auth_data";
@@ -24,7 +24,7 @@ export interface TokenResponse {
 export interface LoginData {
   access_token: string;
   refresh_token?: string;
-  user?: UserData;
+  user?: AppUser;
 }
 
 // Registration payload

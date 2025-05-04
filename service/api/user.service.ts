@@ -1,11 +1,17 @@
 import apiClient from "../apiClient";
-import { UserData, ExperienceLevel, GardenerData } from "@/types/users";
+import {
+  User,
+  ExperienceLevel,
+  Gardener,
+  GardenerProfile,
+} from "@/types/users";
 import {
   UpdateProfileDto,
   ChangePasswordDto,
   ExperienceProgress,
 } from "@/types/users/dtos";
 import { USER_ENDPOINTS } from "../endpoints";
+import { Garden } from "@/types/gardens/garden.types";
 
 /**
  * User Service
@@ -17,7 +23,7 @@ class UserService {
    * Get current user profile
    * @returns User profile data
    */
-  async getProfile(): Promise<UserData> {
+  async getProfile(): Promise<User> {
     const response = await apiClient.get(USER_ENDPOINTS.PROFILE);
     return response.data;
   }
@@ -27,7 +33,7 @@ class UserService {
    * @param profileData Profile update data
    * @returns Updated user profile
    */
-  async updateProfile(profileData: UpdateProfileDto): Promise<UserData> {
+  async updateProfile(profileData: UpdateProfileDto): Promise<User> {
     // If we have a profile picture, use FormData
     if (profileData.profilePicture instanceof File) {
       const formData = new FormData();
@@ -90,13 +96,27 @@ class UserService {
   /**
    * Get gardener profile by ID
    * @param gardenerId Gardener ID
-   * @returns Gardener profile
+   * @returns Gardener profile with extended statistics
    */
-  async getGardenerProfile(gardenerId: number | string): Promise<GardenerData> {
+  async getGardenerProfile(
+    gardenerId: number | string
+  ): Promise<GardenerProfile> {
     const response = await apiClient.get(
       USER_ENDPOINTS.GARDENER_PROFILE(gardenerId)
     );
     return response.data;
+  }
+
+  /**
+   * Get gardener's gardens
+   * @param gardenerId Gardener ID
+   * @returns List of gardens
+   */
+  async getGardenerGardens(gardenerId: number | string): Promise<Garden[]> {
+    const response = await apiClient.get(
+      USER_ENDPOINTS.GARDENER_GARDENS(gardenerId)
+    );
+    return response.data.data;
   }
 
   /**

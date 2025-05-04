@@ -1,12 +1,7 @@
 import apiClient from "../apiClient";
 import { AUTH_ENDPOINTS, USER_ENDPOINTS } from "../endpoints";
 import { setItem, removeItem, getItem } from "@/utils/asyncStorage";
-import {
-  AUTH_KEY,
-  LoginData,
-  UserData,
-  RegisterUserDto,
-} from "@/types/users";
+import { AUTH_KEY, LoginData, AppUser, RegisterUserDto } from "@/types/users";
 
 /**
  * Authentication Service
@@ -31,7 +26,7 @@ class AuthService {
       await setItem(AUTH_KEY, authData);
 
       // Get user info
-      let userData: UserData | undefined;
+      let userData: AppUser | undefined;
       try {
         const userResponse = await apiClient.get(USER_ENDPOINTS.ME);
         userData = userResponse.data;
@@ -52,7 +47,7 @@ class AuthService {
    */
   async register(userData: RegisterUserDto) {
     const response = await apiClient.post(AUTH_ENDPOINTS.REGISTER, userData);
-    return response.data;
+    return response.data.data;
   }
 
   /**
@@ -76,10 +71,10 @@ class AuthService {
    * Get current user info
    * @returns User data
    */
-  async getCurrentUser(): Promise<UserData | null> {
+  async getCurrentUser(): Promise<AppUser | null> {
     try {
       const response = await apiClient.get(USER_ENDPOINTS.ME);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return null;
     }
@@ -123,7 +118,7 @@ class AuthService {
     const response = await apiClient.post(AUTH_ENDPOINTS.FORGOT_PASSWORD, {
       email,
     });
-    return response.data;
+    return response.data.data;
   }
 
   /**
@@ -137,7 +132,7 @@ class AuthService {
       token,
       password,
     });
-    return response.data;
+    return response.data.data;
   }
 
   /**

@@ -7,6 +7,7 @@ import axios, {
   AxiosResponse,
   AxiosError,
 } from "axios";
+import { router } from "expo-router";
 
 declare module "axios" {
   interface AxiosInstance {
@@ -23,6 +24,9 @@ import env from "@/config/environment";
 interface RefreshableRequest extends AxiosRequestConfig {
   _retry?: boolean;
 }
+
+// Flag to prevent multiple redirects to login page
+let isRedirectingToLogin = false;
 
 // ─── Config cơ bản cho Axios ──────────────────────────────────────────────
 const apiConfig: AxiosRequestConfig = {
@@ -56,6 +60,19 @@ const onRefreshedError = (err: any) => {
   refreshSubscribers = [];
 };
 
+// Helper function to redirect to login page
+const redirectToLogin = () => {
+  if (!isRedirectingToLogin) {
+    isRedirectingToLogin = true;
+
+    // Use setTimeout to avoid calling router during render
+    setTimeout(() => {
+      router.replace("/auth");
+      isRedirectingToLogin = false;
+    }, 100);
+  }
+};
+
 // ─── Hàm refresh token nội bộ ─────────────────────────────────────────────
 const refreshTokenInternal = async (): Promise<string | null> => {
   try {
@@ -74,7 +91,7 @@ const refreshTokenInternal = async (): Promise<string | null> => {
       }
     );
 
-    const { access_token, refresh_token } = response.data;
+    const { access_token, refresh_token } = response.data.data;
     await setItem(AUTH_KEY, {
       ...authData,
       access_token,
@@ -86,6 +103,10 @@ const refreshTokenInternal = async (): Promise<string | null> => {
     // refresh thất bại → clear auth + queue error
     await removeItem(AUTH_KEY);
     onRefreshedError(err);
+
+    // Redirect to login page when refresh token fails
+    redirectToLogin();
+
     return null;
   }
 };
@@ -142,9 +163,14 @@ apiClient.interceptors.response.use(
           // retry request gốc
           original.headers.Authorization = `Bearer ${newToken}`;
           return apiClient(original);
+        } else {
+          // newToken is null when refresh failed
+          redirectToLogin();
         }
       } catch {
         isRefreshing = false;
+        // Redirect to login on exception
+        redirectToLogin();
       }
 
       // nếu tới đây tức refresh null hoặc có lỗi:
@@ -157,6 +183,7 @@ apiClient.interceptors.response.use(
         subscribeTokenRefresh((token) => {
           // nếu token là Promise.reject, chuyển thành reject
           if (typeof token !== "string") {
+            redirectToLogin();
             return reject(token);
           }
           // Ensure headers exist before assigning
@@ -169,13 +196,15 @@ apiClient.interceptors.response.use(
       });
     }
 
-    // 3) 401/403 khác → logout
+    // 3) 401/403 khác → logout and redirect
     if (status === 401 || status === 403) {
       await removeItem(AUTH_KEY);
       const msg =
         status === 401
           ? "Phiên đăng nhập đã hết hạn"
           : "Bạn không có quyền truy cập";
+
+      redirectToLogin();
       return Promise.reject(new Error(msg));
     }
 
@@ -190,57 +219,5 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-// apiClient.interceptors.request.use(
-//   async (config) => {
-//     // in ra giá trị của env.apiDebug để test
-//     console.log("[LOGGER] apiDebug =", env.apiDebug);
-
-//     const start = Date.now();
-//     (config as any).metadata = { start };
-
-//     // bỏ guard tạm thời để chắc chắn log chạy
-//     console.groupCollapsed(
-//       `→ [Request] ${config.method?.toUpperCase()} ${config.baseURL}${
-//         config.url
-//       }`
-//     );
-//     console.log("Headers trước:", config.headers);
-//     console.log("Body      :", config.data);
-//     console.groupEnd();
-
-//     const data = await getItem<LoginData>(AUTH_KEY);
-//     if (data?.access_token) {
-//       config.headers.Authorization = `Bearer ${data.access_token}`;
-//     }
-//     return config;
-//   },
-//   (err) => {
-//     console.error("[Request Error]", err);
-//     return Promise.reject(err);
-//   }
-// );
-
-// apiClient.interceptors.response.use(
-//   (res) => {
-//     const meta = (res.config as any).metadata;
-//     const took = meta ? Date.now() - meta.start + " ms" : "";
-//     console.groupCollapsed(
-//       `← [Response] ${res.status} ${res.config.url} ${took}`
-//     );
-//     console.log("Data    :", res.data);
-//     console.groupEnd();
-//     return res;
-//   },
-//   (error) => {
-//     console.error(
-//       "[Response Error]",
-//       error.response?.status,
-//       error.config?.url,
-//       error.message
-//     );
-//     return Promise.reject(error);
-//   }
-// );
 
 export default apiClient;

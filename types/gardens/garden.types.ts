@@ -3,7 +3,7 @@
  *
  * Type definitions for garden-related data
  */
-import { GardenerData } from "../users/user.types";
+import { Gardener } from "../users/user.types";
 
 export enum GardenStatus {
   ACTIVE = "ACTIVE",
@@ -36,7 +36,7 @@ export interface Garden {
 
   // Ownership
   gardenerId: number;
-  gardener?: GardenerData;
+  gardener?: Gardener;
 
   // Garden configuration
   type: GardenType;
