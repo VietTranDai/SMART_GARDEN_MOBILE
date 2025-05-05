@@ -25,12 +25,22 @@ import env from "@/config/environment";
 // Import proper types from schema
 import { AlertStatus, AlertType } from "@/types/gardens/alert.types";
 import { Garden, GardenStatus, GardenType } from "@/types/gardens/garden.types";
-import { Sensor, SensorData, SensorType } from "@/types/gardens/sensor.types";
+import {
+  Sensor,
+  SensorData,
+  SensorType,
+  SensorUnit,
+} from "@/types/gardens/sensor.types";
 import { WeatherObservation } from "@/types/weather/weather.types";
 import { Alert } from "@/types/gardens/alert.types";
 
 // Import services
-import { gardenService, sensorService, weatherService } from "@/service/api";
+import {
+  alertService,
+  gardenService,
+  sensorService,
+  weatherService,
+} from "@/service/api";
 import { API_URL } from "@env";
 
 // Define Section Types
@@ -74,6 +84,16 @@ interface GardenDisplay extends Garden {
   };
   location: string;
 }
+
+// Thêm mapping SensorUnit to display string
+const UNIT_DISPLAY = {
+  [SensorUnit.CELSIUS]: "°C",
+  [SensorUnit.PERCENT]: "%",
+  [SensorUnit.LUX]: "lux",
+  [SensorUnit.METER]: "m",
+  [SensorUnit.MILLIMETER]: "mm",
+  [SensorUnit.PH]: "pH",
+};
 
 export default function HomeScreen() {
   const theme = useAppTheme();
@@ -155,18 +175,20 @@ export default function HomeScreen() {
   // Fetch alerts for all gardens
   const fetchAlerts = useCallback(async () => {
     try {
-      const alertsData = await weatherService.getAlerts({
+      const alertsData = await alertService.getAlerts({
         status: AlertStatus.PENDING,
       });
 
       // Group alerts by garden ID
       const alertsByGarden: Record<number, Alert[]> = {};
-      alertsData.forEach((alert) => {
-        if (!alertsByGarden[alert.gardenId]) {
-          alertsByGarden[alert.gardenId] = [];
-        }
-        alertsByGarden[alert.gardenId].push(alert);
-      });
+      if (alertsData && Array.isArray(alertsData)) {
+        alertsData.forEach((alert) => {
+          if (!alertsByGarden[alert.gardenId || 0]) {
+            alertsByGarden[alert.gardenId || 0] = [];
+          }
+          alertsByGarden[alert.gardenId || 0].push(alert);
+        });
+      }
 
       setGardenAlerts(alertsByGarden);
 
@@ -187,8 +209,14 @@ export default function HomeScreen() {
     if (!selectedGardenId) return;
 
     try {
-      const data = await weatherService.getCurrentWeather(selectedGardenId);
-      setWeatherData(data);
+      const response = await weatherService.getCurrentWeather(selectedGardenId);
+
+      // Kiểm tra xem dữ liệu thời tiết có tồn tại không và xử lý các cấu trúc phản hồi khác nhau
+      if (response) {
+        setWeatherData(response);
+      } else {
+        console.warn("Weather data is empty or invalid");
+      }
     } catch (err) {
       console.error("Failed to load weather data:", err);
     }
@@ -278,63 +306,6 @@ export default function HomeScreen() {
     }
   };
 
-  // Transform sensor data for UI display
-  const getSensorDisplayData = useMemo((): SensorDisplay[] => {
-    if (!selectedGardenId || !sensorDataByType) return [];
-
-    const result: SensorDisplay[] = [];
-    const selectedGarden = gardens.find((g) => g.id === selectedGardenId);
-
-    // Process different sensor types
-    Object.entries(sensorDataByType).forEach(([typeKey, sensorReadings]) => {
-      if (sensorReadings?.length) {
-        const latest = sensorReadings[0];
-        const sensorType = typeKey as SensorType;
-
-        let unit = "";
-        switch (sensorType) {
-          case SensorType.TEMPERATURE:
-            unit = "°C";
-            break;
-          case SensorType.HUMIDITY:
-            unit = "%";
-            break;
-          case SensorType.SOIL_MOISTURE:
-            unit = "%";
-            break;
-          case SensorType.LIGHT:
-            unit = "lux";
-            break;
-          case SensorType.SOIL_PH:
-            unit = "pH";
-            break;
-          case SensorType.RAINFALL:
-            unit = "mm";
-            break;
-          case SensorType.WATER_LEVEL:
-            unit = "cm";
-            break;
-          default:
-            unit = "";
-        }
-
-        result.push({
-          id: `${sensorType.toLowerCase()}-${latest.id}`,
-          gardenId: selectedGardenId,
-          gardenName: selectedGarden?.name || "",
-          type: sensorType,
-          icon: getSensorIconName(sensorType),
-          value: latest.value,
-          unit,
-          status: getSensorStatus(latest.value, sensorType),
-          timestamp: latest.timestamp,
-        });
-      }
-    });
-
-    return result;
-  }, [selectedGardenId, sensorDataByType, gardens]);
-
   // Helper to get the sensor icon name
   const getSensorIconName = (sensorType: SensorType): string => {
     switch (sensorType) {
@@ -355,6 +326,54 @@ export default function HomeScreen() {
       default:
         return "gauge";
     }
+  };
+
+  // Transform sensor data for UI display
+  const getSensorDisplayData = useMemo((): SensorDisplay[] => {
+    if (!selectedGardenId || !sensorDataByType) return [];
+
+    const result: SensorDisplay[] = [];
+    const selectedGarden = gardens.find((g) => g.id === selectedGardenId);
+
+    // Process different sensor types
+    Object.entries(sensorDataByType).forEach(([typeKey, sensorReadings]) => {
+      if (sensorReadings?.length) {
+        const latest = sensorReadings[0];
+        const sensorType = typeKey as SensorType;
+
+        const unit = UNIT_DISPLAY[latest.sensor?.unit || SensorUnit.PERCENT];
+
+        result.push({
+          id: `${sensorType.toLowerCase()}-${latest.id}`,
+          gardenId: selectedGardenId,
+          gardenName: selectedGarden?.name || "",
+          type: sensorType,
+          icon: getSensorIconName(sensorType),
+          value: latest.value,
+          unit,
+          status: getSensorStatus(latest.value, sensorType),
+          timestamp: latest.timestamp,
+        });
+      }
+    });
+
+    return result;
+  }, [selectedGardenId, sensorDataByType, gardens]);
+
+  // Function to generate weather-based gardening tips
+  const getWeatherTip = (weather: WeatherObservation): string => {
+    if (weather.temp > 32) {
+      return "Nhiệt độ cao, hãy tưới thêm nước cho cây và tránh tưới vào buổi trưa.";
+    } else if (weather.temp < 15) {
+      return "Nhiệt độ thấp, hãy che chắn cho cây khỏi gió lạnh và hạn chế tưới nước.";
+    } else if (weather.humidity > 85) {
+      return "Độ ẩm cao, cẩn thận với nấm bệnh. Hạn chế phun nước lên lá cây.";
+    } else if (weather.humidity < 30) {
+      return "Độ ẩm thấp, hãy tưới nhẹ vào buổi sáng sớm hoặc chiều tối.";
+    } else if (weather.weatherMain === "RAIN") {
+      return "Đang có mưa, tránh bón phân để tránh rửa trôi dinh dưỡng.";
+    }
+    return `Thời tiết lý tưởng cho việc chăm sóc vườn. Nhiệt độ: ${weather.temp}°C, Độ ẩm: ${weather.humidity}%.`;
   };
 
   // Generate sections for the home screen
@@ -407,29 +426,13 @@ export default function HomeScreen() {
         data: {
           title: "Lời khuyên dựa trên thời tiết",
           content: getWeatherTip(weatherData),
-          imageUrl: `https://openweathermap.org/img/wn/${weatherData.iconCode}@2x.png`,
+          imageUrl: `https://openweathermap.org/img/wn/${weatherData.iconCode}.png`,
         },
       });
     }
 
     return constructedSections;
   }, [gardens, selectedGardenId, getSensorDisplayData, weatherData]);
-
-  // Function to generate weather-based gardening tips
-  const getWeatherTip = (weather: WeatherObservation): string => {
-    if (weather.temp > 32) {
-      return "Nhiệt độ cao, hãy tưới thêm nước cho cây và tránh tưới vào buổi trưa.";
-    } else if (weather.temp < 15) {
-      return "Nhiệt độ thấp, hãy che chắn cho cây khỏi gió lạnh và hạn chế tưới nước.";
-    } else if (weather.humidity > 85) {
-      return "Độ ẩm cao, cẩn thận với nấm bệnh. Hạn chế phun nước lên lá cây.";
-    } else if (weather.humidity < 30) {
-      return "Độ ẩm thấp, hãy tưới nhẹ vào buổi sáng sớm hoặc chiều tối.";
-    } else if (weather.weatherMain === "RAIN") {
-      return "Đang có mưa, tránh bón phân để tránh rửa trôi dinh dưỡng.";
-    }
-    return `Thời tiết lý tưởng cho việc chăm sóc vườn. Nhiệt độ: ${weather.temp}°C, Độ ẩm: ${weather.humidity}%.`;
-  };
 
   // Render functions for list items
   const renderGardenItem = ({ item }: { item: GardenDisplay }) => (
@@ -572,7 +575,9 @@ export default function HomeScreen() {
               { color: getStatusColor(item.status) },
             ]}
           >
-            {item.value.toFixed(1)}
+            {item.value !== undefined && item.value !== null
+              ? item.value.toFixed(1)
+              : "-"}
             {item.unit}
           </Text>
           <Text style={[styles.sensorTimestamp, { color: theme.textTertiary }]}>
@@ -709,7 +714,7 @@ export default function HomeScreen() {
             </View>
             <TouchableOpacity
               style={styles.notificationButton}
-              onPress={() => router.push("/(modules)/notifications/index")}
+              onPress={() => router.push("/(modules)/alerts")}
             >
               <Ionicons
                 name="notifications-outline"
@@ -731,6 +736,9 @@ export default function HomeScreen() {
       case SectionType.WEATHER:
         const weather = section.data as WeatherObservation;
         if (!weather) return null;
+
+        // Debug thông tin thời tiết để kiểm tra
+        console.log("Rendering weather data:", weather);
 
         return (
           <View style={styles.weatherContainer}>
@@ -758,17 +766,34 @@ export default function HomeScreen() {
 
               <View style={styles.weatherContent}>
                 <View style={styles.weatherIconContainer}>
-                  <Image
-                    source={{
-                      uri: `https://openweathermap.org/img/wn/${weather.iconCode}@4x.png`,
-                    }}
-                    style={styles.weatherIcon}
-                  />
+                  {weather.iconCode ? (
+                    <Image
+                      source={{
+                        uri: `https://openweathermap.org/img/wn/${weather.iconCode}.png`,
+                      }}
+                      style={styles.weatherIcon}
+                      onError={(e) =>
+                        console.error(
+                          "Image loading error:",
+                          e.nativeEvent.error
+                        )
+                      }
+                    />
+                  ) : (
+                    <MaterialCommunityIcons
+                      name="weather-partly-cloudy"
+                      size={80}
+                      color={theme.textSecondary}
+                    />
+                  )}
                 </View>
 
                 <View style={styles.weatherDataContainer}>
                   <Text style={[styles.temperatureText, { color: theme.text }]}>
-                    {Math.round(weather.temp)}°C
+                    {typeof weather.temp === "number"
+                      ? Math.round(weather.temp)
+                      : "--"}
+                    °C
                   </Text>
                   <Text
                     style={[
@@ -776,7 +801,7 @@ export default function HomeScreen() {
                       { color: theme.textSecondary },
                     ]}
                   >
-                    {weather.weatherDesc}
+                    {weather.weatherDesc || "Không có dữ liệu"}
                   </Text>
 
                   <View style={styles.weatherDetailsRow}>
@@ -792,7 +817,10 @@ export default function HomeScreen() {
                           { color: theme.textSecondary },
                         ]}
                       >
-                        {weather.humidity}%
+                        {typeof weather.humidity === "number"
+                          ? weather.humidity
+                          : "--"}
+                        %
                       </Text>
                     </View>
 
@@ -808,7 +836,10 @@ export default function HomeScreen() {
                           { color: theme.textSecondary },
                         ]}
                       >
-                        {Math.round(weather.windSpeed * 3.6)} km/h
+                        {typeof weather.windSpeed === "number"
+                          ? Math.round(weather.windSpeed * 3.6)
+                          : "--"}{" "}
+                        km/h
                       </Text>
                     </View>
                   </View>

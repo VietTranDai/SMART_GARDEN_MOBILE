@@ -21,7 +21,7 @@ import {
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useLocalSearchParams, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { userService } from "@/service/api";
+import { gardenService, userService } from "@/service/api";
 import { communityService } from "@/service/api";
 import { GardenerProfile } from "@/types/users/user.types";
 import { Garden } from "@/types/gardens/garden.types";
@@ -90,7 +90,7 @@ export default function GardenerProfileScreen() {
 
       // Fetch gardener's gardens
       try {
-        const gardensData = await userService.getGardenerGardens(id);
+        const gardensData = await gardenService.getGardens();
         setGardens(gardensData || []);
       } catch (gardensErr) {
         console.error("Could not fetch gardens:", gardensErr);

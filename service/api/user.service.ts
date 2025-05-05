@@ -20,15 +20,6 @@ import { Garden } from "@/types/gardens/garden.types";
  */
 class UserService {
   /**
-   * Get current user profile
-   * @returns User profile data
-   */
-  async getProfile(): Promise<User> {
-    const response = await apiClient.get(USER_ENDPOINTS.PROFILE);
-    return response.data;
-  }
-
-  /**
    * Update user profile
    * @param profileData Profile update data
    * @returns Updated user profile
@@ -85,15 +76,6 @@ class UserService {
   }
 
   /**
-   * Get all experience levels
-   * @returns List of experience levels
-   */
-  async getExperienceLevels(): Promise<ExperienceLevel[]> {
-    const response = await apiClient.get(USER_ENDPOINTS.EXPERIENCE_LEVELS);
-    return response.data;
-  }
-
-  /**
    * Get gardener profile by ID
    * @param gardenerId Gardener ID
    * @returns Gardener profile with extended statistics
@@ -105,18 +87,6 @@ class UserService {
       USER_ENDPOINTS.GARDENER_PROFILE(gardenerId)
     );
     return response.data;
-  }
-
-  /**
-   * Get gardener's gardens
-   * @param gardenerId Gardener ID
-   * @returns List of gardens
-   */
-  async getGardenerGardens(gardenerId: number | string): Promise<Garden[]> {
-    const response = await apiClient.get(
-      USER_ENDPOINTS.GARDENER_GARDENS(gardenerId)
-    );
-    return response.data.data;
   }
 
   /**

@@ -3,7 +3,7 @@
  */
 
 import { Garden } from "../gardens";
-import { UserData } from "../users";
+import { User } from "../users";
 
 // Mục tiêu bình chọn (up/down) áp dụng cho cả bài viết và bình luận
 export enum VoteTargetType {
@@ -11,11 +11,11 @@ export enum VoteTargetType {
   COMMENT = "COMMENT",
 }
 
-
 // Thẻ Tag gắn vào bài viết
 export interface Tag {
   id: number;
   name: string;
+  postCount: number;
 }
 
 // Quan hệ nhiều–nhiều giữa Post và Tag
@@ -38,7 +38,7 @@ export interface Post {
 
   // Tác giả
   userDataId: number;
-  userData: UserData;
+  userData: User;
 
   // Vườn (tuỳ chọn)
   gardenId?: number;
@@ -76,7 +76,7 @@ export interface Comment {
   postId: number;
   parentId?: number; // trả lời bình luận khác
   userDataId: number;
-  userData: UserData;
+  userData: User;
 
   // Nội dung & điểm số
   content: string;
@@ -136,7 +136,7 @@ export interface VoteDto {
 export interface FollowInfo {
   followerId: number;
   followedId: number;
-  follower: UserData;
-  followed: UserData;
+  follower: User;
+  followed: User;
   createdAt: string;
 }

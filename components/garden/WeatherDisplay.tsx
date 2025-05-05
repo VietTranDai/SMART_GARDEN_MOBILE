@@ -24,7 +24,7 @@ export default function WeatherDisplay({
   const theme = useAppTheme();
 
   const getWeatherIcon = (iconCode: string) =>
-    `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
+    `https://openweathermap.org/img/wn/${iconCode}.png`;
 
   const getWindDirection = (deg: number) => {
     const dirs = [

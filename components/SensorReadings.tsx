@@ -2,6 +2,7 @@ import { View, Text, StyleSheet } from "react-native";
 import React from "react";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { SensorType, SensorUnit } from "@/types";
 
 interface SensorData {
   temperature: number;
@@ -13,6 +14,15 @@ interface SensorData {
 interface SensorReadingsProps {
   data: SensorData;
 }
+
+const UNIT_DISPLAY = {
+  [SensorUnit.CELSIUS]: "°C",
+  [SensorUnit.PERCENT]: "%",
+  [SensorUnit.LUX]: "lux",
+  [SensorUnit.METER]: "m",
+  [SensorUnit.MILLIMETER]: "mm",
+  [SensorUnit.PH]: "pH",
+};
 
 export default function SensorReadings({ data }: SensorReadingsProps) {
   const theme = useAppTheme();
@@ -71,19 +81,6 @@ export default function SensorReadings({ data }: SensorReadingsProps) {
     }
   };
 
-  const getSensorUnit = (type: string) => {
-    switch (type) {
-      case "temperature":
-        return "°C";
-      case "humidity":
-      case "soilMoisture":
-      case "lightLevel":
-        return "%";
-      default:
-        return "";
-    }
-  };
-
   const getSensorColor = (type: string) => {
     switch (type) {
       case "temperature":
@@ -102,7 +99,7 @@ export default function SensorReadings({ data }: SensorReadingsProps) {
   const renderSensorItem = (type: string, value: number, label: string) => {
     const status = getSensorStatus(type, value);
     const icon = getSensorIcon(type);
-    const unit = getSensorUnit(type);
+    const unit = sensorUnit ? UNIT_DISPLAY[sensorUnit] : "";
     const sensorTypeColor = getSensorColor(type);
     const statusColor = getStatusColor(status);
 

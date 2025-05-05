@@ -26,7 +26,7 @@ import weatherService from "@/service/api/weather.service";
 import sensorService from "@/service/api/sensor.service";
 import taskService from "@/service/api/task.service";
 import activityService from "@/service/api/activity.service";
-
+import alertService from "@/service/api/alert.service";
 // Import weather types directly from the weather types file
 import {
   DailyForecast,
@@ -134,7 +134,7 @@ export default function GardenDetailScreen() {
 
       // Load alerts
       try {
-        const alertData = await weatherService.getAlertsByGarden(gardenId);
+        const alertData = await alertService.getAlertsByGarden(gardenId);
         setAlerts(alertData);
       } catch (error) {
         console.error("Failed to load alerts:", error);
@@ -186,7 +186,7 @@ export default function GardenDetailScreen() {
 
   const handleResolveAlert = async (alertId: number) => {
     try {
-      await weatherService.resolveAlert(alertId);
+      await alertService.resolveAlert(alertId);
 
       setAlerts((prevAlerts) =>
         prevAlerts.map((alert) =>

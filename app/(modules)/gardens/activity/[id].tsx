@@ -15,7 +15,7 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import ActivityList from "@/components/garden/ActivityList";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { GardenActivity } from "@/types";
-import { taskService, gardenService } from "@/service/api";
+import { taskService, gardenService, activityService } from "@/service/api";
 
 export default function GardenActivityHistoryScreen() {
   const theme = useAppTheme();
@@ -41,7 +41,7 @@ export default function GardenActivityHistoryScreen() {
       setGarden(gardenData);
 
       // Get activities for this garden
-      const activitiesData = await taskService.getActivitiesByGarden(gardenId);
+      const activitiesData = await activityService.getActivitiesByGarden(gardenId);
       setActivities(activitiesData);
     } catch (error) {
       console.error("Failed to load activities:", error);

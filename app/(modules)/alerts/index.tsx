@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -16,8 +17,8 @@ import {
 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { router } from "expo-router";
-import { Alert, AlertStatus } from "@/types/gardens/alert.types";
-import { weatherService } from "@/service/api";
+import { Alert, AlertStatus, AlertType } from "@/types/gardens/alert.types";
+import { alertService, gardenService, weatherService } from "@/service/api";
 
 // Extended Alert type with UI-specific properties
 interface AlertUI extends Alert {
@@ -39,7 +40,8 @@ export default function AlertsScreen() {
   const [alerts, setAlerts] = useState<AlertUI[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<string>("ALL");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,11 +51,42 @@ export default function AlertsScreen() {
   const fetchAlerts = async () => {
     try {
       setError(null);
-      const alertsData = await weatherService.getAlerts();
-      setAlerts(alertsData as AlertUI[]);
+      const alertsData = await alertService.getAlerts();
+
+      // Transform to AlertUI if needed (e.g., add garden name if gardenId exists)
+      const enhancedAlerts = await Promise.all(
+        alertsData.map(async (alert) => {
+          if (alert.gardenId) {
+            try {
+              // Get garden details to add garden name
+              const garden = await gardenService.getGardenById(alert.gardenId);
+              return {
+                ...alert,
+                gardenName: garden?.name || `Garden ${alert.gardenId}`,
+                title: getAlertTitle(alert.type),
+              } as AlertUI;
+            } catch (err) {
+              // If garden fetch fails, still return the alert with default values
+              return {
+                ...alert,
+                gardenName: `Garden ${alert.gardenId}`,
+                title: getAlertTitle(alert.type),
+              } as AlertUI;
+            }
+          } else {
+            // No gardenId, return with just the alert type as title
+            return {
+              ...alert,
+              title: getAlertTitle(alert.type),
+            } as AlertUI;
+          }
+        })
+      );
+
+      setAlerts(enhancedAlerts);
     } catch (err) {
       console.error("Failed to fetch alerts:", err);
-      setError("Không thể tải thông báo. Vui lòng thử lại sau.");
+      setError("Không thể tải thông báo cảnh báo. Vui lòng thử lại sau.");
     } finally {
       setLoading(false);
     }
@@ -68,9 +101,9 @@ export default function AlertsScreen() {
   const updateAlertStatus = async (id: number, newStatus: AlertStatus) => {
     try {
       if (newStatus === AlertStatus.RESOLVED) {
-        await weatherService.resolveAlert(id);
+        await alertService.resolveAlert(id);
       } else {
-        await weatherService.updateAlert(id, { status: newStatus });
+        await alertService.updateAlert(id, { status: newStatus });
       }
 
       // Update local state after successful API call
@@ -90,23 +123,8 @@ export default function AlertsScreen() {
       updateAlertStatus(alert.id, AlertStatus.IN_PROGRESS);
     }
 
-    // Navigate based on alert type
-    switch (alert.type) {
-      case "WEATHER":
-        router.push("/(modules)/weather" as any);
-        break;
-      case "SENSOR_ERROR":
-      case "ACTIVITY":
-        router.push("/(modules)/tasks" as any);
-        break;
-      case "SYSTEM":
-      case "MAINTENANCE":
-      case "SECURITY":
-        // Just update status, no navigation
-        break;
-      default:
-        break;
-    }
+    // Navigate to alert detail view
+    router.push(`/(modules)/alerts/[id]?id=${alert.id}`);
   };
 
   const resolveAllAlerts = async () => {
@@ -120,7 +138,7 @@ export default function AlertsScreen() {
 
       // Resolve each alert
       await Promise.all(
-        unresolvedAlerts.map((alert) => weatherService.resolveAlert(alert.id))
+        unresolvedAlerts.map((alert) => alertService.resolveAlert(alert.id))
       );
 
       // Update local state
@@ -141,6 +159,27 @@ export default function AlertsScreen() {
     await updateAlertStatus(id, AlertStatus.IGNORED);
   };
 
+  const getAlertTitle = (type: AlertType): string => {
+    switch (type) {
+      case AlertType.WEATHER:
+        return "Cảnh báo thời tiết";
+      case AlertType.SENSOR_ERROR:
+        return "Lỗi cảm biến";
+      case AlertType.SYSTEM:
+        return "Cảnh báo hệ thống";
+      case AlertType.PLANT_CONDITION:
+        return "Tình trạng cây trồng";
+      case AlertType.ACTIVITY:
+        return "Hoạt động cần thực hiện";
+      case AlertType.MAINTENANCE:
+        return "Bảo trì thiết bị";
+      case AlertType.SECURITY:
+        return "Cảnh báo an ninh";
+      default:
+        return "Thông báo";
+    }
+  };
+
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -154,23 +193,24 @@ export default function AlertsScreen() {
     const yesterday = new Date(now);
     yesterday.setDate(now.getDate() - 1);
     if (date.toDateString() === yesterday.toDateString()) {
-      return "Yesterday";
+      return "Hôm qua";
     }
 
     // If it's within 7 days, show the day name
     const sevenDaysAgo = new Date(now);
     sevenDaysAgo.setDate(now.getDate() - 7);
     if (date > sevenDaysAgo) {
-      return date.toLocaleDateString(undefined, { weekday: "long" });
+      const days = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+      return days[date.getDay()];
     }
 
     // Otherwise show the full date
     return formatDate(timestamp);
   };
 
-  const getAlertIcon = (type: string) => {
+  const getAlertIcon = (type: AlertType) => {
     switch (type) {
-      case "WEATHER":
+      case AlertType.WEATHER:
         return (
           <MaterialCommunityIcons
             name="weather-lightning-rainy"
@@ -178,7 +218,7 @@ export default function AlertsScreen() {
             color="#FFC107"
           />
         );
-      case "SENSOR_ERROR":
+      case AlertType.SENSOR_ERROR:
         return (
           <MaterialCommunityIcons
             name="alert-circle-outline"
@@ -186,7 +226,7 @@ export default function AlertsScreen() {
             color="#F44336"
           />
         );
-      case "CROP_CONDITION":
+      case AlertType.PLANT_CONDITION:
         return (
           <MaterialCommunityIcons
             name="sprout-outline"
@@ -194,7 +234,7 @@ export default function AlertsScreen() {
             color="#4CAF50"
           />
         );
-      case "ACTIVITY":
+      case AlertType.ACTIVITY:
         return (
           <MaterialCommunityIcons
             name="calendar-clock"
@@ -202,13 +242,13 @@ export default function AlertsScreen() {
             color="#2196F3"
           />
         );
-      case "SYSTEM":
+      case AlertType.SYSTEM:
         return <MaterialIcons name="system-update" size={24} color="#9C27B0" />;
-      case "MAINTENANCE":
+      case AlertType.MAINTENANCE:
         return (
           <MaterialCommunityIcons name="tools" size={24} color="#FF9800" />
         );
-      case "SECURITY":
+      case AlertType.SECURITY:
         return (
           <MaterialCommunityIcons
             name="shield-alert-outline"
@@ -227,28 +267,87 @@ export default function AlertsScreen() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "PENDING":
+  const getSeverityColor = (severity?: string) => {
+    switch (severity) {
+      case "CRITICAL":
+        return "#FF1744";
+      case "HIGH":
+        return "#F44336";
+      case "MEDIUM":
+        return "#FFC107";
+      case "LOW":
+        return "#4CAF50";
+      default:
         return theme.warning;
-      case "IN_PROGRESS":
+    }
+  };
+
+  const getStatusColor = (status: AlertStatus) => {
+    switch (status) {
+      case AlertStatus.PENDING:
+        return theme.warning;
+      case AlertStatus.IN_PROGRESS:
         return theme.info;
-      case "RESOLVED":
+      case AlertStatus.RESOLVED:
         return theme.success;
-      case "IGNORED":
+      case AlertStatus.IGNORED:
         return theme.textTertiary;
+      case AlertStatus.ESCALATED:
+        return "#F44336";
       default:
         return theme.textSecondary;
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    return status.replace("_", " ");
+  const getStatusLabel = (status: AlertStatus) => {
+    switch (status) {
+      case AlertStatus.PENDING:
+        return "Chờ xử lý";
+      case AlertStatus.IN_PROGRESS:
+        return "Đang xử lý";
+      case AlertStatus.RESOLVED:
+        return "Đã giải quyết";
+      case AlertStatus.IGNORED:
+        return "Đã bỏ qua";
+      case AlertStatus.ESCALATED:
+        return "Đã chuyển tiếp";
+      default:
+        return status;
+    }
   };
 
   const filteredAlerts = alerts.filter((alert) => {
-    if (filter === "ALL") return true;
-    return alert.status === filter;
+    // Filter by status
+    if (statusFilter !== "ALL" && alert.status !== statusFilter) {
+      return false;
+    }
+
+    // Filter by type
+    if (typeFilter !== "ALL" && alert.type !== typeFilter) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const sortedAlerts = [...filteredAlerts].sort((a, b) => {
+    // Sort by status (pending first)
+    if (a.status === AlertStatus.PENDING && b.status !== AlertStatus.PENDING)
+      return -1;
+    if (a.status !== AlertStatus.PENDING && b.status === AlertStatus.PENDING)
+      return 1;
+
+    // Then by severity if available
+    if (a.severity && b.severity && a.severity !== b.severity) {
+      const severityOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+      return (
+        severityOrder[a.severity as keyof typeof severityOrder] -
+        severityOrder[b.severity as keyof typeof severityOrder]
+      );
+    }
+
+    // Finally by timestamp (newest first)
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
   const renderAlertItem = ({ item }: { item: AlertUI }) => (
@@ -257,8 +356,10 @@ export default function AlertsScreen() {
         styles.alertItem,
         {
           backgroundColor: theme.card,
-          borderLeftColor: getStatusColor(item.status),
-          opacity: item.status === "IGNORED" ? 0.7 : 1,
+          borderLeftColor: item.severity
+            ? getSeverityColor(item.severity)
+            : getStatusColor(item.status),
+          opacity: item.status === AlertStatus.IGNORED ? 0.7 : 1,
         },
       ]}
       onPress={() => handleAlertPress(item)}
@@ -267,10 +368,10 @@ export default function AlertsScreen() {
       <View style={styles.alertContent}>
         <View style={styles.alertHeaderRow}>
           <Text style={[styles.alertTitle, { color: theme.text }]}>
-            {item.title || item.type}
+            {item.title || getAlertTitle(item.type)}
           </Text>
           <Text style={[styles.alertTime, { color: theme.textTertiary }]}>
-            {formatTimestamp(item.timestamp)}
+            {formatTimestamp(item.createdAt)}
           </Text>
         </View>
 
@@ -280,6 +381,15 @@ export default function AlertsScreen() {
         >
           {item.message}
         </Text>
+
+        {item.suggestion && (
+          <Text
+            style={[styles.alertSuggestion, { color: theme.info }]}
+            numberOfLines={1}
+          >
+            Đề xuất: {item.suggestion}
+          </Text>
+        )}
 
         {item.gardenName ? (
           <Text style={[styles.alertGarden, { color: theme.primary }]}>
@@ -304,19 +414,38 @@ export default function AlertsScreen() {
             </Text>
           </View>
 
+          {item.severity && (
+            <View
+              style={[
+                styles.severityBadge,
+                { backgroundColor: getSeverityColor(item.severity) + "20" },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.severityText,
+                  { color: getSeverityColor(item.severity) },
+                ]}
+              >
+                {item.severity}
+              </Text>
+            </View>
+          )}
+
           <View style={styles.alertActions}>
-            {item.status === "PENDING" && (
+            {item.status === AlertStatus.PENDING && (
               <TouchableOpacity
                 style={styles.actionButton}
                 onPress={() => updateAlertStatus(item.id, AlertStatus.RESOLVED)}
               >
                 <Text style={[styles.actionText, { color: theme.success }]}>
-                  Resolve
+                  Xử lý
                 </Text>
               </TouchableOpacity>
             )}
 
-            {(item.status === "PENDING" || item.status === "IN_PROGRESS") && (
+            {(item.status === AlertStatus.PENDING ||
+              item.status === AlertStatus.IN_PROGRESS) && (
               <TouchableOpacity
                 style={styles.actionButton}
                 onPress={() => dismissAlert(item.id)}
@@ -324,7 +453,7 @@ export default function AlertsScreen() {
                 <Text
                   style={[styles.actionText, { color: theme.textSecondary }]}
                 >
-                  Dismiss
+                  Bỏ qua
                 </Text>
               </TouchableOpacity>
             )}
@@ -334,80 +463,124 @@ export default function AlertsScreen() {
     </TouchableOpacity>
   );
 
+  const renderFilterButtons = () => {
+    const statusOptions = [
+      { label: "Tất cả", value: "ALL" },
+      { label: "Chờ xử lý", value: AlertStatus.PENDING },
+      { label: "Đang xử lý", value: AlertStatus.IN_PROGRESS },
+      { label: "Đã xử lý", value: AlertStatus.RESOLVED },
+    ];
+
+    return (
+      <View style={styles.filterContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScrollContent}
+        >
+          {statusOptions.map((option) => (
+            <TouchableOpacity
+              key={option.value}
+              style={[
+                styles.filterButton,
+                {
+                  backgroundColor:
+                    statusFilter === option.value
+                      ? theme.primary
+                      : theme.background,
+                },
+              ]}
+              onPress={() => setStatusFilter(option.value)}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  {
+                    color:
+                      statusFilter === option.value
+                        ? "#FFFFFF"
+                        : theme.textSecondary,
+                  },
+                ]}
+              >
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
+
+  const renderTypeFilterChips = () => {
+    const typeOptions = [
+      { label: "Tất cả", value: "ALL" },
+      { label: "Thời tiết", value: AlertType.WEATHER },
+      { label: "Cảm biến", value: AlertType.SENSOR_ERROR },
+      { label: "Cây trồng", value: AlertType.PLANT_CONDITION },
+      { label: "Hoạt động", value: AlertType.ACTIVITY },
+      { label: "Hệ thống", value: AlertType.SYSTEM },
+    ];
+
+    return (
+      <View style={styles.typeFilterContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.typeFilterScrollContent}
+        >
+          {typeOptions.map((option) => (
+            <TouchableOpacity
+              key={option.value}
+              style={[
+                styles.typeFilterChip,
+                {
+                  backgroundColor:
+                    typeFilter === option.value
+                      ? theme.primaryLight
+                      : theme.backgroundSecondary,
+                  borderWidth: 1,
+                  borderColor:
+                    typeFilter === option.value
+                      ? theme.primary
+                      : theme.borderLight,
+                },
+              ]}
+              onPress={() => setTypeFilter(option.value)}
+            >
+              <Text
+                style={[
+                  styles.typeFilterText,
+                  {
+                    color:
+                      typeFilter === option.value
+                        ? theme.primary
+                        : theme.textSecondary,
+                  },
+                ]}
+              >
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.backgroundSecondary }]}
       edges={["bottom"]}
     >
-      <View style={styles.filterContainer}>
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            {
-              backgroundColor:
-                filter === "ALL" ? theme.primary : theme.background,
-            },
-          ]}
-          onPress={() => setFilter("ALL")}
-        >
-          <Text
-            style={[
-              styles.filterText,
-              { color: filter === "ALL" ? "#FFFFFF" : theme.textSecondary },
-            ]}
-          >
-            All
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            {
-              backgroundColor:
-                filter === "PENDING" ? theme.primary : theme.background,
-            },
-          ]}
-          onPress={() => setFilter("PENDING")}
-        >
-          <Text
-            style={[
-              styles.filterText,
-              {
-                color: filter === "PENDING" ? "#FFFFFF" : theme.textSecondary,
-              },
-            ]}
-          >
-            Pending
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            {
-              backgroundColor:
-                filter === "RESOLVED" ? theme.primary : theme.background,
-            },
-          ]}
-          onPress={() => setFilter("RESOLVED")}
-        >
-          <Text
-            style={[
-              styles.filterText,
-              {
-                color: filter === "RESOLVED" ? "#FFFFFF" : theme.textSecondary,
-              },
-            ]}
-          >
-            Resolved
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {renderFilterButtons()}
+      {renderTypeFilterChips()}
 
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.primary} />
           <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
-            Loading alerts...
+            Đang tải cảnh báo...
           </Text>
         </View>
       ) : (
@@ -415,30 +588,39 @@ export default function AlertsScreen() {
           <View style={styles.headerContainer}>
             <Text style={[styles.alertsCount, { color: theme.text }]}>
               {filteredAlerts.length}{" "}
-              {filter === "ALL" ? "Alerts" : filter.toLowerCase()}
+              {statusFilter === "ALL"
+                ? "Cảnh báo"
+                : `cảnh báo ${getStatusLabel(
+                    statusFilter as AlertStatus
+                  ).toLowerCase()}`}
             </Text>
             {filteredAlerts.some(
               (alert) =>
-                alert.status === "PENDING" || alert.status === "IN_PROGRESS"
+                alert.status === AlertStatus.PENDING ||
+                alert.status === AlertStatus.IN_PROGRESS
             ) && (
               <TouchableOpacity
                 style={styles.markAllButton}
                 onPress={resolveAllAlerts}
               >
                 <Text style={[styles.markAllText, { color: theme.primary }]}>
-                  Resolve All
+                  Xử lý tất cả
                 </Text>
               </TouchableOpacity>
             )}
           </View>
 
           <FlatList
-            data={filteredAlerts}
+            data={sortedAlerts}
             renderItem={renderAlertItem}
             keyExtractor={(item) => item.id.toString()}
             contentContainerStyle={styles.listContent}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[theme.primary]}
+              />
             }
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
@@ -450,14 +632,16 @@ export default function AlertsScreen() {
                 <Text
                   style={[styles.emptyText, { color: theme.textSecondary }]}
                 >
-                  {filter === "ALL"
-                    ? "No alerts"
-                    : `No ${filter.toLowerCase()} alerts`}
+                  {statusFilter === "ALL"
+                    ? "Không có cảnh báo nào"
+                    : `Không có cảnh báo ${getStatusLabel(
+                        statusFilter as AlertStatus
+                      ).toLowerCase()}`}
                 </Text>
                 <Text
                   style={[styles.emptySubtext, { color: theme.textTertiary }]}
                 >
-                  Pull down to refresh
+                  Kéo xuống để làm mới
                 </Text>
               </View>
             }
@@ -554,6 +738,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Regular",
     marginBottom: 8,
   },
+  alertSuggestion: {
+    fontSize: 13,
+    fontFamily: "Inter-Regular",
+    marginBottom: 8,
+    fontStyle: "italic",
+  },
   alertGarden: {
     fontSize: 13,
     fontFamily: "Inter-Medium",
@@ -563,18 +753,30 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    flexWrap: "wrap",
   },
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
+    marginRight: 8,
   },
   statusText: {
     fontSize: 11,
     fontFamily: "Inter-Medium",
   },
+  severityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  severityText: {
+    fontSize: 11,
+    fontFamily: "Inter-Medium",
+  },
   alertActions: {
     flexDirection: "row",
+    marginLeft: "auto",
   },
   actionButton: {
     marginLeft: 12,
@@ -608,5 +810,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter-Regular",
     marginTop: 8,
+  },
+  filterScrollContent: {
+    paddingHorizontal: 8,
+  },
+  typeFilterContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  typeFilterScrollContent: {
+    paddingHorizontal: 8,
+  },
+  typeFilterChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  typeFilterText: {
+    fontSize: 14,
+    fontFamily: "Inter-Medium",
   },
 });

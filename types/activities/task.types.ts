@@ -32,7 +32,6 @@ export interface Task {
   wateringScheduleId?: number;
 
   // Metadata
-  priority?: "LOW" | "MEDIUM" | "HIGH";
   notes?: string;
 
   // Photo evaluation count
@@ -52,9 +51,7 @@ export interface WateringSchedule {
   amount?: number;
   status: "PENDING" | "COMPLETED" | "SKIPPED";
 
-  // Optional metadata
   notes?: string;
-  source?: string;
 
   // Timestamps
   createdAt?: string;

@@ -10,7 +10,7 @@ import {
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { LineChart } from "react-native-chart-kit";
-import { Sensor, SensorType, SensorData } from "@/types";
+import { Sensor, SensorType, SensorData, SensorUnit } from "@/types";
 
 interface SensorDetailViewProps {
   // Danh sách các sensor (metadata)
@@ -19,6 +19,16 @@ interface SensorDetailViewProps {
   data: SensorData[];
   onSelectSensor?: (sensor: Sensor) => void;
 }
+
+// Thêm hằng số mapping cho các đơn vị đo
+const UNIT_DISPLAY = {
+  [SensorUnit.CELSIUS]: "°C",
+  [SensorUnit.PERCENT]: "%",
+  [SensorUnit.LUX]: "lux",
+  [SensorUnit.METER]: "m",
+  [SensorUnit.MILLIMETER]: "mm",
+  [SensorUnit.PH]: "pH",
+};
 
 export default function SensorDetailView({
   sensors,
@@ -316,7 +326,7 @@ export default function SensorDetailView({
               <Text style={[styles.currentValue, { color: statusColor }]}>
                 {latestReading.value}
                 <Text style={styles.unit}>
-                  {getSensorUnit(selectedSensor.type)}
+                  {UNIT_DISPLAY[selectedSensor.unit]}
                 </Text>
               </Text>
               <View
@@ -415,7 +425,7 @@ export default function SensorDetailView({
                         style={[styles.readingValue, { color: theme.text }]}
                       >
                         {r.value}
-                        {getSensorUnit(selectedSensor.type)}
+                        {UNIT_DISPLAY[selectedSensor.unit]}
                       </Text>
                       <View
                         style={[

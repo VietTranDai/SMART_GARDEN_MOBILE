@@ -14,7 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { TaskStatus, WateringScheduleItem } from "@/types";
-import { taskService, gardenService } from "@/service/api";
+import { taskService, gardenService, wateringService } from "@/service/api";
 
 export default function GardenScheduleScreen() {
   const theme = useAppTheme();
@@ -65,7 +65,7 @@ export default function GardenScheduleScreen() {
       setGarden(gardenData);
 
       // Get watering schedules for this garden
-      const scheduleData = await taskService.getGardenWateringSchedules(
+      const scheduleData = await wateringService.getGardenWateringSchedules(
         gardenId
       );
       setSchedule(scheduleData as WateringScheduleItem[]);
@@ -101,9 +101,9 @@ export default function GardenScheduleScreen() {
   ) => {
     try {
       if (newStatus === TaskStatus.COMPLETED) {
-        await taskService.completeWateringSchedule(id.toString());
+        await wateringService.completeWateringSchedule(id.toString());
       } else if (newStatus === TaskStatus.SKIPPED) {
-        await taskService.skipWateringSchedule(id.toString());
+        await wateringService.skipWateringSchedule(id.toString());
       }
 
       // Update local state

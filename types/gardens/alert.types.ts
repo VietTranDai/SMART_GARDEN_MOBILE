@@ -23,51 +23,41 @@ export enum AlertStatus {
   ESCALATED = "ESCALATED", // Alert has been escalated to a higher level
 }
 
-export enum NotificationMethod {
-  EMAIL = "EMAIL", // Sent via email
-  SMS = "SMS", // Sent via SMS
-  PUSH = "PUSH", // Sent as a push notification
-  IN_APP = "IN_APP", // Displayed in the app without notification
-  NONE = "NONE", // No notification sent, only logged
+export enum Severity {
+  LOW = "LOW",
+  MEDIUM = "MEDIUM",
+  HIGH = "HIGH",
+  CRITICAL = "CRITICAL",
 }
 
 export interface Alert {
   id: number;
-  gardenId: number;
+
+  // Garden relationship (optional)
+  gardenId?: number;
+
+  // User relationship (mandatory)
+  userId: number;
 
   // Alert details
   type: AlertType;
   message: string;
   suggestion?: string;
-  timestamp: string;
 
   // Status information
   status: AlertStatus;
-  notificationMethod?: NotificationMethod;
 
   // Severity level
-  severity?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-
-  // Metadata
-  source?: string;
-  sourceId?: string | number;
+  severity?: Severity;
 
   // Timestamps
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface CreateAlertDto {
-  gardenId: number;
-  type: AlertType;
-  message: string;
-  suggestion?: string;
-  notificationMethod?: NotificationMethod;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface UpdateAlertDto {
   status?: AlertStatus;
   message?: string;
   suggestion?: string;
-  notificationMethod?: NotificationMethod;
+  severity?: Severity;
 }

@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useTheme } from "@/contexts/ThemeContext";
 import apiClient from "@/service/apiClient";
+import { alertService } from "@/service/api";
 
 export default function ModuleLayout() {
   const theme = useAppTheme();
@@ -29,9 +30,9 @@ export default function ModuleLayout() {
     const fetchNotificationCount = async () => {
       if (user) {
         try {
-          // Replace simulated API call with real notification count API
-          const response = await apiClient.get("/user/notification-count");
-          setNotificationCount(response.data.count);
+          // Use alertService to count pending alerts
+          const count = await alertService.countPendingAlerts();
+          setNotificationCount(count);
         } catch (error) {
           console.error("Failed to fetch notification count:", error);
           setNotificationCount(0);
@@ -193,10 +194,10 @@ export default function ModuleLayout() {
 
         {/* Hidden screens that will be accessed from main tabs */}
         <Tabs.Screen
-          name="notifications/index"
+          name="alerts"
           options={{
             href: null,
-            headerTitle: "Thông báo",
+            headerShown: false,
           }}
         />
 

@@ -21,6 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { GardenStatus, GardenType } from "@/types";
 import { gardenService } from "@/service/api";
 import { Garden } from "@/types/gardens/garden.types";
+import env from "@/config/environment";
 
 export default function GardensScreen() {
   const theme = useAppTheme();
@@ -129,7 +130,7 @@ export default function GardensScreen() {
       onPress={() => router.push(`/(modules)/gardens/${item.id}`)}
     >
       <Image
-        source={{ uri: `/gardens/${item.id}/thumbnail` }}
+        source={{ uri: `${env.apiUrl}${item.profilePicture}` }}
         style={styles.gardenThumbnail}
         resizeMode="cover"
         defaultSource={require("@/assets/images/icon.png")}

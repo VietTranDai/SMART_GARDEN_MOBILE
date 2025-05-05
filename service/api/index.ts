@@ -14,6 +14,7 @@ import communityService from "./community.service";
 import weatherService from "./weather.service";
 import userService from "./user.service";
 import authService from "./auth.service";
+import alertService from "./alert.service";
 
 export {
   gardenService,
@@ -26,6 +27,7 @@ export {
   weatherService,
   userService,
   authService,
+  alertService,
 };
 
 // Also export types
@@ -39,3 +41,4 @@ export * from "./community.service";
 export * from "./weather.service";
 export * from "./user.service";
 export * from "./auth.service";
+export * from "./alert.service";

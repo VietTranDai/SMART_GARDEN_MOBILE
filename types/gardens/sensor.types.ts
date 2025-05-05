@@ -5,19 +5,30 @@
  */
 
 export enum SensorType {
-  HUMIDITY = "HUMIDITY",
-  TEMPERATURE = "TEMPERATURE",
-  LIGHT = "LIGHT",
-  WATER_LEVEL = "WATER_LEVEL",
-  RAINFALL = "RAINFALL",
-  SOIL_MOISTURE = "SOIL_MOISTURE",
-  SOIL_PH = "SOIL_PH",
+  HUMIDITY = "HUMIDITY", // Sensor for measuring humidity
+  TEMPERATURE = "TEMPERATURE", // Sensor for measuring temperature
+  LIGHT = "LIGHT", // Sensor for measuring light intensity
+  WATER_LEVEL = "WATER_LEVEL", // Sensor for measuring water level
+  RAINFALL = "RAINFALL", // Sensor for measuring rainfall
+  SOIL_MOISTURE = "SOIL_MOISTURE", // Sensor for measuring soil moisture
+  SOIL_PH = "SOIL_PH", // Sensor for measuring soil pH
+}
+
+export enum SensorUnit {
+  PERCENT = "PERCENT", // phần trăm (ví dụ: độ ẩm)
+  CELSIUS = "CELSIUS", // độ C (nhiệt độ)
+  LUX = "LUX", // đơn vị chiếu sáng
+  METER = "METER", // mét (mực nước)
+  MILLIMETER = "MILLIMETER", // milimét (lượng mưa)
+  PH = "PH", // độ pH (độ chua, độ kiềm)
 }
 
 export interface Sensor {
-  id: number;
-  sensorKey: string;
+  id: number; // Unique ID for the sensor
+  sensorKey: string; // Unique UUID for the sensor
   type: SensorType;
+  unit: SensorUnit;
+  name: string;
   gardenId: number;
   garden?: Garden;
   sensorData?: SensorData[];
@@ -29,7 +40,7 @@ export interface SensorData {
   id: number;
   sensorId: number;
   sensor?: Sensor;
-  timestamp: string;
+  timestamp: string; // ISO format of DateTime
   value: number;
   gardenId?: number;
   garden?: Garden;

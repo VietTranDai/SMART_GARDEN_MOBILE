@@ -11,7 +11,6 @@ import { FontAwesome5 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { Alert, AlertStatus, AlertType } from "@/types";
 
-
 interface AlertsListProps {
   alerts: Alert[];
   onResolveAlert?: (alertId: string) => void;
@@ -191,7 +190,7 @@ export default function AlertsList({
 
   // Sort both arrays by timestamp (newest first)
   const sortByTime = (a: Alert, b: Alert) =>
-    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
 
   activeAlerts.sort(sortByTime);
   resolvedAlerts.sort(sortByTime);
@@ -255,7 +254,7 @@ export default function AlertsList({
 
         <View style={styles.alertFooter}>
           <Text style={[styles.timestamp, { color: theme.textSecondary }]}>
-            {formatDate(item.timestamp)}
+            {formatDate(item.createdAt)}
           </Text>
           {getActionButtons(item)}
         </View>

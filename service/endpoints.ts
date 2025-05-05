@@ -13,31 +13,24 @@ export const AUTH_ENDPOINTS = {
   REGISTER: "/auth/register",
   FORGOT_PASSWORD: "/auth/forgot-password",
   RESET_PASSWORD: "/auth/reset-password",
-  VERIFY_EMAIL: "/auth/verify-email",
 };
 
 // User endpoints
 export const USER_ENDPOINTS = {
   ME: "/user/me",
-  EMAIL: "/user/email",
-  PROFILE: "/user/profile",
   UPDATE_PROFILE: "/user/profile",
   CHANGE_PASSWORD: "/user/change-password",
-  EXPERIENCE_LEVELS: "/experience-levels",
   GARDENER_PROFILE: (gardenerId: string | number) => `/gardeners/${gardenerId}`,
-  GARDENER_GARDENS: (gardenerId: string | number) =>
-    `/gardeners/${gardenerId}/gardens`,
-  EXPERIENCE_PROGRESS: "/user/experience-progress",
-  NOTIFICATION_COUNT: "/user/notification-count",
+  EXPERIENCE_PROGRESS: "/user/me/experience-progress",
 };
 
 // Garden endpoints
 export const GARDEN_ENDPOINTS = {
-  LIST: "/gardens",
-  DETAIL: (id: string | number) => `/gardens/${id}`,
-  CREATE: "/gardens",
-  UPDATE: (id: string | number) => `/gardens/${id}`,
-  DELETE: (id: string | number) => `/gardens/${id}`,
+  LIST: "/gardens/me",
+  DETAIL: (gardenId: string | number) => `/gardens/me/${gardenId}`,
+  CREATE: "/gardens/me",
+  UPDATE: (gardenId: string | number) => `/gardens/me/${gardenId}`,
+  DELETE: (gardenId: string | number) => `/gardens/me/${gardenId}`,
 };
 
 // Plant endpoints
@@ -63,54 +56,54 @@ export const PLANT_ENDPOINTS = {
 
 // Sensor endpoints
 export const SENSOR_ENDPOINTS = {
-  LIST_BY_GARDEN: (gardenId: string | number) => `/gardens/${gardenId}/sensors`,
+  LIST_BY_GARDEN: (gardenId: string | number) => `/sensors/gardens/${gardenId}`,
   DETAIL: (sensorId: string | number) => `/sensors/${sensorId}`,
-  CREATE: (gardenId: string | number) => `/gardens/${gardenId}/sensors`,
-  UPDATE: (sensorId: string | number) => `/sensors/${sensorId}`,
+  CREATE: (gardenId: string | number) => `/sensors/gardens/${gardenId}`,
   DELETE: (sensorId: string | number) => `/sensors/${sensorId}`,
   SENSOR_DATA: (sensorId: string | number) => `/sensors/${sensorId}/data`,
   GARDEN_SENSOR_DATA: (gardenId: string | number) =>
-    `/gardens/${gardenId}/sensor-data`,
+    `/sensors/gardens/${gardenId}/data`,
 };
 
 // Task endpoints
 export const TASK_ENDPOINTS = {
-  LIST: "/tasks",
-  LIST_BY_GARDEN: (gardenId: string | number) => `/gardens/${gardenId}/tasks`,
-  DETAIL: (taskId: string | number) => `/tasks/${taskId}`,
-  CREATE: "/tasks",
+  LIST: "/tasks/me",
+  LIST_BY_GARDEN: (gardenId: string | number) =>
+    `/tasks/me/gardens/${gardenId}`,
+  DETAIL: (taskId: string | number) => `/tasks/me/${taskId}`,
+  CREATE: "/tasks/me",
   CREATE_FOR_GARDEN: (gardenId: string | number) =>
-    `/gardens/${gardenId}/tasks`,
-  UPDATE: (taskId: string | number) => `/tasks/${taskId}`,
-  DELETE: (taskId: string | number) => `/tasks/${taskId}`,
-  COMPLETE: (taskId: string | number) => `/tasks/${taskId}/complete`,
-  SKIP: (taskId: string | number) => `/tasks/${taskId}/skip`,
-  UPLOAD_PHOTO: (taskId: string | number) => `/tasks/${taskId}/photo`,
+    `/tasks/me/gardens/${gardenId}`,
+  UPDATE: (taskId: string | number) => `/tasks/me/${taskId}`,
+  DELETE: (taskId: string | number) => `/tasks/me/${taskId}`,
+  COMPLETE: (taskId: string | number) => `/tasks/me/${taskId}/complete`,
+  SKIP: (taskId: string | number) => `/tasks/me/${taskId}/skip`,
+  UPLOAD_PHOTO: (taskId: string | number) => `/tasks/me/${taskId}/photo`,
 };
 
 // Activity endpoints
 export const ACTIVITY_ENDPOINTS = {
-  LIST: "/activities",
+  LIST: "/activities/me",
   LIST_BY_GARDEN: (gardenId: string | number) =>
-    `/gardens/${gardenId}/activities`,
-  DETAIL: (activityId: string | number) => `/activities/${activityId}`,
-  CREATE: "/activities",
+    `/activities/me/gardens/${gardenId}`,
+  DETAIL: (activityId: string | number) => `/activities/me/${activityId}`,
+  CREATE: "/activities/me",
   EVALUATE: (activityId: string | number) =>
-    `/activities/${activityId}/evaluate`,
+    `/activities/me/${activityId}/evaluate`,
 };
 
 // Watering schedule endpoints
 export const WATERING_ENDPOINTS = {
   LIST: "/watering-schedules",
   LIST_BY_GARDEN: (gardenId: string | number) =>
-    `/gardens/${gardenId}/watering-schedules`,
+    `/watering-schedules/gardens/${gardenId}`,
   DETAIL: (scheduleId: string | number) => `/watering-schedules/${scheduleId}`,
   COMPLETE: (scheduleId: string | number) =>
     `/watering-schedules/${scheduleId}/complete`,
   SKIP: (scheduleId: string | number) =>
     `/watering-schedules/${scheduleId}/skip`,
   AUTO_GENERATE: (gardenId: string | number) =>
-    `/gardens/${gardenId}/watering-schedules/auto`,
+    `/watering-schedules/gardens/${gardenId}/auto`,
 };
 
 // Define the base API endpoints for community features
@@ -118,34 +111,40 @@ export const COMMUNITY_ENDPOINTS = {
   POSTS: "/posts",
   POST_DETAIL: (postId: string | number) => `/posts/${postId}`,
   POST_COMMENTS: (postId: string | number) => `/posts/${postId}/comments`,
+
+  POST_VOTE: (postId: string | number) => `/vote/posts/${postId}`,
+  COMMENT_VOTE: (commentId: string | number) => `/vote/comments/${commentId}`,
+
   COMMENT_DETAIL: (commentId: string | number) => `/comments/${commentId}`,
   COMMENT_REPLIES: (commentId: string | number) =>
     `/comments/${commentId}/replies`,
-  POST_VOTE: (postId: string | number) => `/posts/${postId}/vote`,
-  COMMENT_VOTE: (commentId: string | number) => `/comments/${commentId}/vote`,
+
   TAGS: "/tags",
+
   FOLLOW: "/follow",
   FOLLOWERS: (gardenerId: string | number) =>
-    `/gardeners/${gardenerId}/followers`,
+    `/follow/followers/${gardenerId}`,
   FOLLOWING: (gardenerId: string | number) =>
-    `/gardeners/${gardenerId}/following`,
+    `/follow/following/${gardenerId}`,
   FOLLOW_USER: (gardenerId: string | number) => `/follow/${gardenerId}`,
   UNFOLLOW_USER: (gardenerId: string | number) => `/follow/${gardenerId}`,
 };
 
 // Weather endpoints
 export const WEATHER_ENDPOINTS = {
-  CURRENT: (gardenId: string | number) =>
-    `/gardens/${gardenId}/weather/current`,
+  CURRENT: (gardenId: string | number) => `/weather/garden/${gardenId}/current`,
   HOURLY_FORECAST: (gardenId: string | number) =>
-    `/gardens/${gardenId}/weather/hourly`,
+    `/weather/garden/${gardenId}/hourly`,
   DAILY_FORECAST: (gardenId: string | number) =>
-    `/gardens/${gardenId}/weather/daily`,
+    `/weather/garden/${gardenId}/daily`,
   HISTORICAL: (gardenId: string | number) =>
-    `/gardens/${gardenId}/weather/historical`,
+    `/weather/garden/${gardenId}/historical`,
+};
+
+// Alert endpoints
+export const ALERT_ENDPOINTS = {
   ALERTS: "/alerts",
-  ALERTS_BY_GARDEN: (gardenId: string | number) =>
-    `/gardens/${gardenId}/alerts`,
+  ALERTS_BY_GARDEN: (gardenId: string | number) => `/alerts/garden/${gardenId}`,
   ALERT_DETAIL: (alertId: string | number) => `/alerts/${alertId}`,
   RESOLVE_ALERT: (alertId: string | number) => `/alerts/${alertId}/resolve`,
 };
@@ -162,4 +161,5 @@ export default {
   WATERING: WATERING_ENDPOINTS,
   COMMUNITY: COMMUNITY_ENDPOINTS,
   WEATHER: WEATHER_ENDPOINTS,
+  ALERT: ALERT_ENDPOINTS,
 };

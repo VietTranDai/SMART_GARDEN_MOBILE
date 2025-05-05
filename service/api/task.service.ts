@@ -25,7 +25,7 @@ class TaskService {
     dueDate?: string;
   }): Promise<Task[]> {
     const response = await apiClient.get(TASK_ENDPOINTS.LIST, { params });
-    return response.data;
+    return response.data.data;
   }
 
   /**
@@ -44,7 +44,7 @@ class TaskService {
         params,
       }
     );
-    return response.data;
+    return response.data.data;
   }
 
   /**
@@ -54,7 +54,7 @@ class TaskService {
    */
   async getTaskById(taskId: number | string): Promise<Task> {
     const response = await apiClient.get(TASK_ENDPOINTS.DETAIL(taskId));
-    return response.data;
+    return response.data.data;
   }
 
   /**
@@ -64,7 +64,7 @@ class TaskService {
    */
   async createTask(taskData: CreateTaskDto): Promise<Task> {
     const response = await apiClient.post(TASK_ENDPOINTS.CREATE, taskData);
-    return response.data;
+    return response.data.data;
   }
 
   /**
@@ -81,7 +81,7 @@ class TaskService {
       TASK_ENDPOINTS.CREATE_FOR_GARDEN(gardenId),
       taskData
     );
-    return response.data;
+    return response.data.data;
   }
 
   /**
@@ -98,7 +98,7 @@ class TaskService {
       TASK_ENDPOINTS.DETAIL(taskId),
       taskData
     );
-    return response.data;
+    return response.data.data;
   }
 
   /**
@@ -116,7 +116,7 @@ class TaskService {
    */
   async completeTask(taskId: number | string): Promise<Task> {
     const response = await apiClient.post(TASK_ENDPOINTS.COMPLETE(taskId));
-    return response.data;
+    return response.data.data;
   }
 
   /**
@@ -126,7 +126,7 @@ class TaskService {
    */
   async skipTask(taskId: number | string): Promise<Task> {
     const response = await apiClient.post(TASK_ENDPOINTS.SKIP(taskId));
-    return response.data;
+    return response.data.data;
   }
 
   /**
@@ -148,7 +148,7 @@ class TaskService {
         },
       }
     );
-    return response.data;
+    return response.data.data;
   }
 }
 
