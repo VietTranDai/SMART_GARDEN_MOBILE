@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import {
   View,
   Text,
@@ -9,10 +15,12 @@ import {
   RefreshControl,
   Platform,
   ScrollView,
+  Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useUser } from "@/contexts/UserContext";
+import { usePreferences } from "@/contexts/PreferencesContext";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import {
   Ionicons,
@@ -43,6 +51,13 @@ import {
 } from "@/service/api";
 import { API_URL } from "@env";
 
+// Import new components
+import EnhancedGardenCard from "@/components/garden/EnhancedGardenCard";
+import EnhancedSensorCard from "@/components/garden/EnhancedSensorCard";
+import EnhancedWeatherCard from "@/components/home/EnhancedWeatherCard";
+import GardeningTipCard from "@/components/home/GardeningTipCard";
+import QuickActionsBar from "@/components/home/QuickActionsBar";
+
 // Define Section Types
 enum SectionType {
   HEADER = "HEADER",
@@ -71,6 +86,7 @@ interface SensorDisplay {
   unit: string;
   status: "normal" | "warning" | "critical";
   timestamp: string;
+  trendData?: Array<{ value: number; timestamp: string }>;
 }
 
 // Define a combined garden view interface
@@ -83,6 +99,9 @@ interface GardenDisplay extends Garden {
     light?: number;
   };
   location: string;
+  isPinned: boolean;
+  lastVisitedAt?: string;
+  statusColor: string;
 }
 
 // Thêm mapping SensorUnit to display string
@@ -98,6 +117,21 @@ const UNIT_DISPLAY = {
 export default function HomeScreen() {
   const theme = useAppTheme();
   const { user } = useUser();
+  const { homePreferences, togglePinnedGarden, setLastVisitedGarden } =
+    usePreferences();
+
+  // Track animation refs
+  const refreshAnimationRef = useRef(new Animated.Value(0)).current;
+  const notificationPulse = useRef(new Animated.Value(1)).current;
+  const sectionAnimationRefs = useRef({
+    header: new Animated.Value(0),
+    weather: new Animated.Value(0),
+    gardens: new Animated.Value(0),
+    sensors: new Animated.Value(0),
+    quickActions: new Animated.Value(0),
+    tips: new Animated.Value(0),
+  }).current;
+
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   // State for real API data
@@ -120,24 +154,103 @@ export default function HomeScreen() {
       const gardensData = await gardenService.getGardens();
 
       // Convert API gardens to display format with additional UI properties
-      const displayGardens: GardenDisplay[] = gardensData.map((garden) => ({
-        ...garden,
-        alertCount: 0, // Will be updated when alerts are fetched
-        sensorData: {}, // Will be updated when sensor data is fetched
-        location: getLocationString(garden),
-      }));
+      const displayGardens: GardenDisplay[] = gardensData.map((garden) => {
+        // Check if garden is pinned in user preferences
+        const isPinned = homePreferences.pinnedGardens.includes(garden.id);
 
-      setGardens(displayGardens);
+        // Default status color
+        const statusColor = theme.primary;
+
+        return {
+          ...garden,
+          alertCount: 0, // Will be updated when alerts are fetched
+          sensorData: {}, // Will be updated when sensor data is fetched
+          location: getLocationString(garden),
+          isPinned,
+          statusColor, // Will be updated based on alerts/sensor status
+        };
+      });
+
+      // Sort gardens: pinned first, then recently visited
+      const sortedGardens = [...displayGardens].sort((a, b) => {
+        // 1. Pinned gardens first
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+
+        // 2. Then by last visited (if available)
+        if (a.lastVisitedAt && b.lastVisitedAt) {
+          return (
+            new Date(b.lastVisitedAt).getTime() -
+            new Date(a.lastVisitedAt).getTime()
+          );
+        }
+
+        return 0;
+      });
+
+      setGardens(sortedGardens);
 
       // Set initial selected garden if none selected
-      if (selectedGardenId === null && displayGardens.length > 0) {
-        setSelectedGardenId(displayGardens[0].id);
+      if (selectedGardenId === null) {
+        // First try to use last visited garden from preferences
+        if (homePreferences.lastVisitedGarden) {
+          const exists = sortedGardens.some(
+            (g) => g.id === homePreferences.lastVisitedGarden
+          );
+          if (exists) {
+            setSelectedGardenId(homePreferences.lastVisitedGarden);
+            return;
+          }
+        }
+
+        // Otherwise use first garden
+        if (sortedGardens.length > 0) {
+          setSelectedGardenId(sortedGardens[0].id);
+        }
       }
     } catch (err) {
       console.error("Failed to load gardens:", err);
       setError("Không thể tải danh sách vườn. Vui lòng thử lại sau.");
     }
-  }, [selectedGardenId]);
+  }, [selectedGardenId, homePreferences]);
+
+  // Function to handle garden selection
+  const handleSelectGarden = useCallback(
+    (gardenId: number) => {
+      setSelectedGardenId(gardenId);
+
+      // Save to preferences
+      setLastVisitedGarden(gardenId);
+
+      // Update garden's lastVisitedAt timestamp
+      setGardens((prev) =>
+        prev.map((garden) =>
+          garden.id === gardenId
+            ? { ...garden, lastVisitedAt: new Date().toISOString() }
+            : garden
+        )
+      );
+    },
+    [setLastVisitedGarden]
+  );
+
+  // Function to toggle pinned garden status
+  const handleTogglePinGarden = useCallback(
+    (gardenId: number) => {
+      // Call the context function
+      togglePinnedGarden(gardenId);
+
+      // Update local state
+      setGardens((prev) =>
+        prev.map((garden) =>
+          garden.id === gardenId
+            ? { ...garden, isPinned: !garden.isPinned }
+            : garden
+        )
+      );
+    },
+    [togglePinnedGarden]
+  );
 
   // Fetch sensor data for selected garden
   const fetchSensorData = useCallback(async () => {
@@ -261,11 +374,23 @@ export default function HomeScreen() {
     }
   }, [selectedGardenId, fetchSensorData, fetchWeatherData]);
 
+  // Animation for refresh
+  const animateRefresh = useCallback(() => {
+    refreshAnimationRef.setValue(0);
+    Animated.timing(refreshAnimationRef, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  // Enhanced onRefresh with animation
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    animateRefresh();
     await fetchData();
     setRefreshing(false);
-  }, [fetchData]);
+  }, [fetchData, animateRefresh]);
 
   const getLocationString = (garden: Garden) => {
     const parts = [];
@@ -380,9 +505,10 @@ export default function HomeScreen() {
   const sections: Section[] = useMemo(() => {
     const constructedSections: Section[] = [];
 
+    // Always start with header
     constructedSections.push({ type: SectionType.HEADER, key: "header" });
 
-    // Add weather section if data is available
+    // Add weather section if data is available - give it higher priority
     if (weatherData) {
       constructedSections.push({
         type: SectionType.WEATHER,
@@ -391,6 +517,7 @@ export default function HomeScreen() {
       });
     }
 
+    // Gardens section is always included
     constructedSections.push({
       type: SectionType.GARDENS,
       key: "gardens",
@@ -413,6 +540,7 @@ export default function HomeScreen() {
       });
     }
 
+    // Quick actions are always included
     constructedSections.push({
       type: SectionType.QUICK_ACTIONS,
       key: "quick_actions",
@@ -426,433 +554,141 @@ export default function HomeScreen() {
         data: {
           title: "Lời khuyên dựa trên thời tiết",
           content: getWeatherTip(weatherData),
-          imageUrl: `https://openweathermap.org/img/wn/${weatherData.iconCode}.png`,
+          imageUrl: weatherData.iconCode
+            ? `https://openweathermap.org/img/wn/${weatherData.iconCode}@2x.png`
+            : undefined,
+          iconName: "leaf", // Default icon if no weather icon is available
         },
       });
     }
 
     return constructedSections;
-  }, [gardens, selectedGardenId, getSensorDisplayData, weatherData]);
+  }, [
+    gardens,
+    selectedGardenId,
+    getSensorDisplayData,
+    weatherData,
+    gardenAlerts,
+  ]);
 
-  // Render functions for list items
-  const renderGardenItem = ({ item }: { item: GardenDisplay }) => (
-    <TouchableOpacity
-      style={[
-        styles.gardenCard,
-        {
-          backgroundColor: theme.card,
-          borderColor:
-            selectedGardenId === item.id ? theme.primary : theme.card,
-        },
-      ]}
-      onPress={() => setSelectedGardenId(item.id)}
-      onLongPress={() => router.push(`/(modules)/gardens/${item.id}`)}
-    >
-      <Image
-        source={{ uri: `${env.apiUrl}${item.profilePicture}` }}
-        style={styles.gardenThumbnail}
-        resizeMode="cover"
-        defaultSource={require("@/assets/images/icon.png")}
-      />
-      <View style={styles.gardenContent}>
-        <View style={styles.gardenHeader}>
-          <Text
-            style={[styles.gardenTitle, { color: theme.text }]}
-            numberOfLines={1}
-          >
-            {item.name}
-          </Text>
-          {item.alertCount > 0 && (
-            <View style={[styles.alertBadge, { backgroundColor: theme.error }]}>
-              <Text style={styles.alertBadgeText}>{item.alertCount}</Text>
-            </View>
-          )}
-        </View>
+  // Helper function to generate fake trend data outside the render function
+  const getFakeTrendData = (value: number | undefined) => {
+    if (value === undefined) return undefined;
 
-        <View style={styles.gardenTypeContainer}>
-          <Text style={[styles.gardenType, { color: theme.textSecondary }]}>
-            {getGardenTypeIcon(item.type)} {getGardenTypeLabel(item.type)}
-          </Text>
-        </View>
+    // Generate 5 points of fake trend data
+    const now = new Date();
+    const result = [];
 
-        <Text style={[styles.gardenLocation, { color: theme.textSecondary }]}>
-          <Ionicons name="location-outline" size={14} />
-          {" " + item.location}
-        </Text>
+    // The current value
+    result.push({
+      value: value,
+      timestamp: now.toISOString(),
+    });
 
-        {item.plantName && (
-          <View style={styles.plantInfoContainer}>
-            <FontAwesome5 name="seedling" size={14} color={theme.success} />
-            <Text style={[styles.gardenCrop, { color: theme.textSecondary }]}>
-              {item.plantName}
-              {item.plantGrowStage && ` • ${item.plantGrowStage}`}
-            </Text>
-          </View>
-        )}
+    // Generate 4 earlier values with small random variations
+    for (let i = 1; i <= 4; i++) {
+      const pastTime = new Date(now.getTime() - i * 30 * 60 * 1000); // 30 mins apart
+      const randomChange = (Math.random() * 0.4 - 0.2) * value; // +/- 20%
+      result.push({
+        value: Math.max(0, value + randomChange),
+        timestamp: pastTime.toISOString(),
+      });
+    }
 
-        <View style={styles.sensorPreviewContainer}>
-          {item.sensorData?.temperature != null && (
-            <View style={styles.sensorPreview}>
-              <MaterialCommunityIcons
-                name="thermometer"
-                size={16}
-                color={theme.textSecondary}
-              />
-              <Text
-                style={[styles.sensorValue, { color: theme.textSecondary }]}
-              >
-                {item.sensorData.temperature}°C
-              </Text>
-            </View>
-          )}
-          {item.sensorData?.humidity != null && (
-            <View style={styles.sensorPreview}>
-              <MaterialCommunityIcons
-                name="water-percent"
-                size={16}
-                color={theme.textSecondary}
-              />
-              <Text
-                style={[styles.sensorValue, { color: theme.textSecondary }]}
-              >
-                {item.sensorData.humidity}%
-              </Text>
-            </View>
-          )}
-        </View>
+    // Return in reverse order (oldest first)
+    return result.reverse();
+  };
 
-        <View style={styles.gardenFooter}>
-          <Text style={[styles.lastActivity, { color: theme.textTertiary }]}>
-            {new Date(item.updatedAt || "").toLocaleString("vi-VN")}
-          </Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const renderSensorItem = ({ item }: { item: SensorDisplay }) => {
-    const sensorNameMap: Record<SensorType, string> = {
-      [SensorType.TEMPERATURE]: "Nhiệt độ",
-      [SensorType.HUMIDITY]: "Độ ẩm",
-      [SensorType.SOIL_MOISTURE]: "Độ ẩm đất",
-      [SensorType.LIGHT]: "Ánh sáng",
-      [SensorType.WATER_LEVEL]: "Mực nước",
-      [SensorType.RAINFALL]: "Lượng mưa",
-      [SensorType.SOIL_PH]: "Độ pH đất",
-    };
-
-    const getStatusColor = (status: string) => {
-      switch (status) {
-        case "critical":
-          return theme.error;
-        case "warning":
-          return theme.warning;
-        default:
-          return theme.success;
-      }
-    };
+  // Render garden item using the enhanced component
+  const renderGardenItem = ({ item }: { item: GardenDisplay }) => {
+    // Get main sensor value to display
+    const mainSensor =
+      item.sensorData?.temperature !== undefined
+        ? {
+            type: "temperature",
+            value: item.sensorData.temperature,
+            unit: "°C",
+          }
+        : item.sensorData?.humidity !== undefined
+        ? {
+            type: "humidity",
+            value: item.sensorData.humidity,
+            unit: "%",
+          }
+        : undefined;
 
     return (
-      <TouchableOpacity
-        style={[styles.sensorCard, { backgroundColor: theme.card }]}
-        onPress={() => router.push(`/sensors/${item.id}`)}
-      >
-        <View
-          style={[
-            styles.sensorIconContainer,
-            { backgroundColor: getStatusColor(item.status) + "20" },
-          ]}
-        >
-          {renderSensorIcon(item.type, item.icon, getStatusColor(item.status))}
-        </View>
-        <View style={styles.sensorInfo}>
-          <Text style={[styles.sensorName, { color: theme.text }]}>
-            {sensorNameMap[item.type] || item.type}
-          </Text>
-          <Text
-            style={[
-              styles.sensorValueLarge,
-              { color: getStatusColor(item.status) },
-            ]}
-          >
-            {item.value !== undefined && item.value !== null
-              ? item.value.toFixed(1)
-              : "-"}
-            {item.unit}
-          </Text>
-          <Text style={[styles.sensorTimestamp, { color: theme.textTertiary }]}>
-            {formatTimestamp(item.timestamp)}
-          </Text>
-        </View>
-      </TouchableOpacity>
+      <EnhancedGardenCard
+        garden={item}
+        isPinned={item.isPinned}
+        alertCount={item.alertCount}
+        isSelected={selectedGardenId === item.id}
+        onPress={() => handleSelectGarden(item.id)}
+        onLongPress={() => router.push(`/(modules)/gardens/${item.id}`)}
+        onPinPress={() => handleTogglePinGarden(item.id)}
+        mainSensorValue={mainSensor}
+        location={item.location}
+        statusColor={item.statusColor}
+        lastActivity={item.updatedAt || ""}
+      />
     );
   };
 
-  const renderSensorIcon = (
-    type: SensorType,
-    iconName: string,
-    color: string
-  ) => {
-    switch (iconName) {
-      case "thermometer":
-        return (
-          <MaterialCommunityIcons name="thermometer" size={28} color={color} />
-        );
-      case "water-percent":
-        return (
-          <MaterialCommunityIcons
-            name="water-percent"
-            size={28}
-            color={color}
-          />
-        );
-      case "water-outline":
-        return (
-          <MaterialCommunityIcons
-            name="water-outline"
-            size={28}
-            color={color}
-          />
-        );
-      case "white-balance-sunny":
-        return (
-          <MaterialCommunityIcons
-            name="white-balance-sunny"
-            size={28}
-            color={color}
-          />
-        );
-      case "water":
-        return <MaterialCommunityIcons name="water" size={28} color={color} />;
-      case "weather-pouring":
-        return (
-          <MaterialCommunityIcons
-            name="weather-pouring"
-            size={28}
-            color={color}
-          />
-        );
-      case "flask-outline":
-        return (
-          <MaterialCommunityIcons
-            name="flask-outline"
-            size={28}
-            color={color}
-          />
-        );
-      default:
-        return <MaterialCommunityIcons name="gauge" size={28} color={color} />;
-    }
-  };
+  // Render sensor card using the enhanced component
+  const renderSensorItem = ({ item }: { item: SensorDisplay }) => {
+    const fakeTrendData = getFakeTrendData(item.value);
 
-  // Helper functions
-  const getGardenTypeIcon = (type: GardenType) => {
-    switch (type) {
-      case GardenType.INDOOR:
-        return <MaterialCommunityIcons name="home" size={14} />;
-      case GardenType.OUTDOOR:
-        return <MaterialCommunityIcons name="tree" size={14} />;
-      case GardenType.BALCONY:
-        return <MaterialCommunityIcons name="balcony" size={14} />;
-      case GardenType.ROOFTOP:
-        return <MaterialCommunityIcons name="office-building" size={14} />;
-      case GardenType.WINDOW_SILL:
-        return (
-          <MaterialCommunityIcons name="window-closed-variant" size={14} />
-        );
-      default:
-        return <MaterialCommunityIcons name="flower" size={14} />;
-    }
-  };
-
-  const getGardenTypeLabel = (type: GardenType): string => {
-    switch (type) {
-      case GardenType.INDOOR:
-        return "Trong nhà";
-      case GardenType.OUTDOOR:
-        return "Ngoài trời";
-      case GardenType.BALCONY:
-        return "Ban công";
-      case GardenType.ROOFTOP:
-        return "Sân thượng";
-      case GardenType.WINDOW_SILL:
-        return "Bậu cửa sổ";
-      default:
-        return "Không xác định";
-    }
-  };
-
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  // --- Render Functions for sections ---
-  const getGreeting = () => {
-    const currentHour = new Date().getHours();
-    if (currentHour < 12) return "Chào buổi sáng";
-    if (currentHour < 18) return "Chào buổi chiều";
-    return "Chào buổi tối";
+    return (
+      <EnhancedSensorCard
+        id={item.id}
+        type={item.type}
+        name={item.type} // Will be transformed to display name in the component
+        value={item.value}
+        unit={item.unit}
+        status={item.status}
+        timestamp={item.timestamp}
+        trendData={fakeTrendData}
+        onPress={() => router.push(`/sensors/${item.id}`)}
+      />
+    );
   };
 
   // Render function for main sections
   const renderSection = ({ item: section }: { item: Section }) => {
     switch (section.type) {
       case SectionType.HEADER:
-        return (
-          <View style={styles.headerContainer}>
-            <View>
-              <Text style={[styles.greeting, { color: theme.textSecondary }]}>
-                {getGreeting()},
-              </Text>
-              <Text style={[styles.userName, { color: theme.text }]}>
-                {user?.firstName || "Người dùng"}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.notificationButton}
-              onPress={() => router.push("/(modules)/alerts")}
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={26}
-                color={theme.textSecondary}
-              />
-              {Object.values(gardenAlerts).flat().length > 0 && (
-                <View
-                  style={[
-                    styles.notificationBadge,
-                    { backgroundColor: theme.error },
-                  ]}
-                />
-              )}
-            </TouchableOpacity>
-          </View>
-        );
+        return renderHeader();
 
       case SectionType.WEATHER:
         const weather = section.data as WeatherObservation;
         if (!weather) return null;
 
-        // Debug thông tin thời tiết để kiểm tra
-        console.log("Rendering weather data:", weather);
-
         return (
-          <View style={styles.weatherContainer}>
-            <View
-              style={[styles.weatherCard, { backgroundColor: theme.cardAlt }]}
-            >
-              <View style={styles.weatherHeader}>
-                <Text style={[styles.weatherTitle, { color: theme.text }]}>
-                  Thời tiết hiện tại
-                </Text>
-                <TouchableOpacity
-                  onPress={() => router.push("/(modules)/weather/index")}
-                  style={styles.weatherMore}
-                >
-                  <Text style={{ color: theme.primary, fontSize: 14 }}>
-                    Chi tiết
-                  </Text>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={16}
-                    color={theme.primary}
-                  />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.weatherContent}>
-                <View style={styles.weatherIconContainer}>
-                  {weather.iconCode ? (
-                    <Image
-                      source={{
-                        uri: `https://openweathermap.org/img/wn/${weather.iconCode}.png`,
-                      }}
-                      style={styles.weatherIcon}
-                      onError={(e) =>
-                        console.error(
-                          "Image loading error:",
-                          e.nativeEvent.error
-                        )
-                      }
-                    />
-                  ) : (
-                    <MaterialCommunityIcons
-                      name="weather-partly-cloudy"
-                      size={80}
-                      color={theme.textSecondary}
-                    />
-                  )}
-                </View>
-
-                <View style={styles.weatherDataContainer}>
-                  <Text style={[styles.temperatureText, { color: theme.text }]}>
-                    {typeof weather.temp === "number"
-                      ? Math.round(weather.temp)
-                      : "--"}
-                    °C
-                  </Text>
-                  <Text
-                    style={[
-                      styles.weatherDescription,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {weather.weatherDesc || "Không có dữ liệu"}
-                  </Text>
-
-                  <View style={styles.weatherDetailsRow}>
-                    <View style={styles.weatherDetail}>
-                      <MaterialCommunityIcons
-                        name="water-percent"
-                        size={16}
-                        color={theme.textSecondary}
-                      />
-                      <Text
-                        style={[
-                          styles.weatherDetailText,
-                          { color: theme.textSecondary },
-                        ]}
-                      >
-                        {typeof weather.humidity === "number"
-                          ? weather.humidity
-                          : "--"}
-                        %
-                      </Text>
-                    </View>
-
-                    <View style={styles.weatherDetail}>
-                      <MaterialCommunityIcons
-                        name="weather-windy"
-                        size={16}
-                        color={theme.textSecondary}
-                      />
-                      <Text
-                        style={[
-                          styles.weatherDetailText,
-                          { color: theme.textSecondary },
-                        ]}
-                      >
-                        {typeof weather.windSpeed === "number"
-                          ? Math.round(weather.windSpeed * 3.6)
-                          : "--"}{" "}
-                        km/h
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
+          <EnhancedWeatherCard
+            weatherData={weather}
+            onPress={() => router.push("/(modules)/weather/index")}
+          />
         );
 
       case SectionType.GARDENS:
         // Use section.data which is the gardens state variable
         return (
-          <View style={styles.section}>
+          <Animated.View
+            style={[
+              styles.section,
+              {
+                opacity: sectionAnimationRefs.gardens,
+                transform: [
+                  {
+                    translateY: sectionAnimationRefs.gardens.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [20, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>
                 Vườn của tôi
@@ -860,6 +696,8 @@ export default function HomeScreen() {
               <TouchableOpacity
                 style={styles.viewAllButton}
                 onPress={() => router.push("/(modules)/gardens/index")}
+                accessibilityLabel="Xem tất cả vườn"
+                accessibilityRole="button"
               >
                 <Text style={[styles.viewAllText, { color: theme.primary }]}>
                   Xem tất cả
@@ -883,9 +721,14 @@ export default function HomeScreen() {
                   <TouchableOpacity
                     style={[
                       styles.addGardenCard,
-                      { borderColor: theme.border },
+                      {
+                        borderColor: theme.border,
+                        backgroundColor: theme.backgroundSecondary,
+                      },
                     ]}
                     onPress={() => router.push("/(modules)/gardens/create")}
+                    accessibilityLabel="Thêm vườn mới"
+                    accessibilityRole="button"
                   >
                     <View style={styles.addGardenContent}>
                       <View
@@ -894,12 +737,12 @@ export default function HomeScreen() {
                           { backgroundColor: theme.primaryLight },
                         ]}
                       >
-                        <Ionicons name="add" size={30} color={theme.primary} />
+                        <Ionicons name="add" size={34} color={theme.primary} />
                       </View>
                       <Text
                         style={[styles.addGardenText, { color: theme.primary }]}
                       >
-                        Thêm vườn
+                        Tạo vườn mới
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -931,6 +774,8 @@ export default function HomeScreen() {
                     styles.emptyStateButton,
                     { backgroundColor: theme.primary },
                   ]}
+                  accessibilityLabel="Tạo vườn mới"
+                  accessibilityRole="button"
                 >
                   <Text
                     style={[styles.emptyStateButtonText, { color: theme.card }]}
@@ -940,13 +785,28 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
             )}
-          </View>
+          </Animated.View>
         );
 
       case SectionType.SENSORS:
         // Use section.data which is the sensor display data
         return (
-          <View style={styles.section}>
+          <Animated.View
+            style={[
+              styles.section,
+              {
+                opacity: sectionAnimationRefs.sensors,
+                transform: [
+                  {
+                    translateY: sectionAnimationRefs.sensors.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [20, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>
                 Dữ liệu Cảm biến
@@ -959,6 +819,8 @@ export default function HomeScreen() {
                       `/(modules)/gardens/${selectedGardenId}/sensors`
                     )
                   }
+                  accessibilityLabel="Xem chi tiết cảm biến"
+                  accessibilityRole="button"
                 >
                   <Text style={[styles.viewAllText, { color: theme.primary }]}>
                     Xem chi tiết
@@ -1014,6 +876,8 @@ export default function HomeScreen() {
                       styles.emptyStateButton,
                       { backgroundColor: theme.primary },
                     ]}
+                    accessibilityLabel="Thêm cảm biến mới"
+                    accessibilityRole="button"
                   >
                     <Text
                       style={[
@@ -1045,140 +909,96 @@ export default function HomeScreen() {
                 </Text>
               </View>
             )}
-          </View>
+          </Animated.View>
         );
 
       case SectionType.QUICK_ACTIONS:
+        // Define the quick actions
+        const quickActions = [
+          {
+            id: "tasks",
+            icon: "add-task",
+            iconType: "material" as const,
+            label: "Công việc",
+            onPress: () => router.push("/(modules)/tasks/index"),
+            accessibilityLabel: "Xem danh sách công việc",
+          },
+          {
+            id: "new-garden",
+            icon: "sprout",
+            iconType: "materialCommunity" as const,
+            label: "Vườn mới",
+            onPress: () => router.push("/(modules)/gardens/create"),
+            accessibilityLabel: "Tạo vườn mới",
+          },
+          {
+            id: "new-post",
+            icon: "create-outline",
+            iconType: "ionicons" as const,
+            label: "Bài viết mới",
+            onPress: () => router.push("/(modules)/community/new"),
+            accessibilityLabel: "Tạo bài viết mới",
+          },
+          {
+            id: "scan-sensor",
+            icon: "qrcode-scan",
+            iconType: "materialCommunity" as const,
+            label: "Quét cảm biến",
+            onPress: () => console.log("Navigate to Scan Sensor"),
+            accessibilityLabel: "Quét cảm biến",
+          },
+          {
+            id: "new-activity",
+            icon: "watering-can",
+            iconType: "materialCommunity" as const,
+            label: "Tạo hoạt động",
+            onPress: () => router.push("/(modules)/activities/create"),
+            accessibilityLabel: "Tạo hoạt động mới",
+          },
+        ];
+
         return (
-          <View style={styles.section}>
-            <Text
-              style={[
-                styles.sectionTitle,
-                { color: theme.text, marginBottom: 16, paddingHorizontal: 20 },
-              ]}
-            >
-              Tác vụ nhanh
-            </Text>
-            <View style={styles.quickActionsContainer}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 20 }}
-              >
-                <TouchableOpacity
-                  style={[styles.quickAction, { backgroundColor: theme.card }]}
-                  onPress={() => router.push("/(modules)/tasks/index")}
-                >
-                  <View
-                    style={[
-                      styles.quickActionIconWrapper,
-                      { backgroundColor: theme.primary + "20" },
-                    ]}
-                  >
-                    <MaterialIcons
-                      name="add-task"
-                      size={24}
-                      color={theme.primary}
-                    />
-                  </View>
-                  <Text style={[styles.quickActionText, { color: theme.text }]}>
-                    Công việc
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.quickAction, { backgroundColor: theme.card }]}
-                  onPress={() => router.push("/(modules)/gardens/create")}
-                >
-                  <View
-                    style={[
-                      styles.quickActionIconWrapper,
-                      { backgroundColor: theme.primary + "20" },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name="sprout"
-                      size={24}
-                      color={theme.primary}
-                    />
-                  </View>
-                  <Text style={[styles.quickActionText, { color: theme.text }]}>
-                    Vườn mới
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.quickAction, { backgroundColor: theme.card }]}
-                  onPress={() => router.push("/(modules)/community/new")}
-                >
-                  <View
-                    style={[
-                      styles.quickActionIconWrapper,
-                      { backgroundColor: theme.primary + "20" },
-                    ]}
-                  >
-                    <Ionicons
-                      name="create-outline"
-                      size={24}
-                      color={theme.primary}
-                    />
-                  </View>
-                  <Text style={[styles.quickActionText, { color: theme.text }]}>
-                    Bài viết mới
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.quickAction, { backgroundColor: theme.card }]}
-                  onPress={() => console.log("Navigate to Scan Sensor")}
-                >
-                  <View
-                    style={[
-                      styles.quickActionIconWrapper,
-                      { backgroundColor: theme.primary + "20" },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name="qrcode-scan"
-                      size={24}
-                      color={theme.primary}
-                    />
-                  </View>
-                  <Text style={[styles.quickActionText, { color: theme.text }]}>
-                    Quét cảm biến
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.quickAction, { backgroundColor: theme.card }]}
-                  onPress={() => router.push("/(modules)/activities/create")}
-                >
-                  <View
-                    style={[
-                      styles.quickActionIconWrapper,
-                      { backgroundColor: theme.primary + "20" },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name="watering-can"
-                      size={24}
-                      color={theme.primary}
-                    />
-                  </View>
-                  <Text style={[styles.quickActionText, { color: theme.text }]}>
-                    Tạo hoạt động
-                  </Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </View>
-          </View>
+          <Animated.View
+            style={[
+              styles.section,
+              {
+                opacity: sectionAnimationRefs.quickActions,
+                transform: [
+                  {
+                    translateY: sectionAnimationRefs.quickActions.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [20, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <QuickActionsBar title="Tác vụ nhanh" actions={quickActions} />
+          </Animated.View>
         );
 
       case SectionType.TIPS:
         const tip = section.data;
         if (!tip) return null;
+
         return (
-          <View style={styles.section}>
+          <Animated.View
+            style={[
+              styles.section,
+              {
+                opacity: sectionAnimationRefs.tips,
+                transform: [
+                  {
+                    translateY: sectionAnimationRefs.tips.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [20, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
             <Text
               style={[
                 styles.sectionTitle,
@@ -1187,40 +1007,127 @@ export default function HomeScreen() {
             >
               Mẹo chăm sóc
             </Text>
-            <View style={styles.tipContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.tipCard,
-                  { backgroundColor: theme.primaryLight },
-                ]}
-                onPress={() => router.push(`/weather`)}
-              >
-                <Image
-                  source={{ uri: tip.imageUrl }}
-                  style={styles.tipImage}
-                  resizeMode="contain"
-                />
-                <View style={styles.tipContent}>
-                  <Text style={[styles.tipTitle, { color: theme.primaryDark }]}>
-                    {tip.title}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.tipDescription,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {tip.content}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-          </View>
+
+            <GardeningTipCard
+              title={tip.title}
+              content={tip.content}
+              imageUrl={tip.imageUrl}
+              onPress={() => router.push(`/weather`)}
+            />
+          </Animated.View>
         );
 
       default:
         return null;
     }
+  };
+
+  // Animate sections on mount and when data changes
+  useEffect(() => {
+    // Animate all sections in sequence
+    const animations = Object.values(sectionAnimationRefs).map((anim, index) =>
+      Animated.timing(anim, {
+        toValue: 1,
+        duration: 500,
+        delay: 100 + index * 100, // Stagger the animations
+        useNativeDriver: true,
+      })
+    );
+
+    Animated.stagger(100, animations).start();
+  }, []);
+
+  // Notification badge animation
+  useEffect(() => {
+    const hasNotifications = Object.values(gardenAlerts).flat().length > 0;
+
+    if (hasNotifications) {
+      // Notification alert animation
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(notificationPulse, {
+            toValue: 0.6,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(notificationPulse, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      // Reset animation if no notifications
+      notificationPulse.setValue(1);
+    }
+  }, [gardenAlerts, notificationPulse]);
+
+  // --- Render Functions for sections ---
+  const getGreeting = () => {
+    const currentHour = new Date().getHours();
+    if (currentHour < 12) return "Chào buổi sáng";
+    if (currentHour < 18) return "Chào buổi chiều";
+    return "Chào buổi tối";
+  };
+
+  // Header with animated notification badge
+  const renderHeader = () => {
+    const hasNotifications = Object.values(gardenAlerts).flat().length > 0;
+
+    return (
+      <Animated.View
+        style={[
+          styles.headerContainer,
+          {
+            opacity: sectionAnimationRefs.header,
+            transform: [
+              {
+                translateY: sectionAnimationRefs.header.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [20, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <View>
+          <Text style={[styles.greeting, { color: theme.textSecondary }]}>
+            {getGreeting()},
+          </Text>
+          <Text style={[styles.userName, { color: theme.text }]}>
+            {user?.firstName || "Người dùng"}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.notificationButton}
+          onPress={() => router.push("/(modules)/alerts")}
+          accessibilityLabel={
+            hasNotifications ? "Bạn có thông báo mới" : "Thông báo"
+          }
+          accessibilityRole="button"
+        >
+          <Ionicons
+            name="notifications-outline"
+            size={26}
+            color={theme.textSecondary}
+          />
+          {hasNotifications && (
+            <Animated.View
+              style={[
+                styles.notificationBadge,
+                {
+                  backgroundColor: theme.error,
+                  opacity: notificationPulse,
+                  transform: [{ scale: notificationPulse }],
+                },
+              ]}
+            />
+          )}
+        </TouchableOpacity>
+      </Animated.View>
+    );
   };
 
   return (
@@ -1236,6 +1143,8 @@ export default function HomeScreen() {
           <TouchableOpacity
             style={[styles.retryButton, { backgroundColor: theme.primary }]}
             onPress={onRefresh}
+            accessibilityLabel="Thử lại"
+            accessibilityRole="button"
           >
             <Text style={[styles.retryButtonText, { color: theme.card }]}>
               Thử lại
@@ -1255,14 +1164,22 @@ export default function HomeScreen() {
               onRefresh={onRefresh}
               colors={[theme.primary]}
               tintColor={theme.primary}
+              progressViewOffset={20}
             />
           }
           ListFooterComponent={
-            <View style={styles.footer}>
+            <Animated.View
+              style={[
+                styles.footer,
+                {
+                  opacity: refreshAnimationRef,
+                },
+              ]}
+            >
               <Text style={[styles.footerText, { color: theme.textTertiary }]}>
                 Phiên bản 1.0.0
               </Text>
-            </View>
+            </Animated.View>
           }
         />
       )}
@@ -1287,6 +1204,8 @@ const createStyles = (theme: any) =>
       paddingTop: Platform.OS === "android" ? 15 : 10,
       paddingBottom: 16,
       backgroundColor: theme.background,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.borderLight,
     },
     greeting: {
       fontSize: 16,
@@ -1302,6 +1221,10 @@ const createStyles = (theme: any) =>
     notificationButton: {
       padding: 8,
       position: "relative",
+      width: 44,
+      height: 44,
+      alignItems: "center",
+      justifyContent: "center",
     },
     notificationBadge: {
       position: "absolute",
@@ -1334,6 +1257,10 @@ const createStyles = (theme: any) =>
       flexDirection: "row",
       alignItems: "center",
       paddingVertical: 4,
+      paddingHorizontal: 8,
+      minWidth: 44,
+      minHeight: 44,
+      justifyContent: "center",
     },
     viewAllText: {
       fontSize: 14,
@@ -1348,107 +1275,9 @@ const createStyles = (theme: any) =>
     horizontalSeparator: {
       width: 12,
     },
-    gardenCard: {
-      width: 280,
-      borderRadius: 16,
-      backgroundColor: theme.card,
-      borderWidth: 1.5,
-      elevation: 2,
-      shadowColor: theme.shadow,
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.08,
-      shadowRadius: 2,
-      overflow: "hidden",
-    },
-    gardenThumbnail: {
-      width: "100%",
-      height: 120,
-      backgroundColor: theme.cardAlt,
-    },
-    gardenContent: { padding: 14 },
-    gardenHeader: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 6,
-    },
-    gardenTitle: {
-      fontSize: 16,
-      fontFamily: "Inter-SemiBold",
-      color: theme.text,
-      flex: 1,
-    },
-    gardenTypeContainer: {
-      flexDirection: "row",
-      alignItems: "center",
-      marginBottom: 6,
-    },
-    gardenType: {
-      fontSize: 13,
-      fontFamily: "Inter-Medium",
-      color: theme.textSecondary,
-    },
-    alertBadge: {
-      backgroundColor: theme.error,
-      width: 20,
-      height: 20,
-      borderRadius: 10,
-      alignItems: "center",
-      justifyContent: "center",
-      marginLeft: 8,
-    },
-    alertBadgeText: {
-      color: theme.card,
-      fontSize: 12,
-      fontWeight: "bold",
-      fontFamily: "Inter-Bold",
-    },
-    gardenLocation: {
-      fontSize: 13,
-      fontFamily: "Inter-Regular",
-      color: theme.textSecondary,
-      marginBottom: 8,
-    },
-    plantInfoContainer: {
-      flexDirection: "row",
-      alignItems: "center",
-      marginBottom: 8,
-      gap: 6,
-    },
-    gardenCrop: {
-      fontSize: 13,
-      fontFamily: "Inter-Regular",
-      color: theme.textSecondary,
-    },
-    sensorPreviewContainer: {
-      flexDirection: "row",
-      marginBottom: 10,
-      gap: 16,
-    },
-    sensorPreview: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    sensorValue: {
-      fontSize: 13,
-      fontFamily: "Inter-Medium",
-      color: theme.textSecondary,
-      marginLeft: 4,
-    },
-    gardenFooter: {
-      borderTopWidth: 1,
-      borderTopColor: theme.borderLight,
-      paddingTop: 10,
-      marginTop: 6,
-    },
-    lastActivity: {
-      fontSize: 12,
-      fontFamily: "Inter-Regular",
-      color: theme.textTertiary,
-    },
     addGardenCard: {
-      width: 160,
-      height: 230,
+      width: 240,
+      height: 260,
       borderRadius: 16,
       borderWidth: 1.5,
       borderStyle: "dashed",
@@ -1456,64 +1285,27 @@ const createStyles = (theme: any) =>
       justifyContent: "center",
       alignItems: "center",
       backgroundColor: theme.cardAlt,
+      margin: 6,
     },
     addGardenContent: {
       alignItems: "center",
+      justifyContent: "center",
+      padding: 20,
     },
     addIcon: {
-      width: 50,
-      height: 50,
-      borderRadius: 25,
+      width: 60,
+      height: 60,
+      borderRadius: 30,
       justifyContent: "center",
       alignItems: "center",
       backgroundColor: theme.primaryLight,
-      marginBottom: 12,
+      marginBottom: 16,
     },
     addGardenText: {
-      fontFamily: "Inter-Medium",
-      fontSize: 15,
+      fontFamily: "Inter-SemiBold",
+      fontSize: 16,
       color: theme.primary,
       textAlign: "center",
-    },
-    sensorCard: {
-      width: 140,
-      height: 160,
-      borderRadius: 16,
-      padding: 16,
-      backgroundColor: theme.card,
-      elevation: 2,
-      shadowColor: theme.shadow,
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.08,
-      shadowRadius: 2,
-    },
-    sensorIconContainer: {
-      width: 50,
-      height: 50,
-      borderRadius: 25,
-      backgroundColor: theme.primaryLight,
-      justifyContent: "center",
-      alignItems: "center",
-      marginBottom: 12,
-    },
-    sensorInfo: {
-      flex: 1,
-    },
-    sensorName: {
-      fontSize: 14,
-      fontFamily: "Inter-SemiBold",
-      color: theme.text,
-      marginBottom: 6,
-    },
-    sensorValueLarge: {
-      fontSize: 22,
-      fontFamily: "Inter-Bold",
-      marginBottom: 6,
-    },
-    sensorTimestamp: {
-      fontSize: 12,
-      fontFamily: "Inter-Regular",
-      marginTop: "auto",
     },
     emptyState: {
       height: 170,
@@ -1524,6 +1316,7 @@ const createStyles = (theme: any) =>
       marginHorizontal: 20,
       backgroundColor: theme.cardAlt,
       marginTop: 10,
+      ...theme.elevation1,
     },
     emptyStateText: {
       fontSize: 14,
@@ -1538,77 +1331,14 @@ const createStyles = (theme: any) =>
       paddingHorizontal: 20,
       paddingVertical: 10,
       borderRadius: 20,
+      minWidth: 44,
+      minHeight: 44,
+      alignItems: "center",
+      justifyContent: "center",
     },
     emptyStateButtonText: {
       fontFamily: "Inter-SemiBold",
       fontSize: 14,
-    },
-    quickActionsContainer: {
-      marginBottom: 16,
-    },
-    quickAction: {
-      borderRadius: 16,
-      paddingVertical: 16,
-      paddingHorizontal: 16,
-      alignItems: "center",
-      backgroundColor: theme.card,
-      width: 110,
-      marginRight: 12,
-      elevation: 2,
-      shadowColor: theme.shadow,
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.08,
-      shadowRadius: 3,
-    },
-    quickActionIconWrapper: {
-      width: 50,
-      height: 50,
-      borderRadius: 25,
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 12,
-    },
-    quickActionText: {
-      fontSize: 14,
-      fontFamily: "Inter-Medium",
-      color: theme.text,
-      textAlign: "center",
-    },
-    tipContainer: {
-      paddingHorizontal: 20,
-    },
-    tipCard: {
-      borderRadius: 16,
-      overflow: "hidden",
-      backgroundColor: theme.primaryLight,
-      padding: 16,
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    tipImage: {
-      width: 60,
-      height: 60,
-      marginRight: 14,
-    },
-    tipContent: {
-      flex: 1,
-    },
-    tipTitle: {
-      fontSize: 16,
-      fontFamily: "Inter-SemiBold",
-      marginBottom: 8,
-    },
-    tipDescription: {
-      fontSize: 14,
-      fontFamily: "Inter-Regular",
-      lineHeight: 20,
-    },
-    tipLink: {
-      fontSize: 14,
-      fontFamily: "Inter-Medium",
-      color: theme.primary,
-      marginTop: 12,
-      alignSelf: "flex-start",
     },
     errorContainer: {
       flex: 1,
@@ -1624,9 +1354,13 @@ const createStyles = (theme: any) =>
       marginBottom: 24,
     },
     retryButton: {
-      paddingHorizontal: 24,
       paddingVertical: 12,
+      paddingHorizontal: 24,
       borderRadius: 24,
+      minWidth: 44,
+      minHeight: 44,
+      alignItems: "center",
+      justifyContent: "center",
     },
     retryButtonText: {
       fontSize: 16,
@@ -1639,69 +1373,5 @@ const createStyles = (theme: any) =>
     footerText: {
       fontSize: 12,
       fontFamily: "Inter-Regular",
-    },
-    weatherContainer: {
-      paddingHorizontal: 20,
-      marginBottom: 16,
-    },
-    weatherCard: {
-      borderRadius: 16,
-      overflow: "hidden",
-      backgroundColor: theme.cardAlt,
-      padding: 16,
-    },
-    weatherHeader: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 12,
-    },
-    weatherMore: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    weatherContent: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    weatherIconContainer: {
-      marginRight: 16,
-    },
-    weatherIcon: {
-      width: 80,
-      height: 80,
-    },
-    weatherDataContainer: {
-      flex: 1,
-    },
-    temperatureText: {
-      fontSize: 36,
-      fontFamily: "Inter-Bold",
-      marginBottom: 4,
-    },
-    weatherDescription: {
-      fontSize: 16,
-      fontFamily: "Inter-Medium",
-      marginBottom: 12,
-      textTransform: "capitalize",
-    },
-    weatherDetailsRow: {
-      flexDirection: "row",
-      justifyContent: "flex-start",
-      gap: 16,
-    },
-    weatherDetail: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 4,
-    },
-    weatherDetailText: {
-      fontSize: 14,
-      fontFamily: "Inter-Regular",
-    },
-    weatherTitle: {
-      fontSize: 17,
-      fontFamily: "Inter-SemiBold",
-      color: theme.text,
     },
   });

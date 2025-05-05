@@ -6,6 +6,7 @@ import { getItem } from "@/utils/asyncStorage"; // Import setItem
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { PreferencesProvider } from "@/contexts/PreferencesContext";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as Notifications from "expo-notifications";
 import { Text, View, StyleSheet, TouchableOpacity } from "react-native";
@@ -149,28 +150,30 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ThemeProvider>
           <UserProvider>
-            <SafeAreaProvider>
-              <Stack>
-                <Stack.Screen
-                  name="(modules)"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen name="+not-found" />
-                <Stack.Screen
-                  name="auth/index"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                  name="onboarding/index"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                  name="sensors/[id]"
-                  options={{ headerShown: false }}
-                />
-              </Stack>
-              <AppNavigator />
-            </SafeAreaProvider>
+            <PreferencesProvider>
+              <SafeAreaProvider>
+                <Stack>
+                  <Stack.Screen
+                    name="(modules)"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen name="+not-found" />
+                  <Stack.Screen
+                    name="auth/index"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="onboarding/index"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="sensors/[id]"
+                    options={{ headerShown: false }}
+                  />
+                </Stack>
+                <AppNavigator />
+              </SafeAreaProvider>
+            </PreferencesProvider>
           </UserProvider>
         </ThemeProvider>
       </GestureHandlerRootView>

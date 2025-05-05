@@ -116,6 +116,53 @@ export default {
     shadow: "rgba(0, 0, 0, 0.1)",
     shimmer: "#F5F5F5",
     shimmerHighlight: "#FFFFFF",
+
+    // NEW: Gradient colors for cards and backgrounds
+    gradientPrimary: ["#E8F5E9", "#C8E6C9", "#A5D6A7"],
+    gradientSecondary: ["#E3F2FD", "#BBDEFB", "#90CAF9"],
+    gradientSuccess: ["#E8F5E9", "#C8E6C9", "#A5D6A7"],
+    gradientWarning: ["#FFF8E1", "#FFECB3", "#FFE082"],
+    gradientDanger: ["#FFEBEE", "#FFCDD2", "#EF9A9A"],
+
+    // NEW: Status colors with alpha transparency
+    statusHealthyBg: "rgba(76, 175, 80, 0.1)",
+    statusHealthyBorder: "rgba(76, 175, 80, 0.3)",
+    statusWarningBg: "rgba(255, 193, 7, 0.1)",
+    statusWarningBorder: "rgba(255, 193, 7, 0.3)",
+    statusDangerBg: "rgba(244, 67, 54, 0.1)",
+    statusDangerBorder: "rgba(244, 67, 54, 0.3)",
+    statusInfoBg: "rgba(33, 150, 243, 0.1)",
+    statusInfoBorder: "rgba(33, 150, 243, 0.3)",
+
+    // NEW: Elevation styles for shadows
+    elevation1: {
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.18,
+      shadowRadius: 1.0,
+      elevation: 1,
+    },
+    elevation2: {
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 1.41,
+      elevation: 2,
+    },
+    elevation3: {
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.22,
+      shadowRadius: 2.22,
+      elevation: 3,
+    },
+
+    // NEW: Animation timing constants
+    animationTiming: {
+      fast: 200,
+      medium: 400,
+      slow: 800,
+    },
   },
   dark: {
     // Primary palette
@@ -230,5 +277,52 @@ export default {
     shadow: "rgba(0, 0, 0, 0.3)",
     shimmer: "#2A2A2A",
     shimmerHighlight: "#333333",
+
+    // NEW: Gradient colors for cards and backgrounds
+    gradientPrimary: ["#1F2E1F", "#2E3B2E", "#3C493C"],
+    gradientSecondary: ["#1A237E", "#283593", "#3949AB"],
+    gradientSuccess: ["#1F2E1F", "#2E3B2E", "#3C493C"],
+    gradientWarning: ["#332A15", "#4D3F1F", "#665429"],
+    gradientDanger: ["#2D1A1A", "#471F1F", "#5E2A2A"],
+
+    // NEW: Status colors with alpha transparency
+    statusHealthyBg: "rgba(76, 175, 80, 0.15)",
+    statusHealthyBorder: "rgba(76, 175, 80, 0.4)",
+    statusWarningBg: "rgba(255, 193, 7, 0.15)",
+    statusWarningBorder: "rgba(255, 193, 7, 0.4)",
+    statusDangerBg: "rgba(244, 67, 54, 0.15)",
+    statusDangerBorder: "rgba(244, 67, 54, 0.4)",
+    statusInfoBg: "rgba(33, 150, 243, 0.15)",
+    statusInfoBorder: "rgba(33, 150, 243, 0.4)",
+
+    // NEW: Elevation styles for shadows
+    elevation1: {
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.22,
+      shadowRadius: 2.22,
+      elevation: 1,
+    },
+    elevation2: {
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+      elevation: 2,
+    },
+    elevation3: {
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.27,
+      shadowRadius: 4.65,
+      elevation: 3,
+    },
+
+    // NEW: Animation timing constants
+    animationTiming: {
+      fast: 200,
+      medium: 400,
+      slow: 800,
+    },
   },
 };

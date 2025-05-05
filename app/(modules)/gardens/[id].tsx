@@ -27,6 +27,7 @@ import sensorService from "@/service/api/sensor.service";
 import taskService from "@/service/api/task.service";
 import activityService from "@/service/api/activity.service";
 import alertService from "@/service/api/alert.service";
+import wateringScheduleService from "@/service/api/watering.service";
 // Import weather types directly from the weather types file
 import {
   DailyForecast,
@@ -43,7 +44,7 @@ import {
   GardenStatus,
   Sensor,
   TaskStatus,
-  WateringScheduleItem,
+  WateringSchedule,
 } from "@/types";
 import { apiClient } from "@/service";
 
@@ -79,7 +80,7 @@ export default function GardenDetailScreen() {
   const [dailyForecast, setDailyForecast] = useState<DailyForecast[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [wateringSchedule, setWateringSchedule] = useState<
-    WateringScheduleItem[]
+    WateringSchedule[]
   >([]);
   const [activities, setActivities] = useState<GardenActivity[]>([]);
   const [sensors, setSensors] = useState<Sensor[]>([]);
@@ -143,10 +144,8 @@ export default function GardenDetailScreen() {
 
       // Load watering schedule
       try {
-        const response = await apiClient.get(
-          `/gardens/${gardenId}/watering-schedule`
-        );
-        setWateringSchedule(response.data);
+        const response = await wateringScheduleService.getGardenWateringSchedules(gardenId);
+        setWateringSchedule(response);
       } catch (error) {
         console.error("Failed to load watering schedule:", error);
         setWateringSchedule([]);
