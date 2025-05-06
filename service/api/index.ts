@@ -4,41 +4,32 @@
  * Export all API services for easier imports
  */
 
+import userService from "./user.service";
 import gardenService from "./garden.service";
 import sensorService from "./sensor.service";
-import plantService from "./plant.service";
-import taskService from "./task.service";
+import weatherService from "./weather.service";
+import alertService from "./alert.service";
+import communityService from "./community.service";
 import activityService from "./activity.service";
 import wateringService from "./watering.service";
-import communityService from "./community.service";
-import weatherService from "./weather.service";
-import userService from "./user.service";
+import taskService from "./task.service";
+import plantService from "./plant.service";
 import authService from "./auth.service";
-import alertService from "./alert.service";
 
+// Export services
 export {
+  userService,
   gardenService,
   sensorService,
-  plantService,
-  taskService,
+  weatherService,
+  alertService,
   activityService,
   wateringService,
   communityService,
-  weatherService,
-  userService,
+  taskService,
+  plantService,
   authService,
-  alertService,
 };
 
-// Also export types
-export * from "./garden.service";
-export * from "./sensor.service";
-export * from "./plant.service";
-export * from "./task.service";
-export * from "./activity.service";
-export * from "./watering.service";
-export * from "./community.service";
-export * from "./weather.service";
-export * from "./user.service";
-export * from "./auth.service";
-export * from "./alert.service";
+// Export types
+export type { GardenWeatherData } from "./weather.service";

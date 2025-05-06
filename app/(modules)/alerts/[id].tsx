@@ -17,7 +17,7 @@ import {
 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { alertService, gardenService } from "@/service/api";
-import { Alert, AlertStatus, AlertType } from "@/types/gardens/alert.types";
+import { Alert, AlertStatus, AlertType } from "@/types/alerts/alert.types";
 
 export default function AlertDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -41,7 +41,7 @@ export default function AlertDetailScreen() {
       setAlert(alertData);
 
       // Try to fetch garden info if there's a gardenId
-      if (alertData.gardenId) {
+      if (alertData?.gardenId) {
         try {
           const gardenData = await gardenService.getGardenById(
             alertData.gardenId
@@ -76,9 +76,7 @@ export default function AlertDetailScreen() {
     if (!alert) return;
 
     try {
-      await alertService.updateAlert(alert.id, {
-        status: AlertStatus.IGNORED,
-      });
+      await alertService.updateAlertStatus(alert.id, AlertStatus.IGNORED);
       setAlert({ ...alert, status: AlertStatus.IGNORED });
       RNAlert.alert("Thành công", "Cảnh báo đã được bỏ qua.");
     } catch (err) {
@@ -91,9 +89,7 @@ export default function AlertDetailScreen() {
     if (!alert) return;
 
     try {
-      await alertService.updateAlert(alert.id, {
-        status: AlertStatus.ESCALATED,
-      });
+      await alertService.updateAlertStatus(alert.id, AlertStatus.ESCALATED);
       setAlert({ ...alert, status: AlertStatus.ESCALATED });
       RNAlert.alert("Thành công", "Cảnh báo đã được chuyển tiếp.");
     } catch (err) {

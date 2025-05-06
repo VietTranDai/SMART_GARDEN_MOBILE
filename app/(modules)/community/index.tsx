@@ -15,8 +15,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { Ionicons, FontAwesome5, Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { communityService } from "@/service/api";
+import communityService from "@/service/api/community.service";
 import { Post, Tag } from "@/types";
+import env from "@/config/environment";
 
 export default function CommunityScreen() {
   const theme = useAppTheme();
@@ -112,7 +113,7 @@ export default function CommunityScreen() {
           <Image
             source={{
               uri:
-                item.userData?.profilePicture ||
+                `${env.apiUrl}${item.userData?.profilePicture}` ||
                 "https://i.pravatar.cc/150?img=1",
             }}
             style={styles.avatar}

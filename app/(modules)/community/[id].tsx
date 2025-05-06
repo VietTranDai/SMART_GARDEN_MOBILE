@@ -17,9 +17,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { communityService } from "@/service/api";
+import communityService from "@/service/api/community.service";
 import { Post, Comment, CreateCommentDto } from "@/types";
 import { VoteDto, VoteTargetType } from "@/types/social/post.types";
+import env from "@/config/environment";
 
 export default function PostDetailScreen() {
   const theme = useAppTheme();
@@ -215,7 +216,8 @@ export default function PostDetailScreen() {
     // Helper to safely get profile image
     const getProfileImage = (comment: Comment) => {
       return (
-        comment.userData?.profilePicture || "https://via.placeholder.com/40"
+        `${env.apiUrl}${comment.userData?.profilePicture}` ||
+        "https://via.placeholder.com/40"
       );
     };
 
@@ -338,7 +340,11 @@ export default function PostDetailScreen() {
                   <View style={styles.voteContainer}>
                     <TouchableOpacity
                       onPress={() =>
-                        handleVote(VoteTargetType.COMMENT, reply.id.toString(), 1)
+                        handleVote(
+                          VoteTargetType.COMMENT,
+                          reply.id.toString(),
+                          1
+                        )
                       }
                       style={[
                         styles.voteButton,
@@ -366,7 +372,11 @@ export default function PostDetailScreen() {
 
                     <TouchableOpacity
                       onPress={() =>
-                        handleVote(VoteTargetType.COMMENT, reply.id.toString(), -1)
+                        handleVote(
+                          VoteTargetType.COMMENT,
+                          reply.id.toString(),
+                          -1
+                        )
                       }
                       style={[
                         styles.voteButton,

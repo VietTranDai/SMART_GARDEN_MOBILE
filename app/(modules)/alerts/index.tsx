@@ -17,7 +17,7 @@ import {
 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { router } from "expo-router";
-import { Alert, AlertStatus, AlertType } from "@/types/gardens/alert.types";
+import { Alert, AlertStatus, AlertType } from "@/types/alerts/alert.types";
 import { alertService, gardenService, weatherService } from "@/service/api";
 
 // Extended Alert type with UI-specific properties
@@ -103,7 +103,7 @@ export default function AlertsScreen() {
       if (newStatus === AlertStatus.RESOLVED) {
         await alertService.resolveAlert(id);
       } else {
-        await alertService.updateAlert(id, { status: newStatus });
+        await alertService.updateAlertStatus(id, newStatus);
       }
 
       // Update local state after successful API call

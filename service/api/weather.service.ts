@@ -1,11 +1,17 @@
 import apiClient from "../apiClient";
-import { WEATHER_ENDPOINTS, GARDEN_ENDPOINTS } from "../endpoints";
 import {
   WeatherObservation,
   HourlyForecast,
   DailyForecast,
+  WeatherMain,
 } from "@/types/weather/weather.types";
-import { Garden } from "@/types/gardens/garden.types";
+import { WEATHER_ENDPOINTS } from "../endpoints";
+
+export interface GardenWeatherData {
+  current: WeatherObservation;
+  hourly: HourlyForecast[];
+  daily: DailyForecast[];
+}
 
 /**
  * Weather Service
@@ -14,53 +20,122 @@ import { Garden } from "@/types/gardens/garden.types";
  */
 class WeatherService {
   /**
-   * Get current weather for a garden
-   * @param gardenId Garden ID
-   * @returns Current weather observation
+   * Get complete weather data for a garden
+   */
+  async getCompleteWeatherData(
+    gardenId: string | number,
+    options?: {
+      hourlyLimit?: number;
+      dailyLimit?: number;
+    }
+  ): Promise<GardenWeatherData> {
+    try {
+      // Since there's no specific endpoint for complete weather data,
+      // we'll fetch each part separately and combine them
+      const [current, hourly, daily] = await Promise.all([
+        this.getCurrentWeather(gardenId),
+        this.getHourlyForecast(gardenId),
+        this.getDailyForecast(gardenId),
+      ]);
+
+      return {
+        current,
+        hourly: options?.hourlyLimit
+          ? hourly.slice(0, options.hourlyLimit)
+          : hourly,
+        daily: options?.dailyLimit ? daily.slice(0, options.dailyLimit) : daily,
+      };
+    } catch (error) {
+      console.error("Error fetching complete weather data:", error);
+      // Return default structure in case of error
+      return {
+        current: this.createDefaultWeatherObservation(gardenId),
+        hourly: [],
+        daily: [],
+      };
+    }
+  }
+
+  /**
+   * Get complete weather data for a garden
+   */
+  async getCurrentAndForecast(
+    gardenId: string | number
+  ): Promise<GardenWeatherData> {
+    try {
+      // Since there's no specific endpoint for complete weather data,
+      // we'll fetch each part separately and combine them
+      const [current, hourly, daily] = await Promise.all([
+        this.getCurrentWeather(gardenId),
+        this.getHourlyForecast(gardenId),
+        this.getDailyForecast(gardenId),
+      ]);
+
+      return {
+        current,
+        hourly,
+        daily,
+      };
+    } catch (error) {
+      console.error("Error fetching garden weather data:", error);
+      // Return default structure in case of error
+      return {
+        current: this.createDefaultWeatherObservation(gardenId),
+        hourly: [],
+        daily: [],
+      };
+    }
+  }
+
+  /**
+   * Get current weather observation
    */
   async getCurrentWeather(
-    gardenId: number | string
+    gardenId: string | number
   ): Promise<WeatherObservation> {
-    const response = await apiClient.get(WEATHER_ENDPOINTS.CURRENT(gardenId));
-    return response.data.data;
+    try {
+      const response = await apiClient.get<any>(
+        WEATHER_ENDPOINTS.CURRENT(gardenId)
+      );
+      return (
+        response.data.data || this.createDefaultWeatherObservation(gardenId)
+      );
+    } catch (error) {
+      console.error("Error fetching current weather:", error);
+      return this.createDefaultWeatherObservation(gardenId);
+    }
   }
 
   /**
-   * Get hourly forecast for a garden
-   * @param gardenId Garden ID
-   * @param hours Number of hours to forecast (default 24)
-   * @returns Hourly forecast data
+   * Get hourly forecast
    */
   async getHourlyForecast(
-    gardenId: number | string,
-    hours: number = 24
+    gardenId: string | number
   ): Promise<HourlyForecast[]> {
-    const response = await apiClient.get(
-      WEATHER_ENDPOINTS.HOURLY_FORECAST(gardenId),
-      {
-        params: { hours },
-      }
-    );
-    return response.data.data;
+    try {
+      const response = await apiClient.get<any>(
+        WEATHER_ENDPOINTS.HOURLY_FORECAST(gardenId)
+      );
+      return response.data.data || [];
+    } catch (error) {
+      console.error("Error fetching hourly forecast:", error);
+      return [];
+    }
   }
 
   /**
-   * Get daily forecast for a garden
-   * @param gardenId Garden ID
-   * @param days Number of days to forecast (default 7)
-   * @returns Daily forecast data
+   * Get daily forecast
    */
-  async getDailyForecast(
-    gardenId: number | string,
-    days: number = 7
-  ): Promise<DailyForecast[]> {
-    const response = await apiClient.get(
-      WEATHER_ENDPOINTS.DAILY_FORECAST(gardenId),
-      {
-        params: { days },
-      }
-    );
-    return response.data.data;
+  async getDailyForecast(gardenId: string | number): Promise<DailyForecast[]> {
+    try {
+      const response = await apiClient.get<any>(
+        WEATHER_ENDPOINTS.DAILY_FORECAST(gardenId)
+      );
+      return response.data.data || [];
+    } catch (error) {
+      console.error("Error fetching daily forecast:", error);
+      return [];
+    }
   }
 
   /**
@@ -73,13 +148,43 @@ class WeatherService {
     gardenId: number | string,
     params: { startDate: string; endDate: string }
   ): Promise<WeatherObservation[]> {
-    const response = await apiClient.get(
-      WEATHER_ENDPOINTS.HISTORICAL(gardenId),
-      {
-        params,
-      }
-    );
-    return response.data.data;
+    try {
+      const response = await apiClient.get(
+        WEATHER_ENDPOINTS.HISTORICAL(gardenId),
+        {
+          params,
+        }
+      );
+      return response.data.data || [];
+    } catch (error) {
+      console.error("Error fetching historical weather:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Creates a default weather observation for error handling
+   */
+  private createDefaultWeatherObservation(
+    gardenId: string | number
+  ): WeatherObservation {
+    return {
+      id: 0,
+      gardenId:
+        typeof gardenId === "string" ? parseInt(gardenId, 10) : gardenId,
+      temp: 25,
+      feelsLike: 25,
+      humidity: 50,
+      pressure: 1013,
+      windSpeed: 0,
+      windDeg: 0,
+      clouds: 0,
+      visibility: 10000,
+      iconCode: "01d",
+      weatherMain: WeatherMain.CLEAR,
+      weatherDesc: "No data available",
+      observedAt: new Date().toISOString(),
+    };
   }
 }
 

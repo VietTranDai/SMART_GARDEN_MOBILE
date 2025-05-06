@@ -610,7 +610,7 @@ export default function GardenerProfileScreen() {
           <View style={styles.profileSection}>
             <Image
               source={{
-                uri: `${env.apiUrl}${gardener.profilePicture}` || "https://i.pravatar.cc/150",
+                uri: `${env.apiUrl}${gardener.profilePicture}` || "https://i.pravatar.cc/150?img=11",
               }}
               style={styles.profileImage}
             />

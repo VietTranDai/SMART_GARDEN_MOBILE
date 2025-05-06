@@ -1,5 +1,11 @@
 import apiClient from "../apiClient";
-import { Sensor, SensorData, SensorType } from "@/types/gardens/sensor.types";
+import {
+  Sensor,
+  SensorData,
+  SensorType,
+  SensorUnit,
+  SensorWithLatestReading,
+} from "@/types/gardens/sensor.types";
 import {
   CreateSensorDto,
   UpdateSensorDto,
@@ -48,12 +54,12 @@ class SensorService {
   async getSensorsByGarden(
     gardenId: number | string,
     forceRefresh = false
-  ): Promise<Sensor[]> {
+  ): Promise<SensorWithLatestReading[]> {
     const cacheKey = CACHE_KEYS.SENSOR_LIST(gardenId);
 
     // Try to get from cache first if not forcing refresh
     if (!forceRefresh) {
-      const cachedData = await this.getFromCache<Sensor[]>(
+      const cachedData = await this.getFromCache<SensorWithLatestReading[]>(
         cacheKey,
         CACHE_EXPIRY.SENSOR_LIST
       );
@@ -359,6 +365,26 @@ class SensorService {
 
     // All retries failed
     throw lastError;
+  }
+
+  /**
+   * Get latest readings for all sensors in a garden
+   */
+  async getLatestReadingsByGarden(
+    gardenId: string | number
+  ): Promise<SensorWithLatestReading[]> {
+    try {
+      const response = await this.retryApiCall(() =>
+        apiClient.get(SENSOR_ENDPOINTS.LATEST_READINGS_BY_GARDEN(gardenId))
+      );
+      return response.data.data || [];
+    } catch (error) {
+      console.error(
+        `Error fetching latest readings for garden ${gardenId}:`,
+        error
+      );
+      return [];
+    }
   }
 }
 

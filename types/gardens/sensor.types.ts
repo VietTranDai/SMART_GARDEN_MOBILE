@@ -30,7 +30,6 @@ export interface Sensor {
   unit: SensorUnit;
   name: string;
   gardenId: number;
-  garden?: Garden;
   sensorData?: SensorData[];
   createdAt: string;
   updatedAt: string;
@@ -43,9 +42,12 @@ export interface SensorData {
   timestamp: string; // ISO format of DateTime
   value: number;
   gardenId?: number;
-  garden?: Garden;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SensorWithLatestReading extends Sensor {
+  latestReading?: SensorData;
 }
 
 // Import Garden type to prevent circular dependency

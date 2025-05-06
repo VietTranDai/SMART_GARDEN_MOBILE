@@ -112,10 +112,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         lastName: userData.lastName,
         email: userData.email,
         phoneNumber: userData.phoneNumber,
-        dateOfBirth: userData.dateOfBirth,
-        address: userData.address,
-        bio: userData.bio,
-        // profilePicture handled separately if it's a File
       });
 
       // Update the user state with the new data

@@ -18,10 +18,15 @@ class WateringService {
     startDate?: string;
     endDate?: string;
   }): Promise<WateringSchedule[]> {
-    const response = await apiClient.get(WATERING_ENDPOINTS.LIST, {
-      params,
-    });
-    return response.data;
+    try {
+      const response = await apiClient.get(WATERING_ENDPOINTS.LIST, {
+        params,
+      });
+      return response.data?.data || [];
+    } catch (error) {
+      console.error("Error fetching watering schedules:", error);
+      return [];
+    }
   }
 
   /**
@@ -38,11 +43,19 @@ class WateringService {
       endDate?: string;
     }
   ): Promise<WateringSchedule[]> {
-    const response = await apiClient.get(
-      WATERING_ENDPOINTS.LIST_BY_GARDEN(gardenId),
-      { params }
-    );
-    return response.data;
+    try {
+      const response = await apiClient.get(
+        WATERING_ENDPOINTS.LIST_BY_GARDEN(gardenId),
+        { params }
+      );
+      return response.data?.data || [];
+    } catch (error) {
+      console.error(
+        `Error fetching watering schedules for garden ${gardenId}:`,
+        error
+      );
+      return [];
+    }
   }
 
   /**
@@ -52,9 +65,16 @@ class WateringService {
    */
   async getWateringScheduleById(
     scheduleId: number | string
-  ): Promise<WateringSchedule> {
-    const response = await apiClient.get(WATERING_ENDPOINTS.DETAIL(scheduleId));
-    return response.data;
+  ): Promise<WateringSchedule | null> {
+    try {
+      const response = await apiClient.get(
+        WATERING_ENDPOINTS.DETAIL(scheduleId)
+      );
+      return response.data?.data || null;
+    } catch (error) {
+      console.error(`Error fetching watering schedule ${scheduleId}:`, error);
+      return null;
+    }
   }
 
   /**
@@ -69,12 +89,20 @@ class WateringService {
       scheduledAt: string;
       amount: number;
     }
-  ): Promise<WateringSchedule> {
-    const response = await apiClient.post(
-      WATERING_ENDPOINTS.LIST_BY_GARDEN(gardenId),
-      scheduleData
-    );
-    return response.data;
+  ): Promise<WateringSchedule | null> {
+    try {
+      const response = await apiClient.post(
+        WATERING_ENDPOINTS.LIST_BY_GARDEN(gardenId),
+        scheduleData
+      );
+      return response.data?.data || null;
+    } catch (error) {
+      console.error(
+        `Error creating watering schedule for garden ${gardenId}:`,
+        error
+      );
+      return null;
+    }
   }
 
   /**
@@ -84,11 +112,19 @@ class WateringService {
    */
   async generateAutomaticSchedule(
     gardenId: number | string
-  ): Promise<WateringSchedule> {
-    const response = await apiClient.post(
-      WATERING_ENDPOINTS.AUTO_GENERATE(gardenId)
-    );
-    return response.data;
+  ): Promise<WateringSchedule | null> {
+    try {
+      const response = await apiClient.post(
+        WATERING_ENDPOINTS.AUTO_GENERATE(gardenId)
+      );
+      return response.data?.data || null;
+    } catch (error) {
+      console.error(
+        `Error generating automatic schedule for garden ${gardenId}:`,
+        error
+      );
+      return null;
+    }
   }
 
   /**
@@ -98,11 +134,16 @@ class WateringService {
    */
   async completeWateringSchedule(
     scheduleId: number | string
-  ): Promise<WateringSchedule> {
-    const response = await apiClient.post(
-      WATERING_ENDPOINTS.COMPLETE(scheduleId)
-    );
-    return response.data;
+  ): Promise<WateringSchedule | null> {
+    try {
+      const response = await apiClient.post(
+        WATERING_ENDPOINTS.COMPLETE(scheduleId)
+      );
+      return response.data?.data || null;
+    } catch (error) {
+      console.error(`Error completing watering schedule ${scheduleId}:`, error);
+      return null;
+    }
   }
 
   /**
@@ -112,17 +153,30 @@ class WateringService {
    */
   async skipWateringSchedule(
     scheduleId: number | string
-  ): Promise<WateringSchedule> {
-    const response = await apiClient.post(WATERING_ENDPOINTS.SKIP(scheduleId));
-    return response.data;
+  ): Promise<WateringSchedule | null> {
+    try {
+      const response = await apiClient.post(
+        WATERING_ENDPOINTS.SKIP(scheduleId)
+      );
+      return response.data?.data || null;
+    } catch (error) {
+      console.error(`Error skipping watering schedule ${scheduleId}:`, error);
+      return null;
+    }
   }
 
   /**
    * Delete a watering schedule
    * @param scheduleId Schedule ID
    */
-  async deleteWateringSchedule(scheduleId: number | string): Promise<void> {
-    await apiClient.delete(WATERING_ENDPOINTS.DETAIL(scheduleId));
+  async deleteWateringSchedule(scheduleId: number | string): Promise<boolean> {
+    try {
+      await apiClient.delete(WATERING_ENDPOINTS.DETAIL(scheduleId));
+      return true;
+    } catch (error) {
+      console.error(`Error deleting watering schedule ${scheduleId}:`, error);
+      return false;
+    }
   }
 }
 

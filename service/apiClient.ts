@@ -117,10 +117,10 @@ apiClient.refreshToken = refreshTokenInternal;
 apiClient.interceptors.request.use(
   async (config) => {
     if (env.apiDebug) {
-      console.log(
-        `→ ${config.method?.toUpperCase()} ${config.url}`,
-        config.data || ""
-      );
+      // console.log(
+      //   `→ ${config.method?.toUpperCase()} ${config.url}`,
+      //   config.data || ""
+      // );
     }
     const data = await getItem<LoginData>(AUTH_KEY);
     if (data?.access_token) {
@@ -134,9 +134,9 @@ apiClient.interceptors.request.use(
 // ─── Response interceptor ────────────────────────────────────────────────
 apiClient.interceptors.response.use(
   (res: AxiosResponse) => {
-    if (env.apiDebug) {
-      console.log(`← ${res.status} ${res.config.url}`, res.data);
-    }
+    // if (env.apiDebug) {
+    //   console.log(`← ${res.status} ${res.config.url}`, res.data);
+    // }
     return res;
   },
   async (error: AxiosError) => {

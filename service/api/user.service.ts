@@ -1,101 +1,96 @@
 import apiClient from "../apiClient";
-import {
-  User,
-  ExperienceLevel,
-  Gardener,
-  GardenerProfile,
-} from "@/types/users";
-import {
-  UpdateProfileDto,
-  ChangePasswordDto,
-  ExperienceProgress,
-} from "@/types/users/dtos";
 import { USER_ENDPOINTS } from "../endpoints";
-import { Garden } from "@/types/gardens/garden.types";
+
+export interface UserProfile {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber?: string;
+  profilePicture?: string;
+  lastLogin?: Date;
+}
 
 /**
  * User Service
  *
- * Handles all user profile-related API calls
+ * Handles all user-related API calls
  */
 class UserService {
   /**
-   * Update user profile
-   * @param profileData Profile update data
-   * @returns Updated user profile
+   * Get the current user's profile
    */
-  async updateProfile(profileData: UpdateProfileDto): Promise<User> {
-    // If we have a profile picture, use FormData
-    if (profileData.profilePicture instanceof File) {
-      const formData = new FormData();
+  async getProfile(): Promise<UserProfile> {
+    try {
+      const response = await apiClient.get(USER_ENDPOINTS.ME);
+      return response.data.data || {};
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+      throw error;
+    }
+  }
 
-      // Append all other profile data
-      Object.entries(profileData).forEach(([key, value]) => {
-        if (key !== "profilePicture" && value !== undefined) {
-          formData.append(key, value as string);
-        }
-      });
-
-      // Append profile picture
-      formData.append("profilePicture", profileData.profilePicture);
-
-      const response = await apiClient.patch(
-        USER_ENDPOINTS.UPDATE_PROFILE,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      return response.data;
-    } else {
-      // Regular JSON request if no profile picture
+  /**
+   * Update user profile
+   */
+  async updateProfile(profileData: Partial<UserProfile>): Promise<UserProfile> {
+    try {
       const response = await apiClient.patch(
         USER_ENDPOINTS.UPDATE_PROFILE,
         profileData
       );
-      return response.data;
+      return response.data.data || {};
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      throw error;
     }
   }
 
   /**
    * Change user password
-   * @param passwordData Password change data
-   * @returns Success status
    */
   async changePassword(
-    passwordData: ChangePasswordDto
-  ): Promise<{ success: boolean; message: string }> {
-    const response = await apiClient.post(
-      USER_ENDPOINTS.CHANGE_PASSWORD,
-      passwordData
-    );
-    return response.data;
+    currentPassword: string,
+    newPassword: string
+  ): Promise<boolean> {
+    try {
+      await apiClient.post(USER_ENDPOINTS.CHANGE_PASSWORD, {
+        currentPassword,
+        newPassword,
+      });
+      return true;
+    } catch (error) {
+      console.error("Error changing password:", error);
+      throw error;
+    }
   }
 
   /**
    * Get gardener profile by ID
-   * @param gardenerId Gardener ID
-   * @returns Gardener profile with extended statistics
    */
-  async getGardenerProfile(
-    gardenerId: number | string
-  ): Promise<GardenerProfile> {
-    const response = await apiClient.get(
-      USER_ENDPOINTS.GARDENER_PROFILE(gardenerId)
-    );
-    return response.data;
+  async getGardenerProfile(gardenerId: number | string): Promise<any> {
+    try {
+      const response = await apiClient.get(
+        USER_ENDPOINTS.GARDENER_PROFILE(gardenerId)
+      );
+      return response.data.data || {};
+    } catch (error) {
+      console.error(`Error fetching gardener profile ${gardenerId}:`, error);
+      throw error;
+    }
   }
 
   /**
    * Get current user's experience progress
-   * @returns Experience progress data
    */
-  async getExperienceProgress(): Promise<ExperienceProgress> {
-    const response = await apiClient.get(USER_ENDPOINTS.EXPERIENCE_PROGRESS);
-    return response.data;
+  async getExperienceProgress(): Promise<any> {
+    try {
+      const response = await apiClient.get(USER_ENDPOINTS.EXPERIENCE_PROGRESS);
+      return response.data.data || {};
+    } catch (error) {
+      console.error("Error fetching experience progress:", error);
+      throw error;
+    }
   }
 }
 

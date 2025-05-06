@@ -29,7 +29,7 @@ class CommunityService {
     limit?: number;
   }): Promise<Post[]> {
     const response = await apiClient.get(COMMUNITY_ENDPOINTS.POSTS, { params });
-    return response.data;
+    return response.data?.data || [];
   }
 
   /**
@@ -41,7 +41,7 @@ class CommunityService {
     const response = await apiClient.get(
       COMMUNITY_ENDPOINTS.POST_DETAIL(postId)
     );
-    return response.data;
+    return response.data?.data || null;
   }
 
   /**
@@ -96,14 +96,14 @@ class CommunityService {
         }
       );
 
-      return response.data;
+      return response.data?.data || null;
     } else {
       // Regular JSON request if no images
       const response = await apiClient.post(
         COMMUNITY_ENDPOINTS.POSTS,
         postData
       );
-      return response.data;
+      return response.data?.data || null;
     }
   }
 
@@ -122,7 +122,7 @@ class CommunityService {
       COMMUNITY_ENDPOINTS.POST_DETAIL(postId),
       postData
     );
-    return response.data;
+    return response.data?.data || null;
   }
 
   /**
@@ -142,7 +142,7 @@ class CommunityService {
     const response = await apiClient.get(
       COMMUNITY_ENDPOINTS.POST_COMMENTS(postId)
     );
-    return response.data;
+    return response.data?.data || [];
   }
 
   /**
@@ -154,7 +154,7 @@ class CommunityService {
     const response = await apiClient.get(
       COMMUNITY_ENDPOINTS.COMMENT_REPLIES(commentId)
     );
-    return response.data;
+    return response.data?.data || [];
   }
 
   /**
@@ -167,7 +167,7 @@ class CommunityService {
       COMMUNITY_ENDPOINTS.POST_COMMENTS(commentData.postId),
       commentData
     );
-    return response.data;
+    return response.data?.data || null;
   }
 
   /**
@@ -184,8 +184,8 @@ class CommunityService {
       COMMUNITY_ENDPOINTS.COMMENT_DETAIL(commentId),
       { content }
     );
-    return response.data;
-  }
+    return response.data?.data || null;
+  } 
 
   /**
    * Delete a comment
@@ -209,7 +209,7 @@ class CommunityService {
       COMMUNITY_ENDPOINTS.POST_VOTE(postId),
       voteData
     );
-    return response.data;
+    return response.data?.data || null;
   }
 
   /**
@@ -226,7 +226,7 @@ class CommunityService {
       COMMUNITY_ENDPOINTS.COMMENT_VOTE(commentId),
       voteData
     );
-    return response.data;
+    return response.data?.data || null;
   }
 
   /**
@@ -235,7 +235,7 @@ class CommunityService {
    */
   async getTags(): Promise<Tag[]> {
     const response = await apiClient.get(COMMUNITY_ENDPOINTS.TAGS);
-    return response.data;
+    return response.data?.data || [];
   }
 
   /**
@@ -247,7 +247,7 @@ class CommunityService {
     const response = await apiClient.get(
       COMMUNITY_ENDPOINTS.FOLLOWERS(gardenerId)
     );
-    return response.data;
+    return response.data?.data || [];
   }
 
   /**
@@ -259,7 +259,7 @@ class CommunityService {
     const response = await apiClient.get(
       COMMUNITY_ENDPOINTS.FOLLOWING(gardenerId)
     );
-    return response.data;
+    return response.data?.data || [];
   }
 
   /**
@@ -271,7 +271,7 @@ class CommunityService {
     const response = await apiClient.post(
       COMMUNITY_ENDPOINTS.FOLLOW_USER(gardenerId)
     );
-    return response.data;
+    return response.data?.data || null;
   }
 
   /**

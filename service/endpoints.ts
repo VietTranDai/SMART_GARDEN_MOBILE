@@ -63,6 +63,8 @@ export const SENSOR_ENDPOINTS = {
   SENSOR_DATA: (sensorId: string | number) => `/sensors/${sensorId}/data`,
   GARDEN_SENSOR_DATA: (gardenId: string | number) =>
     `/sensors/gardens/${gardenId}/data`,
+  LATEST_READINGS_BY_GARDEN: (gardenId: string | number) =>
+    `/sensors/gardens/${gardenId}/latest`,
 };
 
 // Task endpoints
@@ -122,10 +124,8 @@ export const COMMUNITY_ENDPOINTS = {
   TAGS: "/tags",
 
   FOLLOW: "/follow",
-  FOLLOWERS: (gardenerId: string | number) =>
-    `/follow/followers/${gardenerId}`,
-  FOLLOWING: (gardenerId: string | number) =>
-    `/follow/following/${gardenerId}`,
+  FOLLOWERS: (gardenerId: string | number) => `/follow/followers/${gardenerId}`,
+  FOLLOWING: (gardenerId: string | number) => `/follow/following/${gardenerId}`,
   FOLLOW_USER: (gardenerId: string | number) => `/follow/${gardenerId}`,
   UNFOLLOW_USER: (gardenerId: string | number) => `/follow/${gardenerId}`,
 };
@@ -139,6 +139,7 @@ export const WEATHER_ENDPOINTS = {
     `/weather/garden/${gardenId}/daily`,
   HISTORICAL: (gardenId: string | number) =>
     `/weather/garden/${gardenId}/historical`,
+  GARDEN_WEATHER: (gardenId: string | number) => `/weather/garden/${gardenId}`,
 };
 
 // Alert endpoints

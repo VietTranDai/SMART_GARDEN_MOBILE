@@ -24,8 +24,13 @@ class ActivityService {
     startDate?: string;
     endDate?: string;
   }): Promise<GardenActivity[]> {
-    const response = await apiClient.get(ACTIVITY_ENDPOINTS.LIST, { params });
-    return response.data;
+    try {
+      const response = await apiClient.get(ACTIVITY_ENDPOINTS.LIST, { params });
+      return response.data?.data || [];
+    } catch (error) {
+      console.error("Error fetching activities:", error);
+      return [];
+    }
   }
 
   /**
@@ -42,11 +47,16 @@ class ActivityService {
       endDate?: string;
     }
   ): Promise<GardenActivity[]> {
-    const response = await apiClient.get(
-      ACTIVITY_ENDPOINTS.LIST_BY_GARDEN(gardenId),
-      { params }
-    );
-    return response.data;
+    try {
+      const response = await apiClient.get(
+        ACTIVITY_ENDPOINTS.LIST_BY_GARDEN(gardenId),
+        { params }
+      );
+      return response.data?.data || [];
+    } catch (error) {
+      console.error(`Error fetching activities for garden ${gardenId}:`, error);
+      return [];
+    }
   }
 
   /**
@@ -54,9 +64,18 @@ class ActivityService {
    * @param activityId Activity ID
    * @returns Activity details
    */
-  async getActivityById(activityId: number | string): Promise<GardenActivity> {
-    const response = await apiClient.get(ACTIVITY_ENDPOINTS.DETAIL(activityId));
-    return response.data;
+  async getActivityById(
+    activityId: number | string
+  ): Promise<GardenActivity | null> {
+    try {
+      const response = await apiClient.get(
+        ACTIVITY_ENDPOINTS.DETAIL(activityId)
+      );
+      return response.data?.data || null;
+    } catch (error) {
+      console.error(`Error fetching activity ${activityId}:`, error);
+      return null;
+    }
   }
 
   /**
@@ -66,12 +85,17 @@ class ActivityService {
    */
   async createActivity(
     activityData: CreateActivityDto
-  ): Promise<GardenActivity> {
-    const response = await apiClient.post(
-      ACTIVITY_ENDPOINTS.CREATE,
-      activityData
-    );
-    return response.data;
+  ): Promise<GardenActivity | null> {
+    try {
+      const response = await apiClient.post(
+        ACTIVITY_ENDPOINTS.CREATE,
+        activityData
+      );
+      return response.data?.data || null;
+    } catch (error) {
+      console.error("Error creating activity:", error);
+      return null;
+    }
   }
 
   /**
@@ -83,12 +107,17 @@ class ActivityService {
   async evaluateActivity(
     activityId: number | string,
     evaluationData: CreateEvaluationDto
-  ): Promise<ActivityEvaluation> {
-    const response = await apiClient.post(
-      ACTIVITY_ENDPOINTS.EVALUATE(activityId),
-      evaluationData
-    );
-    return response.data;
+  ): Promise<ActivityEvaluation | null> {
+    try {
+      const response = await apiClient.post(
+        ACTIVITY_ENDPOINTS.EVALUATE(activityId),
+        evaluationData
+      );
+      return response.data?.data || null;
+    } catch (error) {
+      console.error(`Error evaluating activity ${activityId}:`, error);
+      return null;
+    }
   }
 }
 

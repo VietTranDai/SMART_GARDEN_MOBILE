@@ -11,6 +11,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as Notifications from "expo-notifications";
 import { Text, View, StyleSheet, TouchableOpacity } from "react-native";
 import { ONBOARDING_COMPLETED_KEY } from "@/constants/strings"; // Import the constant
+import Toast from "react-native-toast-message";
 
 // Configure notifications with a simple try-catch pattern
 try {
@@ -176,6 +177,7 @@ export default function RootLayout() {
             </PreferencesProvider>
           </UserProvider>
         </ThemeProvider>
+        <Toast />
       </GestureHandlerRootView>
     </ErrorBoundary>
   );

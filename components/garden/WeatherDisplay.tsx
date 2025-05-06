@@ -2,13 +2,12 @@ import React from "react";
 import { View, Text, StyleSheet, ScrollView, Image } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
 import {
-  WeatherMain,
   WeatherObservation,
   HourlyForecast,
   DailyForecast,
-} from "@/types";
+} from "@/types/weather/weather.types";
+import { useAppTheme } from "@/hooks/useAppTheme";
 
 interface WeatherDisplayProps {
   currentWeather: WeatherObservation;

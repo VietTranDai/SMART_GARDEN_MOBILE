@@ -1,43 +1,84 @@
 // This file is a fallback for using MaterialIcons on Android and web.
 
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { SymbolWeight } from 'expo-symbols';
-import React from 'react';
-import { OpaqueColorValue, StyleProp, ViewStyle } from 'react-native';
+import React from "react";
+import { View, StyleSheet, Platform } from "react-native";
+import {
+  Ionicons,
+  FontAwesome5,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
+import { useAppTheme } from "@/hooks/useAppTheme";
 
-// Add your SFSymbol to MaterialIcons mappings here.
-const MAPPING = {
-  // See MaterialIcons here: https://icons.expo.fyi
-  // See SF Symbols in the SF Symbols app on Mac.
-  'house.fill': 'home',
-  'paperplane.fill': 'send',
-  'chevron.left.forwardslash.chevron.right': 'code',
-  'chevron.right': 'chevron-right',
-} as Partial<
-  Record<
-    import('expo-symbols').SymbolViewProps['name'],
-    React.ComponentProps<typeof MaterialIcons>['name']
-  >
->;
+interface IconSymbolProps {
+  name: string;
+  type?: "ionicons" | "font-awesome" | "material-community";
+  size?: number;
+  color?: string;
+  backgroundColor?: string;
+  withBackground?: boolean;
+  style?: any;
+}
 
-export type IconSymbolName = keyof typeof MAPPING;
-
-/**
- * An icon component that uses native SFSymbols on iOS, and MaterialIcons on Android and web. This ensures a consistent look across platforms, and optimal resource usage.
- *
- * Icon `name`s are based on SFSymbols and require manual mapping to MaterialIcons.
- */
-export function IconSymbol({
+export default function IconSymbol({
   name,
+  type = "ionicons",
   size = 24,
   color,
+  backgroundColor,
+  withBackground = false,
   style,
-}: {
-  name: IconSymbolName;
-  size?: number;
-  color: string | OpaqueColorValue;
-  style?: StyleProp<ViewStyle>;
-  weight?: SymbolWeight;
-}) {
-  return <MaterialIcons color={color} size={size} name={MAPPING[name]} style={style} />;
+}: IconSymbolProps) {
+  const theme = useAppTheme();
+  const iconColor = color || theme.primary;
+  const bgColor = backgroundColor || theme.primaryLight;
+
+  const renderIcon = () => {
+    switch (type) {
+      case "font-awesome":
+        return <FontAwesome5 name={name} size={size} color={iconColor} />;
+      case "material-community":
+        return (
+          <MaterialCommunityIcons name={name} size={size} color={iconColor} />
+        );
+      case "ionicons":
+      default:
+        // Handle platform-specific icon names for Ionicons
+        let iconName = name;
+        if (
+          Platform.OS === "ios" &&
+          !name.endsWith("-outline") &&
+          !name.endsWith("-sharp")
+        ) {
+          // iOS-specific handling, convert to -outline form if necessary
+          if (name.includes("-outline")) {
+            iconName = name;
+          } else if (name.includes("-sharp")) {
+            iconName = name.replace("-sharp", "");
+          } else {
+            iconName = `${name}-outline`;
+          }
+        }
+        return <Ionicons name={iconName} size={size} color={iconColor} />;
+    }
+  };
+
+  if (withBackground) {
+    return (
+      <View style={[styles.iconContainer, { backgroundColor: bgColor }, style]}>
+        {renderIcon()}
+      </View>
+    );
+  }
+
+  return renderIcon();
 }
+
+const styles = StyleSheet.create({
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+});

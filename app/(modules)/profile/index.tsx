@@ -25,6 +25,7 @@ import { router } from "expo-router";
 import { removeItem } from "@/utils/asyncStorage";
 import { userService } from "@/service/api";
 import { isGardener } from "@/types/users/user.types";
+import env from "@/config/environment";
 
 const CustomSwitch = ({
   value,
@@ -200,7 +201,9 @@ export default function ProfileScreen() {
           <View style={styles.profileImageContainer}>
             <Image
               source={{
-                uri: user?.profilePicture || "https://i.pravatar.cc/150?img=11",
+                uri:
+                  `${env.apiUrl}${user?.profilePicture}` ||
+                  "https://i.pravatar.cc/150?img=11",
               }}
               style={styles.profileImage}
             />
@@ -211,12 +214,8 @@ export default function ProfileScreen() {
               ]}
             >
               <Text style={[styles.levelText, { color: appTheme.primary }]}>
-                {user && isGardener(user)
-                  ? user?.experienceLevel?.icon
-                  : "🌱"}{" "}
-                {user && isGardener(user)
-                  ? user?.experienceLevel?.level
-                  : 1}
+                {user && isGardener(user) ? user?.experienceLevel?.icon : "🌱"}{" "}
+                {user && isGardener(user) ? user?.experienceLevel?.level : 1}
               </Text>
             </View>
           </View>

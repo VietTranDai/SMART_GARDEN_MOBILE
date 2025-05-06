@@ -27,7 +27,7 @@ import {
   SensorUnit,
 } from "@/types/gardens/sensor.types";
 import { SensorDataQueryParams } from "@/types/gardens/sensor-dtos";
-import { sensorService } from "@/service/api";
+import sensorService from "@/service/api/sensor.service";
 
 // Define time range options
 enum TimeRange {

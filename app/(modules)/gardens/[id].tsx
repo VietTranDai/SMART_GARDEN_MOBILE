@@ -14,12 +14,10 @@ import { Feather, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 // Import custom components
-import WeatherDisplay from "@/components/garden/WeatherDisplay";
-import SensorDetailView from "@/components/garden/SensorDetailView";
-import GardenStatusCard from "@/components/garden/GardenStatusCard";
-import AlertsList from "@/components/garden/AlertsList";
-import ActivityList from "@/components/garden/ActivityList";
-
+import WeatherDisplay from "@/components/common/WeatherDisplay";
+import SensorDetailView from "@/components/common/SensorDetailView";
+import GardenStatusCard from "@/components/common/GardenStatusCard";
+import AlertsList from "@/components/common/AlertsList";
 // Import API services
 import gardenService from "@/service/api/garden.service";
 import weatherService from "@/service/api/weather.service";
@@ -47,6 +45,8 @@ import {
   WateringSchedule,
 } from "@/types";
 import { apiClient } from "@/service";
+import Toast from "react-native-toast-message";
+import ActivityList from "@/components/garden/ActivityList";
 
 enum DetailSectionType {
   STATUS = "STATUS",
@@ -79,9 +79,9 @@ export default function GardenDetailScreen() {
   const [hourlyForecast, setHourlyForecast] = useState<HourlyForecast[]>([]);
   const [dailyForecast, setDailyForecast] = useState<DailyForecast[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [wateringSchedule, setWateringSchedule] = useState<
-    WateringSchedule[]
-  >([]);
+  const [wateringSchedule, setWateringSchedule] = useState<WateringSchedule[]>(
+    []
+  );
   const [activities, setActivities] = useState<GardenActivity[]>([]);
   const [sensors, setSensors] = useState<Sensor[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -95,9 +95,12 @@ export default function GardenDetailScreen() {
     try {
       // Load garden details
       const gardenData = await gardenService.getGardenById(gardenId);
+      if (!gardenData) {
+        throw new Error("Không thể tải dữ liệu vườn.");
+      }
       setGarden(gardenData);
 
-      // Load weather data
+      // Load weather data with better error handling
       try {
         const weatherData = await weatherService.getCurrentWeather(gardenId);
         setCurrentWeather(weatherData);
@@ -109,7 +112,7 @@ export default function GardenDetailScreen() {
       // Load hourly forecast
       try {
         const hourlyData = await weatherService.getHourlyForecast(gardenId);
-        setHourlyForecast(hourlyData);
+        setHourlyForecast(hourlyData || []);
       } catch (error) {
         console.error("Failed to load hourly forecast:", error);
         setHourlyForecast([]);
@@ -118,7 +121,7 @@ export default function GardenDetailScreen() {
       // Load daily forecast
       try {
         const dailyData = await weatherService.getDailyForecast(gardenId);
-        setDailyForecast(dailyData);
+        setDailyForecast(dailyData || []);
       } catch (error) {
         console.error("Failed to load daily forecast:", error);
         setDailyForecast([]);
@@ -127,7 +130,7 @@ export default function GardenDetailScreen() {
       // Load sensors
       try {
         const sensorData = await sensorService.getSensorsByGarden(gardenId);
-        setSensors(sensorData);
+        setSensors(sensorData || []);
       } catch (error) {
         console.error("Failed to load sensor data:", error);
         setSensors([]);
@@ -136,7 +139,7 @@ export default function GardenDetailScreen() {
       // Load alerts
       try {
         const alertData = await alertService.getAlertsByGarden(gardenId);
-        setAlerts(alertData);
+        setAlerts(alertData || []);
       } catch (error) {
         console.error("Failed to load alerts:", error);
         setAlerts([]);
@@ -144,8 +147,9 @@ export default function GardenDetailScreen() {
 
       // Load watering schedule
       try {
-        const response = await wateringScheduleService.getGardenWateringSchedules(gardenId);
-        setWateringSchedule(response);
+        const response =
+          await wateringScheduleService.getGardenWateringSchedules(gardenId);
+        setWateringSchedule(response || []);
       } catch (error) {
         console.error("Failed to load watering schedule:", error);
         setWateringSchedule([]);
@@ -154,15 +158,31 @@ export default function GardenDetailScreen() {
       // Load activities
       try {
         const response = await activityService.getActivitiesByGarden(gardenId);
-        setActivities(response);
+        setActivities(response || []);
       } catch (error) {
         console.error("Failed to load activities:", error);
         setActivities([]);
       }
     } catch (error) {
       console.error("Failed to load garden data:", error);
-      setError("Failed to load garden data. Please try again.");
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Không thể tải dữ liệu vườn. Vui lòng thử lại sau."
+      );
       setGarden(null);
+
+      // Show toast error message
+      Toast.show({
+        type: "error",
+        text1: "Lỗi tải dữ liệu",
+        text2:
+          error instanceof Error
+            ? error.message
+            : "Không thể tải dữ liệu vườn, vui lòng thử lại",
+        position: "bottom",
+        visibilityTime: 4000,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -170,14 +190,18 @@ export default function GardenDetailScreen() {
 
   useEffect(() => {
     if (id) {
-      loadGardenData(id).then((r) => console.log(r));
+      loadGardenData(id).catch((err) =>
+        console.error("Error loading garden data:", err)
+      );
     }
   }, [id, loadGardenData]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     if (id) {
-      loadGardenData(id).finally(() => setRefreshing(false));
+      loadGardenData(id)
+        .catch((err) => console.error("Error refreshing garden data:", err))
+        .finally(() => setRefreshing(false));
     } else {
       setRefreshing(false);
     }
@@ -185,7 +209,7 @@ export default function GardenDetailScreen() {
 
   const handleResolveAlert = async (alertId: number) => {
     try {
-      await alertService.resolveAlert(alertId);
+      await alertService.updateAlertStatus(alertId, AlertStatus.RESOLVED);
 
       setAlerts((prevAlerts) =>
         prevAlerts.map((alert) =>
@@ -194,9 +218,23 @@ export default function GardenDetailScreen() {
             : alert
         )
       );
+
+      Toast.show({
+        type: "success",
+        text1: "Đã xử lý cảnh báo",
+        position: "bottom",
+        visibilityTime: 2000,
+      });
     } catch (error) {
       console.error("Failed to resolve alert:", error);
-      // Show error toast or message
+
+      Toast.show({
+        type: "error",
+        text1: "Lỗi xử lý cảnh báo",
+        text2: "Vui lòng thử lại sau",
+        position: "bottom",
+        visibilityTime: 3000,
+      });
     }
   };
 
@@ -208,9 +246,23 @@ export default function GardenDetailScreen() {
       setAlerts((prevAlerts) =>
         prevAlerts.filter((alert) => alert.id !== alertId)
       );
+
+      Toast.show({
+        type: "success",
+        text1: "Đã bỏ qua cảnh báo",
+        position: "bottom",
+        visibilityTime: 2000,
+      });
     } catch (error) {
       console.error("Failed to ignore alert:", error);
-      // Show error toast or message
+
+      Toast.show({
+        type: "error",
+        text1: "Lỗi bỏ qua cảnh báo",
+        text2: "Vui lòng thử lại sau",
+        position: "bottom",
+        visibilityTime: 3000,
+      });
     }
   };
 
@@ -268,13 +320,19 @@ export default function GardenDetailScreen() {
   const sections: DetailSection[] = useMemo(() => {
     if (!garden) return [];
 
-    const activeAlerts = alerts.filter(
-      (a) =>
-        a.status !== AlertStatus.RESOLVED && a.status !== AlertStatus.IGNORED
-    );
-    const upcomingSchedules = wateringSchedule.filter(
-      (ws) => ws.status === "PENDING" && new Date(ws.scheduledAt) > new Date()
-    );
+    const activeAlerts = Array.isArray(alerts)
+      ? alerts.filter(
+          (a) =>
+            a.status !== AlertStatus.RESOLVED &&
+            a.status !== AlertStatus.IGNORED
+        )
+      : [];
+    const upcomingSchedules = Array.isArray(wateringSchedule)
+      ? wateringSchedule.filter(
+          (ws) =>
+            ws.status === "PENDING" && new Date(ws.scheduledAt) > new Date()
+        )
+      : [];
 
     let dataSections: DetailSection[] = [
       { type: DetailSectionType.STATUS, key: "status", data: [garden] },
@@ -368,11 +426,7 @@ export default function GardenDetailScreen() {
         return (
           <View style={styles.sectionContentPadding}>
             {item.currentWeather ? (
-              <WeatherDisplay
-                currentWeather={item.currentWeather}
-                hourlyForecast={item.hourlyForecast}
-                dailyForecast={item.dailyForecast}
-              />
+              <WeatherDisplay currentWeather={item.currentWeather} />
             ) : (
               <Text style={styles.noDataText}>
                 Đang tải dữ liệu thời tiết...
@@ -629,7 +683,9 @@ export default function GardenDetailScreen() {
         <TouchableOpacity
           onPress={() => {
             if (id) {
-              loadGardenData(id).then((r) => console.log(r));
+              loadGardenData(id).catch((err) =>
+                console.error("Error retrying garden data:", err)
+              );
             }
           }}
           style={[

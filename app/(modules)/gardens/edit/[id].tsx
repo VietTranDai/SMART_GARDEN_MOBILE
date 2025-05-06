@@ -49,12 +49,12 @@ export default function EditGardenScreen() {
         setGarden(gardenData);
 
         setFormData({
-          name: gardenData.name,
-          type: gardenData.type || "vegetable",
-          description: gardenData.description || "",
+          name: gardenData?.name || "",
+          type: gardenData?.type || "vegetable",
+          description: gardenData?.description || "",
         });
 
-        setImage(gardenData.profilePicture || null);
+        setImage( gardenData?.profilePicture || null);
       } catch (err) {
         console.error("Failed to fetch garden:", err);
         setError("Không thể tải thông tin vườn. Vui lòng thử lại sau.");

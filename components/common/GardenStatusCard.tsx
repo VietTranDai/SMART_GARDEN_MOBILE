@@ -1,8 +1,8 @@
 import React from "react";
 import { View, Text, StyleSheet, Image, Pressable } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { GardenStatus, GardenType } from "@/types";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { GardenStatus, GardenType } from "@/types";
 
 interface GardenStatusCardProps {
   garden: {
@@ -86,13 +86,6 @@ export default function GardenStatusCard({
     }
   };
 
-  const getGardenTypeLabel = (type: GardenType) => {
-    return (
-      type.charAt(0).toUpperCase() +
-      type.slice(1).toLowerCase().replace("_", " ")
-    );
-  };
-
   const formatDate = (dateString?: string) => {
     if (!dateString) return "Không có";
 
@@ -108,7 +101,7 @@ export default function GardenStatusCard({
     if (!garden.plantStartDate || !garden.plantDuration) return 0;
 
     const startDate = new Date(garden.plantStartDate).getTime();
-    const endDate = startDate + garden.plantDuration * 24 * 60 * 60 * 1000; // convert days to milliseconds
+    const endDate = startDate + garden.plantDuration * 24 * 60 * 60 * 1000;
     const currentDate = new Date().getTime();
 
     // Calculate progress percentage
@@ -126,7 +119,7 @@ export default function GardenStatusCard({
     if (!garden.plantStartDate || !garden.plantDuration) return null;
 
     const startDate = new Date(garden.plantStartDate).getTime();
-    const endDate = startDate + garden.plantDuration * 24 * 60 * 60 * 1000; // convert days to milliseconds
+    const endDate = startDate + garden.plantDuration * 24 * 60 * 60 * 1000;
     const currentDate = new Date().getTime();
 
     const daysRemaining = Math.ceil(
@@ -257,74 +250,74 @@ export default function GardenStatusCard({
                 <Text
                   style={[styles.plantLabel, { color: theme.textSecondary }]}
                 >
-                  Loại:
+                  Tên cây:
                 </Text>
                 <Text style={[styles.plantValue, { color: theme.text }]}>
                   {garden.plantName}
                 </Text>
               </View>
-              {garden.plantGrowStage && (
-                <View style={styles.plantRow}>
-                  <Text
-                    style={[styles.plantLabel, { color: theme.textSecondary }]}
-                  >
-                    Giai đoạn:
-                  </Text>
-                  <Text style={[styles.plantValue, { color: theme.text }]}>
-                    {garden.plantGrowStage}
-                  </Text>
-                </View>
-              )}
-              {garden.plantStartDate && garden.plantDuration && (
-                <View style={styles.progressContainer}>
-                  <Text
-                    style={[
-                      styles.progressLabel,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    Tiến độ phát triển
-                  </Text>
-                  <View style={styles.progressBarBackground}>
-                    <View
-                      style={[
-                        styles.progressBarFill,
-                        {
-                          width: `${growthProgress}%`,
-                          backgroundColor: getProgressColor(growthProgress),
-                        },
-                      ]}
-                    />
-                  </View>
-                  <View style={styles.progressTextContainer}>
-                    <Text
-                      style={[
-                        styles.progressPercent,
-                        { color: getProgressColor(growthProgress) },
-                      ]}
-                    >
-                      {growthProgress}%
-                    </Text>
-                    {daysRemaining !== null && (
-                      <Text
-                        style={[
-                          styles.progressDays,
-                          { color: theme.textTertiary },
-                        ]}
-                      >
-                        {daysRemaining} ngày còn lại
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              )}
+
+              <View style={styles.plantRow}>
+                <Text
+                  style={[styles.plantLabel, { color: theme.textSecondary }]}
+                >
+                  Giai đoạn:
+                </Text>
+                <Text style={[styles.plantValue, { color: theme.text }]}>
+                  {garden.plantGrowStage || "Không có"}
+                </Text>
+              </View>
+
+              <View style={styles.plantRow}>
+                <Text
+                  style={[styles.plantLabel, { color: theme.textSecondary }]}
+                >
+                  Ngày gieo trồng:
+                </Text>
+                <Text style={[styles.plantValue, { color: theme.text }]}>
+                  {formatDate(garden.plantStartDate)}
+                </Text>
+              </View>
             </View>
           </View>
+
+          {garden.plantDuration && garden.plantStartDate && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressLabels}>
+                <Text style={[styles.progressLabel, { color: theme.text }]}>
+                  Tiến độ tăng trưởng
+                </Text>
+                <Text style={[styles.progressLabel, { color: theme.text }]}>
+                  {growthProgress}%
+                </Text>
+              </View>
+              <View
+                style={[styles.progressBar, { backgroundColor: theme.border }]}
+              >
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${growthProgress}%`,
+                      backgroundColor: getProgressColor(growthProgress),
+                    },
+                  ]}
+                />
+              </View>
+              {daysRemaining !== null && (
+                <Text
+                  style={[styles.daysRemaining, { color: theme.textSecondary }]}
+                >
+                  {daysRemaining} ngày còn lại đến ngày thu hoạch dự kiến
+                </Text>
+              )}
+            </View>
+          )}
         </View>
       ) : (
         <View style={styles.noPlantContainer}>
           <Text style={[styles.noPlantText, { color: theme.textSecondary }]}>
-            Chưa có thông tin cây trồng cho vườn này.
+            Chưa có thông tin cây trồng cho vườn này
           </Text>
         </View>
       )}
@@ -335,54 +328,58 @@ export default function GardenStatusCard({
 const styles = StyleSheet.create({
   container: {
     borderRadius: 12,
-    padding: 16,
-    marginVertical: 8,
+    overflow: "hidden",
+    marginBottom: 16,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    padding: 16,
+    paddingBottom: 12,
   },
   title: {
-    fontSize: 18,
-    fontWeight: "bold",
+    fontSize: 16,
+    fontFamily: "Inter-Bold",
   },
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 20,
   },
   statusText: {
-    color: "white",
+    color: "#FFFFFF",
     fontSize: 12,
-    fontWeight: "bold",
+    fontFamily: "Inter-Medium",
   },
   infoContainer: {
-    marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginVertical: 6,
+    marginBottom: 12,
   },
   labelContainer: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
   },
   label: {
     fontSize: 14,
-    marginLeft: 8,
+    fontFamily: "Inter-Medium",
   },
   value: {
     fontSize: 14,
-    fontWeight: "500",
+    fontFamily: "Inter-Regular",
+    maxWidth: "60%",
+    textAlign: "right",
   },
   plantContainer: {
+    padding: 16,
     borderTopWidth: 1,
-    paddingTop: 16,
-    marginTop: 8,
   },
   plantHeader: {
     flexDirection: "row",
@@ -392,84 +389,88 @@ const styles = StyleSheet.create({
   },
   plantTitle: {
     fontSize: 16,
-    fontWeight: "bold",
+    fontFamily: "Inter-Bold",
   },
   detailsButton: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    padding: 6,
+    borderRadius: 6,
+    gap: 4,
   },
   detailsButtonText: {
     fontSize: 12,
-    marginRight: 4,
+    fontFamily: "Inter-Medium",
   },
   plantInfoContainer: {
     flexDirection: "row",
+    gap: 12,
     marginBottom: 16,
   },
   plantImageContainer: {
-    marginRight: 12,
-  },
-  plantImage: {
     width: 80,
     height: 80,
     borderRadius: 8,
+    overflow: "hidden",
+  },
+  plantImage: {
+    width: "100%",
+    height: "100%",
   },
   plantDetails: {
     flex: 1,
     justifyContent: "center",
+    gap: 4,
   },
   plantRow: {
     flexDirection: "row",
-    marginVertical: 3,
+    justifyContent: "space-between",
   },
   plantLabel: {
-    fontSize: 14,
-    marginRight: 4,
+    fontSize: 13,
+    fontFamily: "Inter-Medium",
   },
   plantValue: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 13,
+    fontFamily: "Inter-Regular",
+    maxWidth: "60%",
+    textAlign: "right",
   },
   progressContainer: {
     marginTop: 8,
   },
-  progressLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-    marginBottom: 8,
-  },
-  progressBarBackground: {
-    height: 12,
-    borderRadius: 6,
-    overflow: "hidden",
-    marginBottom: 8,
-  },
-  progressBarFill: {
-    height: "100%",
-  },
-  progressTextContainer: {
+  progressLabels: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    marginBottom: 4,
   },
-  progressPercent: {
-    fontSize: 12,
+  progressLabel: {
+    fontSize: 13,
+    fontFamily: "Inter-Medium",
   },
-  progressDays: {
+  progressBar: {
+    height: 8,
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+  },
+  daysRemaining: {
     fontSize: 12,
+    fontFamily: "Inter-Regular",
+    marginTop: 6,
+    textAlign: "center",
   },
   noPlantContainer: {
+    padding: 16,
     alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-    borderRadius: 8,
-    marginTop: 16,
+    borderTopWidth: 1,
+    borderColor: "#E5E5E5",
   },
   noPlantText: {
-    marginTop: 8,
+    fontSize: 14,
+    fontFamily: "Inter-Medium",
     textAlign: "center",
   },
 });

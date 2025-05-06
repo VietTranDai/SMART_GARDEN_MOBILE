@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useTheme } from "@/contexts/ThemeContext";
 import apiClient from "@/service/apiClient";
-import { alertService } from "@/service/api";
+import alertService from "@/service/api/alert.service";
 
 export default function ModuleLayout() {
   const theme = useAppTheme();

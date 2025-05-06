@@ -16,7 +16,7 @@ class PlantService {
    */
   async createPlant(plantData: { name: string; scientificName: string; gardenId: number; plantTypeId: number; description: string; family: string; growthDuration: number | undefined; }) {
     const response = await apiClient.post(PLANT_ENDPOINTS.ADD, plantData);
-    return response.data;
+    return response.data?.data || null;
   }
   /**
    * Get all plant types
@@ -24,7 +24,7 @@ class PlantService {
    */
   async getPlantTypes(): Promise<PlantType[]> {
     const response = await apiClient.get(PLANT_ENDPOINTS.TYPES);
-    return response.data;
+    return response.data?.data || [];
   }
 
   /**
@@ -34,7 +34,7 @@ class PlantService {
    */
   async getPlants(params?: PlantQueryParams): Promise<Plant[]> {
     const response = await apiClient.get(PLANT_ENDPOINTS.LIST, { params });
-    return response.data;
+    return response.data?.data || [];
   }
 
   /**
@@ -44,7 +44,7 @@ class PlantService {
    */
   async getPlantById(id: number | string): Promise<Plant> {
     const response = await apiClient.get(PLANT_ENDPOINTS.DETAIL(id));
-    return response.data;
+    return response.data?.data || null;
   }
 
   /**
@@ -56,7 +56,7 @@ class PlantService {
     const response = await apiClient.get(
       PLANT_ENDPOINTS.GROWTH_STAGES(plantId)
     );
-    return response.data;
+    return response.data?.data || [];
   }
 
   /**
@@ -72,7 +72,7 @@ class PlantService {
     const response = await apiClient.get(
       PLANT_ENDPOINTS.GROWTH_STAGE_DETAIL(plantId, stageId)
     );
-    return response.data;
+    return response.data?.data || null;
   }
 }
 
