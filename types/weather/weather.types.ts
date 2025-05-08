@@ -82,3 +82,61 @@ export interface DailyForecast {
   weatherDesc: string;
   iconCode: string;
 }
+
+/**
+ * Weather-based advice interface for suggesting activities based on weather conditions
+ */
+export interface WeatherAdvice {
+  id: number;
+  title: string; // Short title for the advice
+  description: string; // Detailed explanation
+  weatherCondition: WeatherMain; // Weather condition this advice applies to
+  temperature?: {
+    // Optional temperature range this advice applies to
+    min?: number;
+    max?: number;
+  };
+  humidity?: {
+    // Optional humidity range this advice applies to
+    min?: number;
+    max?: number;
+  };
+  wind?: {
+    // Optional wind conditions this advice applies to
+    minSpeed?: number;
+    maxSpeed?: number;
+  };
+  icon: string; // Icon to represent this advice
+  priority: number; // 1-5, with 5 being highest priority
+  bestTimeOfDay?: string; // Recommended time to perform the activity
+  applicableGardenTypes?: string[]; // Garden types this advice is most relevant for
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Interface for optimal gardening time slots based on weather forecasts
+ */
+export interface OptimalGardenTime {
+  startTime: string; // ISO timestamp for when the optimal time starts
+  endTime: string; // ISO timestamp for when the optimal time ends
+  activity: string; // The recommended activity (e.g., "Watering", "Fertilizing")
+  reason: string; // Why this time slot is optimal
+  score: number; // 0-100 score indicating how optimal this time is
+  weatherCondition: WeatherMain; // Expected weather during this time
+  temperature: number; // Expected temperature during this time
+}
+
+/**
+ * Interface for UI display components
+ */
+export interface WeatherDisplayProps {
+  currentWeather: WeatherObservation | null;
+  selectedGarden?: any; // Sử dụng GardenDisplay từ types/gardens khi chúng ta cập nhật
+  hourlyForecast?: HourlyForecast[];
+  dailyForecast?: DailyForecast[];
+  getWeatherTip?: (weather: WeatherObservation, gardenType?: string) => string;
+  showFullDetails?: boolean;
+  isCompact?: boolean;
+  onShowDetail?: () => void;
+}

@@ -50,7 +50,6 @@ const SENSOR_NAME_MAP: Record<SensorType, string> = {
   [SensorType.SOIL_MOISTURE]: "Độ ẩm đất",
   [SensorType.LIGHT]: "Ánh sáng",
   [SensorType.WATER_LEVEL]: "Mực nước",
-  [SensorType.RAINFALL]: "Lượng mưa",
   [SensorType.SOIL_PH]: "Độ pH đất",
 };
 

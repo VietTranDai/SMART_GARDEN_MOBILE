@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Image, Pressable } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { GardenStatus, GardenType } from "@/types";
+import { gardenService } from "@/service/api";
 
 interface GardenStatusCardProps {
   garden: {
@@ -56,45 +57,6 @@ export default function GardenStatusCard({
       default:
         return "seedling";
     }
-  };
-
-  const getGardenTypeText = (type: GardenType): string => {
-    switch (type) {
-      case GardenType.INDOOR:
-        return "Trong nhà";
-      case GardenType.OUTDOOR:
-        return "Ngoài trời";
-      case GardenType.BALCONY:
-        return "Ban công";
-      case GardenType.ROOFTOP:
-        return "Sân thượng";
-      case GardenType.WINDOW_SILL:
-        return "Bệ cửa sổ";
-      default:
-        return String(type);
-    }
-  };
-
-  const getGardenStatusText = (status: GardenStatus): string => {
-    switch (status) {
-      case GardenStatus.ACTIVE:
-        return "Hoạt động";
-      case GardenStatus.INACTIVE:
-        return "Không hoạt động";
-      default:
-        return String(status);
-    }
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "Không có";
-
-    const date = new Date(dateString);
-    return date.toLocaleDateString("vi-VN", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
   };
 
   const calculateGrowthProgress = () => {
@@ -152,7 +114,7 @@ export default function GardenStatusCard({
           ]}
         >
           <Text style={styles.statusText}>
-            {getGardenStatusText(garden.status)}
+            {gardenService.getGardenStatusText(garden.status)}
           </Text>
         </View>
       </View>
@@ -170,7 +132,7 @@ export default function GardenStatusCard({
             </Text>
           </View>
           <Text style={[styles.value, { color: theme.text }]}>
-            {getGardenTypeText(garden.type)}
+            {gardenService.getGardenTypeText(garden.type)}
           </Text>
         </View>
 
@@ -200,7 +162,7 @@ export default function GardenStatusCard({
             </Text>
           </View>
           <Text style={[styles.value, { color: theme.text }]}>
-            {formatDate(garden.createdAt)}
+            {gardenService.formatDate(garden.createdAt)}
           </Text>
         </View>
       </View>
@@ -275,7 +237,7 @@ export default function GardenStatusCard({
                   Ngày gieo trồng:
                 </Text>
                 <Text style={[styles.plantValue, { color: theme.text }]}>
-                  {formatDate(garden.plantStartDate)}
+                  {gardenService.formatDate(garden.plantStartDate)}
                 </Text>
               </View>
             </View>

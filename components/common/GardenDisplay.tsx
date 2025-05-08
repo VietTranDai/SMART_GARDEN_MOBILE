@@ -1,13 +1,14 @@
-import React, { useRef } from "react";
+import React, { useRef, useCallback, useMemo, memo, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   Image,
+  ScrollView,
   Animated,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -15,14 +16,27 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import useSectionAnimation from "@/hooks/useSectionAnimation";
 import { GardenDisplay as GardenDisplayType } from "@/hooks/useHomeData";
 import { GardenType } from "@/types/gardens/garden.types";
+import { SensorType, SensorData } from "@/types/gardens/sensor.types";
+import SensorStrip from "./SensorStrip";
+import { makeHomeStyles } from "../common/styles";
+import { LinearGradient } from "expo-linear-gradient";
+import { useGardenContext } from "@/context/GardenContext";
+import { sensorService, gardenService } from "@/service/api";
 
 // Mở rộng interface GardenDisplay để thêm các thuộc tính thiếu
 interface ExtendedGardenDisplay extends GardenDisplayType {
   imageUrl?: string;
+  profilePicture?: string;
   plantCount?: number;
   sensorCount?: number;
   area?: number;
   createdAt?: string;
+  daysUntilHarvest?: number;
+  growthProgress?: number;
+  plantStartDate?: string;
+  plantName?: string;
+  plantGrowStage?: string;
+  description?: string;
 }
 
 interface GardenDisplayProps {
@@ -31,109 +45,113 @@ interface GardenDisplayProps {
   onSelectGarden: (gardenId: number) => void;
   onTogglePinGarden: (gardenId: number) => void;
   showFullDetails?: boolean;
+  sensorDataByGarden?: Record<number, Record<SensorType, SensorData[]>>;
+  sensorDataLoading?: Record<number, boolean>;
+  sensorDataError?: Record<number, string | null>;
+  onShowAdvice?: (gardenId: number) => void;
+  weatherDataByGarden?: Record<number, any>;
+  showLargeCards?: boolean;
+  getSensorStatus?: (
+    value: number,
+    type: SensorType
+  ) => "normal" | "warning" | "critical";
+  onShowWeatherDetail?: (gardenId: number) => void;
+  onScrollToWeatherSection?: (gardenId: number) => void;
+  adviceLoading?: Record<number, boolean>;
+  weatherDetailLoading?: Record<number, boolean>;
+  onShowAlertDetails?: (gardenId: number) => void;
 }
 
-export default function GardenDisplay({
-  gardens,
-  selectedGardenId,
-  onSelectGarden,
-  onTogglePinGarden,
-  showFullDetails = false,
-}: GardenDisplayProps) {
-  const theme = useAppTheme();
-  const { getAnimatedStyle } = useSectionAnimation("gardens");
-  const scrollViewRef = useRef<ScrollView>(null);
+// Interface cho GardenCard props
+interface GardenCardProps {
+  garden: ExtendedGardenDisplay;
+  index: number;
+  isSelected: boolean;
+  onSelect: (gardenId: number, index: number) => void;
+  onTogglePinGarden: (gardenId: number) => void;
+  onShowAdvice?: (gardenId: number) => void;
+  onShowWeatherDetail?: (gardenId: number) => void;
+  gardenSensorData: Record<string, SensorData[]>;
+  isLoadingSensorData: boolean;
+  sensorDataErrorMsg: string | null;
+  gardenWeather: any | null;
+  getSensorStatus?: (
+    value: number,
+    type: SensorType
+  ) => "normal" | "warning" | "critical";
+  theme: any;
+  showLargeCards: boolean;
+  getGardenIcon: (type: GardenType) => any;
+  getGardenTypeText: (type: GardenType) => string;
+  getDefaultGardenImage: (type: GardenType) => { uri: string };
+  formatDate: (dateString?: string) => string;
+  adviceLoading?: boolean;
+  weatherLoading?: boolean;
+  onShowAlertDetails?: (gardenId: number) => void;
+}
 
-  const getGardenIcon = (type: GardenType) => {
-    switch (type) {
-      case "INDOOR":
-        return "home-outline";
-      case "OUTDOOR":
-        return "leaf-outline";
-      case "GREENHOUSE" as GardenType:
-        return "umbrella-outline";
-      case "BALCONY" as GardenType:
-        return "grid-outline";
-      case "ROOFTOP" as GardenType:
-        return "business-outline";
-      case "WINDOW_SILL" as GardenType:
-        return "apps-outline";
-      default:
-        return "leaf-outline";
-    }
-  };
-
-  const getGardenTypeText = (type: GardenType) => {
-    switch (type) {
-      case "INDOOR":
-        return "Vườn trong nhà";
-      case "OUTDOOR":
-        return "Vườn ngoài trời";
-      case "GREENHOUSE" as GardenType:
-        return "Nhà kính";
-      case "BALCONY" as GardenType:
-        return "Vườn ban công";
-      case "ROOFTOP" as GardenType:
-        return "Vườn sân thượng";
-      case "WINDOW_SILL" as GardenType:
-        return "Vườn cửa sổ";
-      default:
-        return "Vườn";
-    }
-  };
-
-  const getGardenEmojiIcon = (type: GardenType) => {
-    switch (type) {
-      case "INDOOR":
-        return "🏡";
-      case "OUTDOOR":
-        return "🌿";
-      case "GREENHOUSE" as GardenType:
-        return "🏕️";
-      case "BALCONY" as GardenType:
-        return "🌻";
-      case "ROOFTOP" as GardenType:
-        return "🏢";
-      case "WINDOW_SILL" as GardenType:
-        return "🪟";
-      default:
-        return "🌱";
-    }
-  };
-
-  const getGardenBackgroundColor = (type: GardenType, isSelected: boolean) => {
-    if (isSelected) {
-      return `${theme.primary}10`;
-    }
-
-    switch (type) {
-      case "INDOOR":
-        return "#F5F3FF"; // Light purple
-      case "OUTDOOR":
-        return "#ECFDF5"; // Light green
-      case "GREENHOUSE" as GardenType:
-        return "#F0FFF4"; // Lighter green
-      case "BALCONY" as GardenType:
-        return "#FEF3C7"; // Light yellow
-      case "ROOFTOP" as GardenType:
-        return "#FEF2F2"; // Light red
-      case "WINDOW_SILL" as GardenType:
-        return "#EFF6FF"; // Light blue
-      default:
-        return "#F9FAFB"; // Light gray
-    }
-  };
-
-  const renderGardenCard = (garden: ExtendedGardenDisplay, index: number) => {
-    const isSelected = garden.id === selectedGardenId;
+// Tối ưu component với memo
+const GardenCard = memo(
+  ({
+    garden,
+    index,
+    isSelected,
+    onSelect,
+    onTogglePinGarden,
+    onShowAdvice,
+    onShowWeatherDetail,
+    gardenSensorData = {},
+    isLoadingSensorData = false,
+    sensorDataErrorMsg = null,
+    gardenWeather = null,
+    getSensorStatus,
+    theme,
+    showLargeCards = false,
+    getGardenIcon,
+    getGardenTypeText,
+    getDefaultGardenImage,
+    formatDate,
+    adviceLoading = false,
+    weatherLoading = false,
+    onShowAlertDetails,
+  }: GardenCardProps) => {
     const iconName = getGardenIcon(garden.type);
-    const emojiIcon = getGardenEmojiIcon(garden.type);
-    const bgColor = getGardenBackgroundColor(garden.type, isSelected);
-
-    // Card scale animation for selection
     const scaleValue = useRef(new Animated.Value(1)).current;
 
-    const handlePress = () => {
+    // Xác định số cảnh báo từ sensor data
+    const getSensorAlerts = useCallback(() => {
+      let alertCount = 0;
+      // Kiểm tra các loại cảm biến phổ biến
+      const sensorTypes = [
+        SensorType.TEMPERATURE,
+        SensorType.HUMIDITY,
+        SensorType.SOIL_MOISTURE,
+        SensorType.LIGHT,
+      ];
+
+      sensorTypes.forEach((type) => {
+        if (gardenSensorData[type]?.length) {
+          const latestReading = gardenSensorData[type][0]; // Lấy chỉ số mới nhất
+          if (latestReading) {
+            // Giả định rằng có một hàm kiểm tra giá trị cảm biến có vượt ngưỡng không
+            const status = getSensorStatus
+              ? getSensorStatus(latestReading.value, type)
+              : "normal";
+
+            if (status === "warning" || status === "critical") {
+              alertCount++;
+            }
+          }
+        }
+      });
+
+      return alertCount;
+    }, [gardenSensorData, getSensorStatus]);
+
+    // Lấy tổng số cảnh báo (kết hợp giữa alert từ backend và sensor alerts)
+    const totalAlerts = garden.alertCount + getSensorAlerts();
+
+    const handlePress = useCallback(() => {
       Animated.sequence([
         Animated.timing(scaleValue, {
           toValue: 0.95,
@@ -148,37 +166,35 @@ export default function GardenDisplay({
         }),
       ]).start();
 
-      // Scroll to this item if it's selected
-      if (scrollViewRef.current && gardens.length > 2) {
-        scrollViewRef.current.scrollTo({
-          x: index * 180,
-          animated: true,
-        });
-      }
+      onSelect(garden.id, index);
+    }, [scaleValue, onSelect, garden.id, index]);
 
-      onSelectGarden(garden.id);
-    };
+    // Navigate to garden detail page
+    const handleGoToDetail = useCallback(() => {
+      router.push(`/garden/${garden.id}`);
+    }, [garden.id]);
 
     return (
       <Animated.View
-        key={garden.id}
         style={{
           transform: [{ scale: scaleValue }],
+          margin: 4,
         }}
       >
         <TouchableOpacity
           style={[
             styles.gardenCard,
+            showLargeCards ? styles.largeGardenCard : {},
             {
-              backgroundColor: bgColor,
-              borderColor: isSelected ? theme.primary : "transparent",
+              backgroundColor: theme.card,
               borderWidth: isSelected ? 2 : 0,
+              borderColor: isSelected ? theme.primary : "transparent",
               ...Platform.select({
                 ios: {
-                  shadowColor: isSelected ? theme.primary : "rgba(0,0,0,0.1)",
+                  shadowColor: theme.shadow,
                   shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 4,
+                  shadowOpacity: isSelected ? 0.15 : 0.1,
+                  shadowRadius: 6,
                 },
                 android: {
                   elevation: isSelected ? 4 : 2,
@@ -187,24 +203,44 @@ export default function GardenDisplay({
             },
           ]}
           onPress={handlePress}
-          activeOpacity={0.7}
+          activeOpacity={0.9}
         >
-          <View style={styles.gardenHeader}>
-            <View
-              style={[
-                styles.emojiContainer,
-                { backgroundColor: `${theme.primary}15` },
-              ]}
-            >
-              <Text style={styles.gardenEmoji}>{emojiIcon}</Text>
+          {/* Profile Picture với overlay gradient */}
+          <View style={styles.imageContainer}>
+            {garden.profilePicture ? (
+              <Image
+                source={{ uri: garden.profilePicture }}
+                style={styles.gardenImage}
+                defaultSource={getDefaultGardenImage(garden.type)}
+              />
+            ) : (
+              <Image
+                source={getDefaultGardenImage(garden.type)}
+                style={styles.gardenImage}
+              />
+            )}
+
+            {/* Gradient overlay để làm nổi bật thông tin trên ảnh */}
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.6)"]}
+              style={styles.imageGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+            />
+
+            {/* Icon Garden Type */}
+            <View style={styles.gardenTypeIconContainer}>
+              <Ionicons name={iconName} size={14} color="#fff" />
             </View>
+
+            {/* Pin Button */}
             <TouchableOpacity
               style={[
                 styles.pinButton,
                 {
                   backgroundColor: garden.isPinned
-                    ? `${theme.primary}20`
-                    : "rgba(0,0,0,0.05)",
+                    ? `${theme.primary}40`
+                    : "rgba(255,255,255,0.3)",
                 },
               ]}
               onPress={() => onTogglePinGarden(garden.id)}
@@ -212,81 +248,449 @@ export default function GardenDisplay({
               <Ionicons
                 name={garden.isPinned ? "pin" : "pin-outline"}
                 size={16}
-                color={garden.isPinned ? theme.primary : theme.textSecondary}
+                color={garden.isPinned ? "#fff" : "#fff"}
               />
             </TouchableOpacity>
-          </View>
 
-          <Text
-            style={[styles.gardenName, { color: theme.text }]}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {garden.name}
-          </Text>
-
-          <Text style={[styles.gardenType, { color: theme.textSecondary }]}>
-            {getGardenTypeText(garden.type)}
-          </Text>
-
-          <View style={styles.gardenStats}>
-            <View style={styles.statItem}>
-              <Ionicons name="leaf-outline" size={14} color={theme.primary} />
-              <Text style={[styles.statValue, { color: theme.text }]}>
-                {garden.plantCount || 0}
-              </Text>
-            </View>
-            <View style={styles.statItem}>
-              <Ionicons
-                name="hardware-chip-outline"
-                size={14}
-                color={theme.primary}
-              />
-              <Text style={[styles.statValue, { color: theme.text }]}>
-                {garden.sensorCount || 0}
-              </Text>
-            </View>
-            <View style={styles.statItem}>
-              <Ionicons
-                name="alert-circle-outline"
-                size={14}
-                color={garden.alertCount > 0 ? theme.warning : theme.primary}
-              />
+            {/* Garden name over image */}
+            <View style={styles.gardenNameContainer}>
               <Text
-                style={[
-                  styles.statValue,
-                  {
-                    color: garden.alertCount > 0 ? theme.warning : theme.text,
-                  },
-                ]}
-              >
-                {garden.alertCount}
-              </Text>
-            </View>
-          </View>
-
-          {garden.location && (
-            <View style={styles.locationRow}>
-              <Ionicons
-                name="location-outline"
-                size={12}
-                color={theme.textSecondary}
-              />
-              <Text
-                style={[styles.locationText, { color: theme.textSecondary }]}
+                style={styles.gardenImageName}
                 numberOfLines={1}
                 ellipsizeMode="tail"
               >
-                {garden.location}
+                {garden.name}
               </Text>
+              <Text style={styles.gardenImageType}>
+                {getGardenTypeText(garden.type)}
+              </Text>
+              {totalAlerts > 0 && (
+                <TouchableOpacity
+                  style={styles.alertBadge}
+                  onPress={() => {
+                    // This would show alert details
+                    if (isSelected && onShowAlertDetails) {
+                      onShowAlertDetails(garden.id);
+                    } else {
+                      // Select garden first, then show alerts
+                      onSelect(garden.id, index);
+                      setTimeout(() => {
+                        if (onShowAlertDetails) onShowAlertDetails(garden.id);
+                      }, 300);
+                    }
+                  }}
+                >
+                  <Ionicons name="alert-circle" size={12} color="#fff" />
+                  <Text style={styles.alertBadgeText}>
+                    {totalAlerts} cảnh báo
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
-          )}
+          </View>
+
+          {/* Garden Information */}
+          <View style={styles.gardenInfo}>
+            {/* Garden Stats - Thông tin số liệu đặt ở đầu */}
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Ionicons
+                  name="hardware-chip-outline"
+                  size={16}
+                  color={theme.primary}
+                  style={styles.statIcon}
+                />
+                <View style={styles.statTextContainer}>
+                  <Text style={styles.statLabel}>Cảm biến</Text>
+                  <Text style={[styles.statValue, { color: theme.text }]}>
+                    {garden.sensorCount || 0}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.statItem}>
+                <Ionicons
+                  name="alert-circle-outline"
+                  size={16}
+                  color={totalAlerts > 0 ? theme.warning : theme.primary}
+                  style={styles.statIcon}
+                />
+                <View style={styles.statTextContainer}>
+                  <Text style={styles.statLabel}>Cảnh báo</Text>
+                  <Text
+                    style={[
+                      styles.statValue,
+                      { color: totalAlerts > 0 ? theme.warning : theme.text },
+                    ]}
+                  >
+                    {totalAlerts}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.statItem}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={16}
+                  color={theme.primary}
+                  style={styles.statIcon}
+                />
+                <View style={styles.statTextContainer}>
+                  <Text style={styles.statLabel}>Trồng lúc</Text>
+                  <Text style={[styles.statValue, { color: theme.text }]}>
+                    {garden.plantStartDate
+                      ? formatDate(garden.plantStartDate)
+                      : "--/--"}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Plant Info Row - Đầu tiên */}
+            {garden.plantName && (
+              <View style={styles.plantInfoRow}>
+                <Ionicons name="leaf-outline" size={14} color={theme.primary} />
+                <Text
+                  style={[styles.plantInfoText, { color: theme.text }]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {garden.plantName}{" "}
+                  {garden.plantGrowStage ? `(${garden.plantGrowStage})` : ""}
+                </Text>
+              </View>
+            )}
+
+            {/* Garden Description */}
+            {garden.description && (
+              <View style={styles.descriptionContainer}>
+                <Text
+                  style={[
+                    styles.descriptionText,
+                    { color: theme.textSecondary },
+                  ]}
+                  numberOfLines={2}
+                  ellipsizeMode="tail"
+                >
+                  {garden.description}
+                </Text>
+              </View>
+            )}
+
+            {/* Harvest Progress - Đặt thứ hai */}
+            {garden.daysUntilHarvest !== undefined && (
+              <View style={styles.harvestProgressContainer}>
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressTitle}>Tiến độ thu hoạch</Text>
+                  <Text style={styles.daysRemaining}>
+                    {garden.daysUntilHarvest} ngày
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.progressBar,
+                    { backgroundColor: `${theme.primary}15` },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        backgroundColor: theme.primary,
+                        width: `${garden.growthProgress || 0}%`,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* Direct Sensor Data Display - Đặt thứ ba */}
+            <SensorStrip
+              sensorData={gardenSensorData}
+              isLoading={isLoadingSensorData}
+              error={sensorDataErrorMsg}
+              theme={theme}
+              compact={true}
+            />
+
+            {/* Location Row - Đặt thứ tư */}
+            {garden.location && (
+              <View style={styles.metaInfoRow}>
+                <Ionicons
+                  name="location-outline"
+                  size={14}
+                  color={theme.textSecondary}
+                />
+                <Text
+                  style={[styles.metaInfoText, { color: theme.textSecondary }]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {garden.location}
+                </Text>
+              </View>
+            )}
+
+            {/* Action Buttons */}
+            <View style={styles.actionButtonsContainer}>
+              {/* Detail Button - Go to garden detail page */}
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  { backgroundColor: `${theme.primary}20` },
+                ]}
+                onPress={handleGoToDetail}
+              >
+                <Ionicons
+                  name="information-circle-outline"
+                  size={18}
+                  color={theme.primary}
+                />
+              </TouchableOpacity>
+
+              {/* Advice Button */}
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  { backgroundColor: `${theme.card}E6` },
+                ]}
+                disabled={adviceLoading}
+                onPress={() => {
+                  if (onShowAdvice && !adviceLoading) {
+                    onShowAdvice(garden.id);
+                  }
+                }}
+              >
+                {adviceLoading ? (
+                  <ActivityIndicator size="small" color={theme.primary} />
+                ) : (
+                  <Ionicons
+                    name="bulb-outline"
+                    size={18}
+                    color={theme.primary}
+                  />
+                )}
+              </TouchableOpacity>
+
+              {/* Weather Button - Enhanced with better styling */}
+              {gardenWeather && (
+                <TouchableOpacity
+                  style={[
+                    styles.actionButton,
+                    { backgroundColor: `${theme.primary}20` },
+                  ]}
+                  disabled={weatherLoading}
+                  onPress={() => {
+                    if (onShowWeatherDetail && !weatherLoading) {
+                      onShowWeatherDetail(garden.id);
+                    }
+                  }}
+                >
+                  {weatherLoading ? (
+                    <ActivityIndicator size="small" color="#4da0ff" />
+                  ) : (
+                    <Ionicons
+                      name={
+                        gardenWeather.weatherMain === "CLEAR"
+                          ? "sunny-outline"
+                          : gardenWeather.weatherMain === "CLOUDS"
+                          ? "cloudy-outline"
+                          : gardenWeather.weatherMain === "RAIN"
+                          ? "rainy-outline"
+                          : "cloud-outline"
+                      }
+                      size={18}
+                      color="#4da0ff"
+                    />
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
         </TouchableOpacity>
       </Animated.View>
     );
-  };
+  },
+  // Optimize memo comparison to prevent unnecessary renders
+  (prevProps, nextProps) => {
+    // Only re-render if these specific props change
+    return (
+      prevProps.isSelected === nextProps.isSelected &&
+      prevProps.gardenSensorData === nextProps.gardenSensorData &&
+      prevProps.isLoadingSensorData === nextProps.isLoadingSensorData &&
+      prevProps.adviceLoading === nextProps.adviceLoading &&
+      prevProps.weatherLoading === nextProps.weatherLoading &&
+      prevProps.gardenWeather === nextProps.gardenWeather
+    );
+  }
+);
 
-  const renderCreateGardenCard = () => {
+// Wrap GardenDisplay in memo for maximum optimization
+const GardenDisplay = memo(function GardenDisplay({
+  gardens,
+  selectedGardenId: propSelectedGardenId,
+  onSelectGarden: propOnSelectGarden,
+  onTogglePinGarden,
+  showFullDetails = false,
+  sensorDataByGarden = {},
+  sensorDataLoading = {},
+  sensorDataError = {},
+  onShowAdvice,
+  weatherDataByGarden = {},
+  showLargeCards = false,
+  getSensorStatus,
+  onShowWeatherDetail,
+  onScrollToWeatherSection,
+  adviceLoading = {},
+  weatherDetailLoading = {},
+  onShowAlertDetails,
+}: GardenDisplayProps) {
+  const theme = useAppTheme();
+  const { selectedGardenId, selectGarden } = useGardenContext();
+  const { getAnimatedStyle } = useSectionAnimation("gardens");
+  const scrollViewRef = useRef<ScrollView>(null);
+  const lastSelectedIndex = useRef<number | null>(null);
+
+  // Sử dụng propSelectedGardenId nếu được cung cấp, nếu không sử dụng giá trị từ context
+  const effectiveSelectedGardenId = propSelectedGardenId ?? selectedGardenId;
+
+  // Sử dụng callback propOnSelectGarden nếu được cung cấp, nếu không sử dụng context
+  const handleSelectGarden = useCallback(
+    (gardenId: number) => {
+      if (propOnSelectGarden) {
+        propOnSelectGarden(gardenId);
+      } else {
+        selectGarden(gardenId);
+      }
+    },
+    [propOnSelectGarden, selectGarden]
+  );
+
+  // Memoize utility functions để tối ưu hiệu suất
+  // Sử dụng sensorService thay vì định nghĩa trực tiếp
+  const getSensorStatusFunc = useCallback(
+    (value: number, type: SensorType) => {
+      return getSensorStatus
+        ? getSensorStatus(value, type)
+        : sensorService.getSensorStatus(value, type);
+    },
+    [getSensorStatus]
+  );
+
+  // Các utility functions đã memoize
+  const getGardenIcon = useCallback((type: GardenType) => {
+    switch (type) {
+      case "OUTDOOR":
+        return "flower";
+      case "INDOOR":
+        return "home";
+      case "BALCONY":
+        return "grid";
+      case "ROOFTOP":
+        return "sunny";
+      case "COMMUNITY" as GardenType:
+        return "people";
+      case "HYDROPONIC" as GardenType:
+        return "water";
+      default:
+        return "leaf";
+    }
+  }, []);
+
+  const getGardenTypeText = useCallback((type: GardenType) => {
+    switch (type) {
+      case "OUTDOOR":
+        return "Vườn ngoài trời";
+      case "INDOOR":
+        return "Vườn trong nhà";
+      case "BALCONY":
+        return "Vườn ban công";
+      case "ROOFTOP":
+        return "Vườn sân thượng";
+      case "COMMUNITY" as GardenType:
+        return "Vườn cộng đồng";
+      case "HYDROPONIC" as GardenType:
+        return "Vườn thủy canh";
+      default:
+        return "Vườn";
+    }
+  }, []);
+
+  const getDefaultGardenImage = useCallback((type: GardenType) => {
+    // Trả về ảnh mặc định dựa trên loại vườn
+    switch (type) {
+      case "OUTDOOR":
+        return {
+          uri: "https://images.unsplash.com/photo-1624438246237-8b8c2e213a5b",
+        };
+      case "INDOOR":
+        return {
+          uri: "https://images.unsplash.com/photo-1627910080621-031a7ab8e769",
+        };
+      case "BALCONY":
+        return {
+          uri: "https://images.unsplash.com/photo-1545319261-f3760f9dd54c",
+        };
+      case "ROOFTOP":
+        return {
+          uri: "https://images.unsplash.com/photo-1599076482136-e8c25bfa85e7",
+        };
+      case "COMMUNITY" as GardenType:
+        return {
+          uri: "https://images.unsplash.com/photo-1621955584212-66e5976feab3",
+        };
+      case "HYDROPONIC" as GardenType:
+        return {
+          uri: "https://images.unsplash.com/photo-1553025484-cee7712bc812",
+        };
+      default:
+        return {
+          uri: "https://images.unsplash.com/photo-1622383563672-fc05f9d99dd7",
+        };
+    }
+  }, []);
+
+  const formatDate = useCallback((dateString?: string) => {
+    if (!dateString) return "";
+
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("vi-VN", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return dateString;
+    }
+  }, []);
+
+  // Luôn duy trì vị trí scroll khi component re-render
+  useEffect(() => {
+    // Scroll tới item đã chọn sau khi component render
+    if (
+      effectiveSelectedGardenId !== null &&
+      lastSelectedIndex.current !== null
+    ) {
+      const selectedIndex = gardens.findIndex(
+        (g) => g.id === effectiveSelectedGardenId
+      );
+      if (selectedIndex >= 0 && scrollViewRef.current) {
+        setTimeout(() => {
+          if (scrollViewRef.current) {
+            scrollViewRef.current.scrollTo({
+              x: selectedIndex * (showLargeCards ? 390 : 300),
+              animated: false, // Không dùng animation để tránh nhảy
+            });
+          }
+        }, 50); // Delay nhỏ để đảm bảo ScrollView đã render
+      }
+    }
+  }, [gardens, effectiveSelectedGardenId, showLargeCards]);
+
+  const renderCreateGardenCard = useCallback(() => {
     return (
       <TouchableOpacity
         style={[
@@ -310,7 +714,7 @@ export default function GardenDisplay({
         </Text>
       </TouchableOpacity>
     );
-  };
+  }, [theme]);
 
   if (gardens.length === 0) {
     return (
@@ -354,26 +758,59 @@ export default function GardenDisplay({
         showsHorizontalScrollIndicator={false}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollViewContent}
-        snapToInterval={180}
+        snapToInterval={showLargeCards ? 390 : 300}
         decelerationRate="fast"
+        onMomentumScrollEnd={(e) => {
+          // Lưu lại vị trí scroll hiện tại để duy trì khi re-render
+          const offsetX = e.nativeEvent.contentOffset.x;
+          const index = Math.round(offsetX / (showLargeCards ? 390 : 300));
+          lastSelectedIndex.current = index;
+        }}
       >
-        {gardens.map(renderGardenCard)}
-        {renderCreateGardenCard()}
+        {gardens.map((garden) => (
+          <GardenCard
+            key={`garden-${garden.id}-${garden.name}`}
+            garden={garden}
+            index={gardens.indexOf(garden)}
+            isSelected={garden.id === selectedGardenId}
+            onSelect={handleSelectGarden}
+            onTogglePinGarden={onTogglePinGarden}
+            onShowAdvice={onShowAdvice}
+            onShowWeatherDetail={onShowWeatherDetail}
+            onShowAlertDetails={onShowAlertDetails}
+            gardenSensorData={sensorDataByGarden[garden.id] || {}}
+            isLoadingSensorData={sensorDataLoading[garden.id] || false}
+            sensorDataErrorMsg={sensorDataError[garden.id] || null}
+            gardenWeather={weatherDataByGarden[garden.id] || null}
+            getSensorStatus={getSensorStatus}
+            theme={theme}
+            showLargeCards={showLargeCards}
+            getGardenIcon={getGardenIcon}
+            getGardenTypeText={getGardenTypeText}
+            getDefaultGardenImage={getDefaultGardenImage}
+            formatDate={formatDate}
+            adviceLoading={adviceLoading[garden.id]}
+            weatherLoading={weatherDetailLoading[garden.id]}
+          />
+        ))}
+        <View key="create-garden-card">{renderCreateGardenCard()}</View>
       </ScrollView>
     </Animated.View>
   );
-}
+});
+
+export default GardenDisplay;
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   headerTitle: {
     fontSize: 18,
@@ -395,29 +832,208 @@ const styles = StyleSheet.create({
   },
   scrollViewContent: {
     paddingRight: 20,
-    gap: 16,
+    gap: 10,
   },
   gardenCard: {
-    width: 160,
-    height: 180,
+    width: 300,
+    height: 520,
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 8,
+    overflow: "hidden",
+    borderWidth: 0,
+    backgroundColor: "#fff",
   },
-  gardenHeader: {
+  largeGardenCard: {
+    width: 390,
+    height: 550,
+  },
+  imageContainer: {
+    height: 165,
+    width: "100%",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: "hidden",
+    position: "relative",
+  },
+  imageGradient: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 80,
+    zIndex: 1,
+  },
+  gardenImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  gardenNameContainer: {
+    position: "absolute",
+    bottom: 8,
+    left: 10,
+    right: 10,
+    zIndex: 2,
+  },
+  gardenImageName: {
+    fontSize: 18,
+    fontFamily: "Inter-SemiBold",
+    color: "#fff",
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  gardenImageType: {
+    fontSize: 12,
+    fontFamily: "Inter-Regular",
+    color: "rgba(255,255,255,0.9)",
+    marginTop: 2,
+  },
+  gardenTypeIconContainer: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    padding: 6,
+    borderRadius: 12,
+    zIndex: 2,
+  },
+  alertBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    backgroundColor: "rgba(255, 87, 51, 0.8)",
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+    gap: 4,
+  },
+  alertBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontFamily: "Inter-Medium",
+  },
+  gardenInfo: {
+    padding: 12,
+    flex: 1,
+  },
+  statsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: 8,
+    gap: 5,
   },
-  emojiContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  statItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "31%",
+    backgroundColor: "rgba(0,0,0,0.03)",
+    padding: 4,
+    borderRadius: 8,
+  },
+  statIcon: {
+    marginRight: 4,
+  },
+  statTextContainer: {
+    flexDirection: "column",
+  },
+  statLabel: {
+    fontSize: 10,
+    fontFamily: "Inter-Regular",
+    color: "rgba(0,0,0,0.5)",
+  },
+  statValue: {
+    fontSize: 14,
+    fontFamily: "Inter-SemiBold",
+  },
+  harvestProgressContainer: {
+    marginTop: 8,
+    marginBottom: 8,
+    backgroundColor: "rgba(0,0,0,0.02)",
+    padding: 8,
+    borderRadius: 8,
+  },
+  progressHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 5,
+  },
+  progressTitle: {
+    fontSize: 12,
+    fontFamily: "Inter-Medium",
+    color: "rgba(0,0,0,0.7)",
+  },
+  daysRemaining: {
+    fontSize: 12,
+    fontFamily: "Inter-SemiBold",
+    color: "rgba(0,0,0,0.8)",
+  },
+  progressBar: {
+    height: 6,
+    borderRadius: 3,
+    width: "100%",
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  metaInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 4,
+    marginTop: 6,
+  },
+  metaInfoText: {
+    fontSize: 11,
+    fontFamily: "Inter-Regular",
+    flex: 1,
+  },
+  plantInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.02)",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    marginVertical: 6,
+    gap: 4,
+  },
+  plantInfoText: {
+    fontSize: 12,
+    fontFamily: "Inter-Medium",
+    flex: 1,
+  },
+  descriptionContainer: {
+    marginTop: 3,
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  descriptionText: {
+    fontSize: 11,
+    fontFamily: "Inter-Regular",
+    fontStyle: "italic",
+    lineHeight: 14,
+  },
+  actionButtonsContainer: {
+    position: "absolute",
+    bottom: 10,
+    right: 10,
+    flexDirection: "row",
+    gap: 6,
+  },
+  actionButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
-  },
-  gardenEmoji: {
-    fontSize: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
   },
   pinButton: {
     width: 28,
@@ -425,47 +1041,36 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
+    position: "absolute",
+    top: 8,
+    right: 8,
+    zIndex: 2,
   },
-  gardenName: {
-    fontSize: 16,
+  weatherBadge: {
+    position: "absolute",
+    right: 8,
+    bottom: 8,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    zIndex: 2,
+  },
+  weatherTemp: {
+    color: "#FFF",
+    fontSize: 12,
     fontFamily: "Inter-Bold",
-    marginBottom: 4,
-  },
-  gardenType: {
-    fontSize: 12,
-    fontFamily: "Inter-Regular",
-    marginBottom: 12,
-  },
-  gardenStats: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  statItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  statValue: {
-    fontSize: 12,
-    fontFamily: "Inter-Medium",
-  },
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  locationText: {
-    fontSize: 11,
-    fontFamily: "Inter-Regular",
-    flex: 1,
   },
   createGardenCard: {
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
     borderStyle: "dashed",
-    height: 180,
+    height: 480,
+    width: 280,
   },
   createIconContainer: {
     width: 48,
@@ -500,6 +1105,19 @@ const styles = StyleSheet.create({
   },
   createButtonText: {
     fontSize: 16,
-    fontFamily: "Inter-Bold",
+    fontFamily: "Inter-SemiBold",
+    color: "#FFFFFF",
+  },
+  weatherInfoContainer: {
+    marginVertical: 6,
+    padding: 8,
+    backgroundColor: "rgba(0,0,0,0.02)",
+    borderRadius: 8,
+  },
+  weatherInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 3,
   },
 });

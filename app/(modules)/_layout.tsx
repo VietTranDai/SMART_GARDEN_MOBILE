@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Tabs } from "expo-router";
 import {
   Ionicons,
@@ -6,9 +6,18 @@ import {
   MaterialCommunityIcons,
   MaterialIcons,
   Entypo,
+  AntDesign,
+  FontAwesome,
 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { Platform } from "react-native";
+import {
+  Platform,
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
 import * as Notifications from "expo-notifications";
 import { useUser } from "@/contexts/UserContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,6 +25,198 @@ import { StatusBar } from "expo-status-bar";
 import { useTheme } from "@/contexts/ThemeContext";
 import apiClient from "@/service/apiClient";
 import alertService from "@/service/api/alert.service";
+import { router } from "expo-router";
+import env from "@/config/environment";
+
+// Header component for Gardens tab
+const GardensHeaderTitle = () => {
+  const theme = useAppTheme();
+
+  return (
+    <View style={styles.headerTitleContainer}>
+      <MaterialCommunityIcons
+        name="flower-tulip"
+        size={24}
+        color={theme.primary}
+        style={styles.headerIcon}
+      />
+      <Text style={[styles.headerTitleText, { color: theme.text }]}>
+        Vườn của tôi
+      </Text>
+    </View>
+  );
+};
+
+// Header component for Community tab
+const CommunityHeaderTitle = () => {
+  const theme = useAppTheme();
+
+  return (
+    <View style={styles.headerTitleContainer}>
+      <Ionicons
+        name="people-circle-outline"
+        size={24}
+        color={theme.primary}
+        style={styles.headerIcon}
+      />
+      <Text style={[styles.headerTitleText, { color: theme.text }]}>
+        Cộng đồng vườn
+      </Text>
+    </View>
+  );
+};
+
+// Header component for Tasks tab
+const TasksHeaderTitle = () => {
+  const theme = useAppTheme();
+
+  return (
+    <View style={styles.headerTitleContainer}>
+      <FontAwesome
+        name="tasks"
+        size={22}
+        color={theme.primary}
+        style={styles.headerIcon}
+      />
+      <Text style={[styles.headerTitleText, { color: theme.text }]}>
+        Công việc vườn
+      </Text>
+    </View>
+  );
+};
+
+// Header component for Profile tab
+const ProfileHeaderTitle = () => {
+  const theme = useAppTheme();
+  const { user } = useUser();
+
+  return (
+    <View style={styles.headerTitleContainer}>
+      <FontAwesome5
+        name="user-circle"
+        size={22}
+        color={theme.primary}
+        style={styles.headerIcon}
+      />
+      <Text style={[styles.headerTitleText, { color: theme.text }]}>
+        Hồ sơ của {user?.firstName || "tôi"}
+      </Text>
+    </View>
+  );
+};
+
+// Custom header component for Home tab
+const CustomHeaderTitle = () => {
+  const theme = useAppTheme();
+
+  // Get greeting based on time of day
+  const getGreeting = () => {
+    const currentHour = new Date().getHours();
+    if (currentHour < 12) return "Chào buổi sáng";
+    if (currentHour < 18) return "Chào buổi chiều";
+    return "Chào buổi tối";
+  };
+
+  const { user } = useUser();
+
+  return (
+    <View style={styles.titleContainer}>
+      <View style={styles.logoWithText}>
+        <Image
+          source={require("@/assets/images/logo.png")}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        <View style={styles.textContainer}>
+          <Text style={[styles.appTitle, { color: theme.primary }]}>
+            Nông trại thông minh
+          </Text>
+          <Text style={[styles.greeting, { color: theme.textSecondary }]}>
+            {getGreeting()}, {user?.firstName} {user?.lastName || "Người dùng"}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+// Custom right header component with notification badge
+const CustomHeaderRight = () => {
+  const theme = useAppTheme();
+  const [notificationCount, setNotificationCount] = React.useState(0);
+  const { user } = useUser();
+  const [imageError, setImageError] = React.useState(false);
+
+  // Fetch notification count
+  useEffect(() => {
+    const fetchNotificationCount = async () => {
+      try {
+        const count = await alertService.countPendingAlerts();
+        setNotificationCount(count);
+      } catch (error) {
+        console.error("Failed to fetch notification count:", error);
+      }
+    };
+
+    fetchNotificationCount();
+
+    const subscription = Notifications.addNotificationReceivedListener(() => {
+      setNotificationCount((prev) => prev + 1);
+    });
+
+    return () => subscription.remove();
+  }, []);
+
+  const avatarSource = useMemo(() => {
+    if (user?.profilePicture && !imageError) {
+      const imageUrl = `${env.apiUrl}${user.profilePicture}`;
+      return { uri: imageUrl };
+    }
+    return require("@/assets/images/default-avatar.png");
+  }, [user?.profilePicture, imageError]);
+
+  return (
+    <View style={styles.actionsContainer}>
+      <TouchableOpacity
+        style={[styles.avatarContainer, { borderColor: theme.border }]}
+        onPress={() => router.push("/(modules)/profile")}
+      >
+        <Image
+          source={avatarSource}
+          style={styles.avatar}
+          onError={() => {
+            console.log("Error loading profile image");
+            setImageError(true);
+          }}
+        />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[
+          styles.notificationButton,
+          { backgroundColor: "rgba(0,0,0,0.03)" },
+        ]}
+        onPress={() => router.push("/(modules)/alerts")}
+      >
+        <Ionicons
+          name="notifications-outline"
+          size={24}
+          color={theme.textSecondary}
+        />
+        {notificationCount > 0 && (
+          <View
+            style={[
+              styles.notificationBadge,
+              {
+                backgroundColor: theme.error,
+              },
+            ]}
+          />
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 export default function ModuleLayout() {
   const theme = useAppTheme();
@@ -101,7 +302,17 @@ export default function ModuleLayout() {
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="home" size={size} color={color} />
             ),
-            headerTitle: "Nông trại thông minh",
+            headerTitle: (props) => <CustomHeaderTitle />,
+            headerRight: () => <CustomHeaderRight />,
+            headerTitleAlign: "left",
+            headerLeft: () => null,
+            headerShown: true,
+            headerStyle: {
+              backgroundColor: theme.background,
+              height: 120,
+              shadowOpacity: 0.1,
+              elevation: 1,
+            },
           }}
         />
 
@@ -113,7 +324,14 @@ export default function ModuleLayout() {
             tabBarIcon: ({ color, size }) => (
               <MaterialCommunityIcons name="flower" size={size} color={color} />
             ),
-            headerTitle: "Vườn của tôi",
+            headerTitle: (props) => <GardensHeaderTitle />,
+            headerRight: () => <CustomHeaderRight />,
+            headerLeft: () => null,
+            headerShown: true,
+            headerStyle: {
+              backgroundColor: theme.background,
+              elevation: 1,
+            },
           }}
         />
 
@@ -164,7 +382,13 @@ export default function ModuleLayout() {
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="people" size={size} color={color} />
             ),
-            headerTitle: "Cộng đồng vườn",
+            headerTitle: (props) => <CommunityHeaderTitle />,
+            headerRight: () => <CustomHeaderRight />,
+            headerTitleAlign: "left",
+            headerStyle: {
+              backgroundColor: theme.background,
+              elevation: 1,
+            },
           }}
         />
 
@@ -176,7 +400,13 @@ export default function ModuleLayout() {
             tabBarIcon: ({ color, size }) => (
               <MaterialIcons name="task-alt" size={size} color={color} />
             ),
-            headerTitle: "Công việc vườn",
+            headerTitle: (props) => <TasksHeaderTitle />,
+            headerRight: () => <CustomHeaderRight />,
+            headerTitleAlign: "left",
+            headerStyle: {
+              backgroundColor: theme.background,
+              elevation: 1,
+            },
           }}
         />
 
@@ -188,7 +418,13 @@ export default function ModuleLayout() {
             tabBarIcon: ({ color, size }) => (
               <FontAwesome5 name="user" size={size - 2} color={color} />
             ),
-            headerTitle: "Hồ sơ của tôi",
+            headerTitle: (props) => <ProfileHeaderTitle />,
+            headerRight: () => null,
+            headerTitleAlign: "left",
+            headerStyle: {
+              backgroundColor: theme.background,
+              elevation: 1,
+            },
           }}
         />
 
@@ -270,3 +506,102 @@ export default function ModuleLayout() {
     </>
   );
 }
+
+// Styles for custom header components
+const styles = StyleSheet.create({
+  titleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 0,
+    marginLeft: 0,
+  },
+  logoWithText: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 0,
+  },
+  logo: {
+    width: 40,
+    height: 40,
+    marginLeft: 0,
+  },
+  logoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  textContainer: {
+    marginLeft: 6, // khoảng cách giữa logo và text
+    flexDirection: "column", // mặc định là cột, có thể không cần khai báo
+  },
+  appTitle: {
+    fontSize: 18,
+    fontFamily: "Inter-Bold",
+  },
+  greetingContainer: {
+    flexDirection: "column",
+  },
+  greeting: {
+    fontSize: 14,
+    fontFamily: "Inter-Regular",
+  },
+  userName: {
+    fontSize: 18,
+    fontFamily: "Inter-Bold",
+    marginTop: 2,
+  },
+  actionsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  avatarContainer: {
+    marginRight: 6,
+    borderWidth: 2,
+    borderRadius: 22,
+    padding: 2,
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  notificationButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  // Styles for other tab headers
+  headerTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 5,
+  },
+  headerIcon: {
+    marginRight: 8,
+  },
+  headerTitleText: {
+    fontSize: 18,
+    fontFamily: "Inter-Bold",
+  },
+  sharedActionsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  iconButton: {
+    padding: 8,
+  },
+});

@@ -5,32 +5,34 @@
  */
 
 export enum SensorType {
-  HUMIDITY = "HUMIDITY", // Sensor for measuring humidity
-  TEMPERATURE = "TEMPERATURE", // Sensor for measuring temperature
-  LIGHT = "LIGHT", // Sensor for measuring light intensity
-  WATER_LEVEL = "WATER_LEVEL", // Sensor for measuring water level
-  RAINFALL = "RAINFALL", // Sensor for measuring rainfall
-  SOIL_MOISTURE = "SOIL_MOISTURE", // Sensor for measuring soil moisture
-  SOIL_PH = "SOIL_PH", // Sensor for measuring soil pH
+  TEMPERATURE = "TEMPERATURE",
+  HUMIDITY = "HUMIDITY",
+  SOIL_MOISTURE = "SOIL_MOISTURE",
+  LIGHT = "LIGHT",
+  SOIL_PH = "SOIL_PH",
+  WATER_LEVEL = "WATER_LEVEL",
+  RAINFALL = "RAINFALL",
 }
 
 export enum SensorUnit {
-  PERCENT = "PERCENT", // phần trăm (ví dụ: độ ẩm)
-  CELSIUS = "CELSIUS", // độ C (nhiệt độ)
-  LUX = "LUX", // đơn vị chiếu sáng
-  METER = "METER", // mét (mực nước)
-  MILLIMETER = "MILLIMETER", // milimét (lượng mưa)
-  PH = "PH", // độ pH (độ chua, độ kiềm)
+  CELSIUS = "°C",
+  PERCENT = "%",
+  LUX = "lux",
+  PH = "pH",
+  LITER = "L",
+  M = "m",
+  MM = "mm",
 }
 
 export interface Sensor {
-  id: number; // Unique ID for the sensor
-  sensorKey: string; // Unique UUID for the sensor
+  id: number;
+  name: string;
   type: SensorType;
   unit: SensorUnit;
-  name: string;
   gardenId: number;
-  sensorData?: SensorData[];
+  isActive: boolean;
+  lastReading?: number;
+  lastReadingAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -38,9 +40,8 @@ export interface Sensor {
 export interface SensorData {
   id: number;
   sensorId: number;
-  sensor?: Sensor;
-  timestamp: string; // ISO format of DateTime
   value: number;
+  timestamp: string;
   gardenId?: number;
   createdAt: string;
   updatedAt: string;
@@ -48,6 +49,39 @@ export interface SensorData {
 
 export interface SensorWithLatestReading extends Sensor {
   latestReading?: SensorData;
+}
+
+/**
+ * Interface definitions for UI components
+ */
+
+export interface SensorDataExtended {
+  id: number;
+  sensorId: number;
+  type: SensorType;
+  name: string;
+  value: number;
+  unit: string;
+  lastUpdated: string;
+  timestamp: string;
+  gardenId?: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  trendData?: { value: number; timestamp: string }[];
+}
+
+export interface SensorDisplayProps {
+  selectedGardenId?: number | null;
+  sensorDataByType: Record<SensorType, SensorData[]>;
+  getSensorStatus: (
+    value: number,
+    type: SensorType
+  ) => "normal" | "warning" | "critical";
+  getSensorIconName: (sensorType: SensorType) => string;
+  showFullDetails?: boolean;
+  loading?: boolean;
+  error?: string | null;
 }
 
 // Import Garden type to prevent circular dependency

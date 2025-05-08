@@ -386,6 +386,182 @@ class SensorService {
       return [];
     }
   }
+
+  /**
+   * Utility functions for SensorDisplay component
+   */
+
+  /**
+   * Get sensor status based on sensor value and type
+   */
+  getSensorStatus(
+    value: number,
+    type: SensorType
+  ): "normal" | "warning" | "critical" {
+    switch (type) {
+      case SensorType.TEMPERATURE:
+        if (value < 10 || value > 35) return "critical";
+        if (value < 15 || value > 30) return "warning";
+        return "normal";
+
+      case SensorType.HUMIDITY:
+      case SensorType.SOIL_MOISTURE:
+        if (value < 20 || value > 90) return "critical";
+        if (value < 30 || value > 80) return "warning";
+        return "normal";
+
+      case SensorType.LIGHT:
+        if (value < 100 || value > 10000) return "critical";
+        if (value < 500 || value > 8000) return "warning";
+        return "normal";
+
+      case SensorType.SOIL_PH:
+        if (value < 4.5 || value > 8.5) return "critical";
+        if (value < 5.5 || value > 7.5) return "warning";
+        return "normal";
+
+      case SensorType.WATER_LEVEL:
+        if (value < 0.1) return "critical";
+        if (value < 0.3) return "warning";
+        return "normal";
+
+      default:
+        return "normal";
+    }
+  }
+
+  /**
+   * Get the display name for a sensor type
+   */
+  getSensorTypeName(type: SensorType): string {
+    switch (type) {
+      case SensorType.TEMPERATURE:
+        return "Nhiệt độ";
+      case SensorType.HUMIDITY:
+        return "Độ ẩm không khí";
+      case SensorType.SOIL_MOISTURE:
+        return "Độ ẩm đất";
+      case SensorType.LIGHT:
+        return "Ánh sáng";
+      case SensorType.SOIL_PH:
+        return "Độ pH";
+      case SensorType.WATER_LEVEL:
+        return "Mực nước";
+      default:
+        return "Cảm biến";
+    }
+  }
+
+  /**
+   * Get the display text for a sensor unit
+   */
+  getSensorUnitText(unit: string): string {
+    switch (unit) {
+      case SensorUnit.CELSIUS:
+        return "°C";
+      case SensorUnit.PERCENT:
+        return "%";
+      case SensorUnit.LUX:
+        return "lux";
+      case SensorUnit.PH:
+        return "pH";
+      case SensorUnit.LITER:
+        return "L";
+      default:
+        return "";
+    }
+  }
+
+  /**
+   * Get the icon name for a sensor type
+   */
+  getSensorIconName(type: SensorType): string {
+    switch (type) {
+      case SensorType.TEMPERATURE:
+        return "thermometer-outline";
+      case SensorType.HUMIDITY:
+        return "water-outline";
+      case SensorType.SOIL_MOISTURE:
+        return "leaf-outline";
+      case SensorType.LIGHT:
+        return "sunny-outline";
+      case SensorType.SOIL_PH:
+        return "flask-outline";
+      case SensorType.WATER_LEVEL:
+        return "beaker-outline";
+      default:
+        return "hardware-chip-outline";
+    }
+  }
+
+  /**
+   * Generate dummy trend data for testing
+   */
+  generateDummyTrendData(
+    value: number
+  ): { value: number; timestamp: string }[] {
+    const now = new Date();
+    return Array.from({ length: 5 }, (_, i) => {
+      const time = new Date(now);
+      time.setHours(time.getHours() - (5 - i));
+      return {
+        value: value - 2 + Math.random() * 4,
+        timestamp: time.toISOString(),
+      };
+    });
+  }
+
+  /**
+   * Format data for SensorDisplay component
+   */
+  formatSensorDataForDisplay(
+    sensorData: Record<SensorType, SensorData[]>
+  ): Record<string, SensorDataExtended[]> {
+    const result: Record<string, SensorDataExtended[]> = {};
+
+    Object.entries(sensorData).forEach(([type, dataArray]) => {
+      result[type] = dataArray.map((data) => ({
+        id: data.id,
+        sensorId: data.sensorId,
+        type: type as SensorType,
+        name: this.getSensorTypeName(type as SensorType),
+        value: data.value,
+        unit: this.getSensorUnitText(
+          this.getSensorUnitForType(type as SensorType)
+        ),
+        lastUpdated: data.timestamp,
+        timestamp: data.timestamp,
+        gardenId: data.gardenId,
+        isActive: true,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+        trendData: this.generateDummyTrendData(data.value),
+      }));
+    });
+
+    return result;
+  }
+
+  /**
+   * Helper to get the appropriate unit for a sensor type
+   */
+  private getSensorUnitForType(type: SensorType): string {
+    switch (type) {
+      case SensorType.TEMPERATURE:
+        return SensorUnit.CELSIUS;
+      case SensorType.HUMIDITY:
+      case SensorType.SOIL_MOISTURE:
+        return SensorUnit.PERCENT;
+      case SensorType.LIGHT:
+        return SensorUnit.LUX;
+      case SensorType.SOIL_PH:
+        return SensorUnit.PH;
+      case SensorType.WATER_LEVEL:
+        return SensorUnit.LITER;
+      default:
+        return "";
+    }
+  }
 }
 
 export default new SensorService();

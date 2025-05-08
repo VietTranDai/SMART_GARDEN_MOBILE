@@ -9,18 +9,31 @@ export const makeHomeStyles = (theme: any) =>
     listContainer: {
       paddingBottom: 30,
     },
+    content: {
+      paddingBottom: 30,
+    },
     section: {
       backgroundColor: theme.background,
-      marginBottom: 8,
+      marginBottom: 16,
+      borderRadius: 0,
+      overflow: "hidden",
+      // Add subtle shadow to sections
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 3,
     },
     sectionHeader: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
       paddingHorizontal: 20,
-      paddingTop: 10,
+      paddingTop: 16,
       paddingBottom: 12,
       marginBottom: 4,
+      borderBottomWidth: 1,
+      borderBottomColor: `${theme.border}10`,
     },
     sectionTitle: {
       fontSize: 18,
@@ -30,11 +43,13 @@ export const makeHomeStyles = (theme: any) =>
     viewAllButton: {
       flexDirection: "row",
       alignItems: "center",
-      paddingVertical: 4,
-      paddingHorizontal: 8,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
       minWidth: 44,
       minHeight: 44,
       justifyContent: "center",
+      borderRadius: 20,
+      backgroundColor: `${theme.primary}08`,
     },
     viewAllText: {
       fontSize: 14,
@@ -42,12 +57,50 @@ export const makeHomeStyles = (theme: any) =>
       color: theme.primary,
       marginRight: 2,
     },
+    weatherDetailButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      minWidth: 44,
+      minHeight: 30,
+      justifyContent: "center",
+      borderRadius: 16,
+      backgroundColor: `${theme.primary}08`,
+    },
+    weatherDetailText: {
+      fontSize: 14,
+      fontFamily: "Inter-Medium",
+      color: theme.primary,
+      marginRight: 2,
+    },
     horizontalListContainer: {
       paddingHorizontal: 20,
-      paddingVertical: 8,
+      paddingVertical: 12,
     },
     horizontalSeparator: {
-      width: 12,
+      width: 16,
+    },
+
+    // Softer garden selection highlight
+    selectedGardenHighlight: {
+      backgroundColor: `${theme.primary}08`,
+      borderColor: `${theme.primary}30`,
+      borderWidth: 0,
+    },
+    gardenCard: {
+      borderRadius: 0,
+      overflow: "hidden",
+      backgroundColor: theme.card,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 6,
+      elevation: 4,
+      borderWidth: 0,
+      borderColor: "transparent",
+      // Add a subtle animation property
+      transform: [{ scale: 1 }],
     },
 
     // EmptyState Components
@@ -238,7 +291,17 @@ export const makeHomeStyles = (theme: any) =>
 
     // Weather and Tips Components
     weatherTipsContainer: {
-      padding: 10,
+      padding: 16,
+      marginHorizontal: 4,
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: `${theme.border}15`,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 5,
+      elevation: 2,
     },
     tipSeparator: {
       height: 16,

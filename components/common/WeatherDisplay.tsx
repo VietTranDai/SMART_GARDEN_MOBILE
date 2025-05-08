@@ -1,43 +1,16 @@
-import React, { useMemo, ReactNode } from "react";
+import React from "react";
 import {
   View,
   Text,
   StyleSheet,
   Image,
   TouchableOpacity,
-  Animated,
   ScrollView,
-  Platform,
 } from "react-native";
-import {
-  Ionicons,
-  FontAwesome5,
-  MaterialCommunityIcons,
-} from "@expo/vector-icons";
-import { router } from "expo-router";
-import { useAppTheme } from "@/hooks/useAppTheme";
-import useSectionAnimation from "@/hooks/useSectionAnimation";
-import {
-  WeatherObservation,
-  HourlyForecast,
-  DailyForecast,
-  WeatherMain,
-  GardenType,
-} from "@/types";
-import { GardenDisplay } from "@/hooks/useHomeData";
-
-interface WeatherDisplayProps {
-  currentWeather: WeatherObservation | null;
-  selectedGarden?: GardenDisplay;
-  hourlyForecast?: HourlyForecast[];
-  dailyForecast?: DailyForecast[];
-  getWeatherTip?: (
-    weather: WeatherObservation,
-    gardenType?: GardenType
-  ) => string;
-  showFullDetails?: boolean;
-  isCompact?: boolean;
-}
+import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { WeatherDisplayProps } from "@/types";
+import { weatherService } from "@/service/api";
 
 export default function WeatherDisplay({
   currentWeather,
@@ -47,241 +20,102 @@ export default function WeatherDisplay({
   getWeatherTip,
   showFullDetails = false,
   isCompact = false,
+  onShowDetail,
 }: WeatherDisplayProps) {
-  const theme = useAppTheme();
-  const { getAnimatedStyle } = useSectionAnimation("weather");
-
   if (!currentWeather) return null;
 
-  // Determine background color based on weather condition
-  const getWeatherBackgroundColor = () => {
-    switch (currentWeather.weatherMain) {
-      case "CLEAR":
-        return "#4da0ff";
-      case "CLOUDS":
-        return "#b8c3d2";
-      case "RAIN":
-      case "DRIZZLE":
-        return "#778899";
-      case "THUNDERSTORM":
-        return "#6c7689";
-      case "SNOW":
-        return "#e3e3e3";
-      case "ATMOSPHERE":
-        return "#c7c5c5";
-      default:
-        return "#4da0ff";
-    }
-  };
+  // Get background colors based on weather condition
+  const [gradientStart, gradientEnd] = weatherService.getWeatherBackgroundColor(
+    currentWeather.weatherMain
+  );
 
-  const getWeatherIcon = (iconCode: string, size = "4x") =>
-    `https://openweathermap.org/img/wn/${iconCode}@${size}.png`;
+  // Get weather icon URL
+  const weatherIconUrl = weatherService.getWeatherIcon(currentWeather.iconCode);
 
-  const capitalizeFirstLetter = (text: string) => {
-    return text.charAt(0).toUpperCase() + text.slice(1);
-  };
+  // Format weather display data
+  const formattedTime = weatherService.formatTime(currentWeather.observedAt);
+  const windDirection = weatherService.getWindDirection(currentWeather.windDeg);
 
-  // Format time to hour:minute
-  const formatTime = (timestamp: string | Date) => {
-    return new Date(timestamp).toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-  };
+  // Get weather tip - use prop function if provided, otherwise use service function
+  const tip = getWeatherTip
+    ? getWeatherTip(currentWeather, selectedGarden?.type)
+    : weatherService.getWeatherTip(currentWeather, selectedGarden?.type);
 
-  const getFormattedWeatherDesc = () => {
-    return capitalizeFirstLetter(currentWeather.weatherDesc);
-  };
-
-  const getWindDirection = (deg: number) => {
-    const dirs = [
-      "B",
-      "BĐB",
-      "ĐB",
-      "ĐĐB",
-      "Đ",
-      "ĐĐN",
-      "ĐN",
-      "NĐN",
-      "N",
-      "NTN",
-      "TN",
-      "TNN",
-      "T",
-      "TBB",
-      "TB",
-      "NTB",
-    ];
-    return dirs[Math.round(deg / 22.5) % 16];
-  };
-
-  const formatDay = (iso: string) =>
-    new Date(iso).toLocaleDateString("vi-VN", {
-      weekday: "short",
-      month: "numeric",
-      day: "numeric",
-    });
-
-  // Get precipitation probability text
-  const getPrecipitationText = () => {
-    if (
-      currentWeather.weatherMain === "RAIN" ||
-      currentWeather.weatherMain === "DRIZZLE" ||
-      currentWeather.weatherMain === "THUNDERSTORM"
-    ) {
-      if (currentWeather.rain1h) {
-        return `${currentWeather.rain1h} mm mưa`;
-      }
-      return "Có mưa";
-    }
-    return `${currentWeather.humidity}% độ ẩm`;
-  };
-
-  // Get icon for weather main
-  const getWeatherStateIcon = () => {
-    switch (currentWeather.weatherMain) {
-      case "CLEAR":
-        return "sunny-outline";
-      case "CLOUDS":
-        return "cloud-outline";
-      case "RAIN":
-      case "DRIZZLE":
-        return "rainy-outline";
-      case "THUNDERSTORM":
-        return "thunderstorm-outline";
-      case "SNOW":
-        return "snow-outline";
-      case "ATMOSPHERE":
-        return "water-outline";
-      default:
-        return "cloud-outline";
-    }
-  };
-
-  const tip =
-    getWeatherTip?.(currentWeather, selectedGarden?.type as GardenType) || "";
-
-  const backgroundColor = getWeatherBackgroundColor();
-
-  if (showFullDetails) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.card }]}>
-        {/* --- Hiện tại --- */}
-        <View style={styles.currentWeatherContainer}>
-          <View style={styles.mainWeatherInfo}>
-            <Image
-              source={{ uri: getWeatherIcon(currentWeather.iconCode, "") }}
-              style={styles.weatherIcon}
-            />
-            <View style={styles.tempContainer}>
-              <Text style={[styles.temperature, { color: theme.text }]}>
-                {Math.round(currentWeather.temp)}°C
-              </Text>
-              <Text style={[styles.feelsLike, { color: theme.textSecondary }]}>
-                Cảm giác như {Math.round(currentWeather.feelsLike)}°C
-              </Text>
-            </View>
+  return (
+    <View style={styles.container}>
+      <LinearGradient
+        colors={[gradientStart, gradientEnd]}
+        style={styles.cardContent}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={styles.weatherHeader}>
+          <View style={styles.locationContainer}>
+            {selectedGarden ? (
+              <Text style={styles.location}>{selectedGarden.name}</Text>
+            ) : (
+              <Text style={styles.location}>Thời tiết hiện tại</Text>
+            )}
+            <Text style={styles.weatherTime}>{formattedTime}</Text>
           </View>
+          <Image source={{ uri: weatherIconUrl }} style={styles.weatherIcon} />
+        </View>
 
-          <Text style={[styles.weatherDescription, { color: theme.text }]}>
-            {getFormattedWeatherDesc()}
+        <View style={styles.weatherBody}>
+          <Text style={styles.temperature}>
+            {Math.round(currentWeather.temp)}°C
           </Text>
+          <Text style={styles.weatherDesc}>
+            {currentWeather.weatherDesc.charAt(0).toUpperCase() +
+              currentWeather.weatherDesc.slice(1)}
+          </Text>
+          <Text style={styles.feelsLike}>
+            Cảm giác như {Math.round(currentWeather.feelsLike)}°C
+          </Text>
+        </View>
 
-          <View style={styles.weatherDetailsContainer}>
-            <View style={styles.weatherDetailItem}>
-              <FontAwesome5 name="wind" size={16} color={theme.primary} />
-              <Text
-                style={[
-                  styles.weatherDetailValue,
-                  { color: theme.textSecondary },
-                ]}
-              >
-                {currentWeather.windSpeed} m/s{" "}
-                {getWindDirection(currentWeather.windDeg)}
-              </Text>
-            </View>
-
-            <View style={styles.weatherDetailItem}>
-              <FontAwesome5 name="tint" size={16} color={theme.primary} />
-              <Text
-                style={[
-                  styles.weatherDetailValue,
-                  { color: theme.textSecondary },
-                ]}
-              >
-                {currentWeather.humidity}%
-              </Text>
-            </View>
-
-            <View style={styles.weatherDetailItem}>
-              <MaterialCommunityIcons
-                name="cloud-outline"
-                size={16}
-                color={theme.primary}
-              />
-              <Text
-                style={[
-                  styles.weatherDetailValue,
-                  { color: theme.textSecondary },
-                ]}
-              >
-                {currentWeather.clouds}%
-              </Text>
-            </View>
-
-            <View style={styles.weatherDetailItem}>
-              <FontAwesome5
-                name="compress-arrows-alt"
-                size={16}
-                color={theme.primary}
-              />
-              <Text
-                style={[
-                  styles.weatherDetailValue,
-                  { color: theme.textSecondary },
-                ]}
-              >
-                {currentWeather.pressure} hPa
-              </Text>
-            </View>
+        <View style={styles.weatherDetails}>
+          <View style={styles.detailItem}>
+            <FontAwesome5 name="tint" size={18} color="#fff" />
+            <Text style={styles.detailText}>
+              {currentWeather.humidity}% độ ẩm
+            </Text>
+          </View>
+          <View style={styles.detailDivider} />
+          <View style={styles.detailItem}>
+            <FontAwesome5 name="wind" size={18} color="#fff" />
+            <Text style={styles.detailText}>
+              {currentWeather.windSpeed} m/s {windDirection}
+            </Text>
           </View>
         </View>
 
-        {/* --- Dự báo hàng giờ --- */}
-        {hourlyForecast && hourlyForecast.length > 0 && (
+        {hourlyForecast.length > 0 && (
           <View style={styles.forecastSection}>
-            <Text style={[styles.forecastTitle, { color: theme.text }]}>
-              Dự báo hàng giờ
-            </Text>
+            <Text style={styles.forecastTitle}>Dự báo 24 giờ tới</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               style={styles.horizontalScroll}
             >
-              {hourlyForecast.map((item, idx) => (
+              {hourlyForecast.slice(0, 24).map((item, index) => (
                 <View
-                  key={idx}
-                  style={[styles.hourlyItem, { borderColor: theme.border }]}
+                  key={`hourly-${item.forecastFor}-${index}`}
+                  style={styles.hourItem}
                 >
-                  <Text style={[styles.hourlyTime, { color: theme.text }]}>
-                    {formatTime(item.forecastFor)}
+                  <Text style={styles.hourText}>
+                    {weatherService.formatTime(item.forecastFor)}
                   </Text>
                   <Image
-                    source={{ uri: getWeatherIcon(item.iconCode, "") }}
-                    style={styles.hourlyIcon}
+                    source={{
+                      uri: weatherService.getWeatherIcon(item.iconCode),
+                    }}
+                    style={styles.smallIcon}
                   />
-                  <Text style={[styles.hourlyTemp, { color: theme.text }]}>
-                    {Math.round(item.temp)}°C
-                  </Text>
+                  <Text style={styles.hourTemp}>{Math.round(item.temp)}°</Text>
                   <View style={styles.precipContainer}>
-                    <FontAwesome5 name="tint" size={12} color={theme.primary} />
-                    <Text
-                      style={[
-                        styles.precipChance,
-                        { color: theme.textSecondary },
-                      ]}
-                    >
+                    <FontAwesome5 name="tint" size={12} color="#fff" />
+                    <Text style={styles.precipChance}>
                       {Math.round(item.pop * 100)}%
                     </Text>
                   </View>
@@ -291,389 +125,187 @@ export default function WeatherDisplay({
           </View>
         )}
 
-        {/* --- Dự báo 5 ngày --- */}
-        {dailyForecast && dailyForecast.length > 0 && (
-          <View style={styles.forecastSection}>
-            <Text style={[styles.forecastTitle, { color: theme.text }]}>
-              Dự báo 5 ngày
-            </Text>
-            <View style={styles.dailyForecastContainer}>
-              {dailyForecast.map((item, idx) => (
-                <View
-                  key={idx}
-                  style={[
-                    styles.dailyItem,
-                    {
-                      borderBottomColor:
-                        idx < dailyForecast.length - 1
-                          ? theme.divider
-                          : "transparent",
-                    },
-                  ]}
-                >
-                  <Text style={[styles.dayName, { color: theme.text }]}>
-                    {formatDay(item.forecastFor)}
-                  </Text>
-                  <Image
-                    source={{ uri: getWeatherIcon(item.iconCode, "") }}
-                    style={styles.dailyIcon}
-                  />
-                  <Text
-                    style={[styles.dailyDesc, { color: theme.textSecondary }]}
-                  >
-                    {item.weatherDesc.charAt(0).toUpperCase() +
-                      item.weatherDesc.slice(1)}
-                  </Text>
-                  <View style={styles.precipContainer}>
-                    <FontAwesome5 name="tint" size={12} color={theme.primary} />
-                    <Text
-                      style={[
-                        styles.precipChance,
-                        { color: theme.textSecondary },
-                      ]}
-                    >
-                      {Math.round(item.pop * 100)}%
-                    </Text>
-                  </View>
-                  <Text style={[styles.dailyTemp, { color: theme.text }]}>
-                    {Math.round(item.tempDay)}°C
-                  </Text>
-                </View>
-              ))}
-            </View>
+        {tip && (
+          <View style={styles.tipContainer}>
+            <Ionicons name="bulb-outline" size={18} color="#fff" />
+            <Text style={styles.tipText}>{tip}</Text>
           </View>
         )}
-      </View>
-    );
-  }
 
-  return (
-    <Animated.View style={[styles.container, getAnimatedStyle()]}>
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>
-          Thời tiết
-        </Text>
-        <TouchableOpacity
-          style={styles.viewAllButton}
-          onPress={() => router.push("/weather")}
-        >
-          <Text style={[styles.viewAllText, { color: theme.primary }]}>
-            Xem chi tiết
-          </Text>
-          <Ionicons name="chevron-forward" size={18} color={theme.primary} />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.weatherContainer}>
-        <View style={[styles.weatherContent, { backgroundColor }]}>
-          <View style={styles.weatherLayout}>
-            <View style={styles.currentWeather}>
-              <Ionicons
-                name={getWeatherStateIcon() as any}
-                size={16}
-                color="#FFFFFF"
-                style={styles.weatherStateIcon}
-              />
-              <Image
-                source={{ uri: getWeatherIcon(currentWeather.iconCode) }}
-                style={styles.weatherIcon}
-              />
-              <Text style={[styles.temperature, { color: "#FFFFFF" }]}>
-                {Math.round(currentWeather.temp)}°C
-              </Text>
-              <Text style={[styles.weatherDesc, { color: "#FFFFFF" }]}>
-                {getFormattedWeatherDesc()}
-              </Text>
-              {selectedGarden && (
-                <View style={styles.locationTag}>
-                  <Ionicons name="location" size={12} color="#FFFFFF" />
-                  <Text style={styles.locationText} numberOfLines={1}>
-                    {selectedGarden.location || selectedGarden.name}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.weatherDetails}>
-              <View style={styles.detailSection}>
-                <View style={styles.detailItems}>
-                  <View style={styles.detailRow}>
-                    <FontAwesome5 name="tint" size={12} color="#FFFFFF" />
-                    <Text style={[styles.detailText, { color: "#FFFFFF" }]}>
-                      {getPrecipitationText()}
-                    </Text>
-                  </View>
-
-                  <View style={styles.detailRow}>
-                    <FontAwesome5
-                      name="thermometer-half"
-                      size={12}
-                      color="#FFFFFF"
-                    />
-                    <Text style={[styles.detailText, { color: "#FFFFFF" }]}>
-                      Cảm giác: {Math.round(currentWeather.feelsLike)}°C
-                    </Text>
-                  </View>
-
-                  <View style={styles.detailRow}>
-                    <FontAwesome5 name="wind" size={12} color="#FFFFFF" />
-                    <Text style={[styles.detailText, { color: "#FFFFFF" }]}>
-                      Gió: {currentWeather.windSpeed} m/s
-                    </Text>
-                  </View>
-
-                  <View style={styles.detailRow}>
-                    <Ionicons name="eye-outline" size={14} color="#FFFFFF" />
-                    <Text style={[styles.detailText, { color: "#FFFFFF" }]}>
-                      Tầm nhìn: {(currentWeather.visibility / 1000).toFixed(1)}{" "}
-                      km
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {tip && (
-            <View style={styles.tipContainer}>
-              <Text style={styles.tipIcon}>💡</Text>
-              <Text style={styles.tipText}>{tip}</Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </Animated.View>
+        {showFullDetails && onShowDetail && (
+          <TouchableOpacity
+            style={styles.showDetailButton}
+            onPress={onShowDetail}
+          >
+            <Text style={styles.showDetailText}>Xem chi tiết</Text>
+            <Ionicons name="chevron-forward" size={16} color="#fff" />
+          </TouchableOpacity>
+        )}
+      </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
-    borderRadius: 12,
+    margin: 8,
+    borderRadius: 20,
     overflow: "hidden",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
   },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontFamily: "Inter-Bold",
-  },
-  viewAllButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  viewAllText: {
-    fontSize: 14,
-    fontFamily: "Inter-Medium",
-    marginRight: 2,
-  },
-  weatherContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  weatherContent: {
-    borderRadius: 16,
-    overflow: "hidden",
-  },
-  weatherLayout: {
-    flexDirection: "row",
+  cardContent: {
     padding: 16,
+    borderRadius: 20,
   },
-  currentWeather: {
+  weatherHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  locationContainer: {
     flex: 1,
-    alignItems: "center",
   },
-  weatherStateIcon: {
-    alignSelf: "flex-start",
-    marginBottom: -10,
+  location: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Inter-SemiBold",
+    marginBottom: 2,
+  },
+  weatherTime: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 12,
+    fontFamily: "Inter-Regular",
   },
   weatherIcon: {
-    width: 80,
-    height: 80,
+    width: 60,
+    height: 60,
+  },
+  weatherBody: {
+    alignItems: "flex-start",
+    marginTop: 8,
+    marginBottom: 16,
   },
   temperature: {
+    color: "#fff",
     fontSize: 32,
     fontFamily: "Inter-Bold",
-    marginTop: -10,
   },
   weatherDesc: {
-    fontSize: 16,
+    color: "#fff",
+    fontSize: 14,
     fontFamily: "Inter-Medium",
     marginTop: 4,
   },
-  locationTag: {
+  feelsLike: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 12,
+    fontFamily: "Inter-Regular",
+    marginTop: 2,
+  },
+  weatherDetails: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.2)",
+    paddingTop: 12,
+    marginTop: 4,
+  },
+  detailItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 8,
   },
-  locationText: {
-    color: "#FFFFFF",
+  detailText: {
+    color: "#fff",
     fontSize: 12,
     fontFamily: "Inter-Medium",
     marginLeft: 4,
   },
-  weatherDetails: {
-    flex: 1,
-    justifyContent: "center",
-  },
-  detailSection: {
-    borderLeftWidth: 1,
-    borderLeftColor: "rgba(255,255,255,0.3)",
-    paddingLeft: 16,
-  },
-  forecastTitle: {
-    fontSize: 14,
-    fontFamily: "Inter-Medium",
-    color: "#FFFFFF",
-    marginBottom: 8,
-  },
-  detailItems: {
-    gap: 8,
-  },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  detailText: {
-    fontSize: 12,
-    fontFamily: "Inter-Regular",
-  },
-  tipContainer: {
-    flexDirection: "row",
-    padding: 10,
+  detailDivider: {
+    width: 1,
+    height: 16,
     backgroundColor: "rgba(255,255,255,0.2)",
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.3)",
-    alignItems: "center",
-    gap: 8,
-  },
-  tipIcon: {
-    fontSize: 16,
-  },
-  tipText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontFamily: "Inter-Regular",
-    flex: 1,
-  },
-  // Styles for detailed weather view
-  currentWeatherContainer: {
-    padding: 16,
-  },
-  mainWeatherInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  tempContainer: {
-    marginLeft: 12,
-  },
-  feelsLike: {
-    fontSize: 14,
-    fontFamily: "Inter-Regular",
-  },
-  weatherDescription: {
-    fontSize: 18,
-    fontFamily: "Inter-Medium",
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  weatherDetailsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-  weatherDetailItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: "48%",
-    marginBottom: 12,
-    gap: 8,
-  },
-  weatherDetailValue: {
-    fontSize: 14,
-    fontFamily: "Inter-Regular",
   },
   forecastSection: {
-    padding: 16,
+    marginTop: 16,
     borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.2)",
+    paddingTop: 12,
+  },
+  forecastTitle: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Inter-Medium",
+    marginBottom: 8,
   },
   horizontalScroll: {
-    flexGrow: 0,
+    marginHorizontal: -8,
   },
-  hourlyItem: {
+  hourItem: {
     alignItems: "center",
-    padding: 12,
-    marginRight: 8,
-    borderRadius: 12,
-    borderWidth: 1,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 10,
+    padding: 8,
+    marginHorizontal: 4,
     width: 80,
   },
-  hourlyTime: {
+  hourText: {
+    color: "#fff",
     fontSize: 12,
-    fontFamily: "Inter-Medium",
-    marginBottom: 4,
+    fontFamily: "Inter-Regular",
   },
-  hourlyIcon: {
-    width: 40,
-    height: 40,
-  },
-  hourlyTemp: {
-    fontSize: 16,
+  hourTemp: {
+    color: "#fff",
+    fontSize: 14,
     fontFamily: "Inter-Bold",
-    marginVertical: 4,
+  },
+  smallIcon: {
+    width: 32,
+    height: 32,
   },
   precipContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    marginTop: 4,
   },
   precipChance: {
+    color: "#fff",
     fontSize: 12,
     fontFamily: "Inter-Regular",
+    marginLeft: 4,
   },
-  dailyForecastContainer: {
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-  dailyItem: {
+  tipContainer: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
+    marginTop: 12,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    padding: 10,
+    borderRadius: 10,
   },
-  dayName: {
-    width: "25%",
-    fontSize: 14,
-    fontFamily: "Inter-Medium",
-  },
-  dailyIcon: {
-    width: 40,
-    height: 40,
-  },
-  dailyDesc: {
-    width: "30%",
+  tipText: {
+    color: "#fff",
     fontSize: 12,
     fontFamily: "Inter-Regular",
-    paddingHorizontal: 4,
+    marginLeft: 6,
+    flex: 1,
   },
-  dailyTemp: {
-    width: "15%",
+  showDetailButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 16,
+    padding: 8,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 8,
+  },
+  showDetailText: {
+    color: "#fff",
     fontSize: 14,
-    fontFamily: "Inter-Bold",
-    textAlign: "right",
+    fontFamily: "Inter-Medium",
+    marginRight: 4,
   },
 });
