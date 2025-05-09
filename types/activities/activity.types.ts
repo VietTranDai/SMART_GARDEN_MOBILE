@@ -60,6 +60,24 @@ export interface GardenActivity {
   updatedAt?: string;
 }
 
+/**
+ * Extended GardenActivity with UI-specific properties
+ */
+export interface ActivityDisplay extends GardenActivity {
+  completed: boolean;
+}
+
+/**
+ * Display interface for scheduled activities
+ */
+export interface ScheduleDisplay {
+  id: number;
+  activityType: ActivityType;
+  name: string;
+  scheduledTime: string;
+  gardenId: number;
+}
+
 export interface ActivityEvaluation {
   id: number;
 
@@ -116,4 +134,3 @@ export interface PhotoEvaluation {
   createdAt?: string;
   updatedAt?: string;
 }
-

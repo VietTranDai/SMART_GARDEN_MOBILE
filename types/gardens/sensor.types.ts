@@ -47,10 +47,6 @@ export interface SensorData {
   updatedAt: string;
 }
 
-export interface SensorWithLatestReading extends Sensor {
-  latestReading?: SensorData;
-}
-
 /**
  * Interface definitions for UI components
  */
@@ -83,6 +79,3 @@ export interface SensorDisplayProps {
   loading?: boolean;
   error?: string | null;
 }
-
-// Import Garden type to prevent circular dependency
-import { Garden } from "./garden.types";

@@ -2,6 +2,7 @@ import { CreateGardenDto, UpdateGardenDto } from "@/types";
 import apiClient from "../apiClient";
 import { GARDEN_ENDPOINTS } from "../endpoints";
 import { Garden, GardenType, GardenStatus } from "@/types/gardens/garden.types";
+import { GardenAdvice } from "@/types/weather/weather.types";
 
 /**
  * Garden Service
@@ -17,7 +18,11 @@ class GardenService {
   async getGardens(): Promise<Garden[]> {
     try {
       const response = await apiClient.get(GARDEN_ENDPOINTS.LIST);
-      return response.data.data || [];
+      if (!response || !response.data) {
+        console.warn("Unexpected API response format in getGardens");
+        return [];
+      }
+      return Array.isArray(response.data.data) ? response.data.data : [];
     } catch (error) {
       console.error("Error fetching gardens:", error);
       return [];
@@ -188,6 +193,80 @@ class GardenService {
           uri: "https://images.unsplash.com/photo-1622383563672-fc05f9d99dd7",
         };
     }
+  }
+
+  /**
+   * Get garden advice based on current conditions
+   * @param gardenId Garden ID to get advice for
+   * @returns List of advice items for the garden
+   */
+  async getGardenAdvice(gardenId: number | string): Promise<GardenAdvice[]> {
+    try {
+      // This would be replaced with a real API endpoint in production
+      // For now, we'll simulate an API call
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Generate mock advice
+      return this.generateMockAdvice(gardenId);
+    } catch (error) {
+      console.error(`Error fetching garden advice ${gardenId}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Generate mock garden advice (temporary until API is ready)
+   * @param gardenId Garden ID to generate advice for
+   * @private
+   */
+  private generateMockAdvice(gardenId: number | string): GardenAdvice[] {
+    const gardenIdNum =
+      typeof gardenId === "string" ? parseInt(gardenId, 10) : gardenId;
+
+    const adviceList: GardenAdvice[] = [
+      {
+        id: 1000 + gardenIdNum,
+        gardenId: gardenIdNum,
+        action: "Tưới nước buổi sáng",
+        description:
+          "Tưới cây vào buổi sáng sớm giúp giảm sự bốc hơi nước và cung cấp đủ nước cho cây suốt ngày nóng.",
+        reason: "Độ ẩm đất hiện đang ở mức thấp.",
+        priority: 5,
+        suggestedTime: new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(),
+        category: "WATERING",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 2000 + gardenIdNum,
+        gardenId: gardenIdNum,
+        action: "Bón phân hữu cơ",
+        description:
+          "Thêm phân hữu cơ giúp cải thiện cấu trúc đất và cung cấp dinh dưỡng cho cây.",
+        reason:
+          "Cây đang trong giai đoạn phát triển nhanh và cần bổ sung dinh dưỡng.",
+        priority: 4,
+        suggestedTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        category: "FERTILIZING",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 3000 + gardenIdNum,
+        gardenId: gardenIdNum,
+        action: "Kiểm tra và loại bỏ sâu bệnh",
+        description: "Kiểm tra lá cây để phát hiện và xử lý sâu bệnh kịp thời.",
+        reason:
+          "Thời tiết ẩm ướt hiện tại thuận lợi cho sự phát triển của nấm và sâu bệnh.",
+        priority: 3,
+        suggestedTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+        category: "PEST_CONTROL",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+
+    return adviceList;
   }
 
   /**

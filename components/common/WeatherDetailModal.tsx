@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -23,7 +23,7 @@ import {
   WeatherAdvice,
   OptimalGardenTime,
 } from "@/types/weather/weather.types";
-import { GardenDisplay } from "@/hooks/useHomeData";
+import { GardenDisplayDto } from "@/types/gardens/dtos";
 import { LineChart } from "react-native-chart-kit";
 import { GardenType } from "@/types/gardens/garden.types";
 import { weatherService } from "@/service/api";
@@ -38,7 +38,7 @@ interface WeatherDetailModalProps {
   dailyForecast: DailyForecast[];
   weatherAdvice: WeatherAdvice[];
   optimalTimes: OptimalGardenTime[];
-  garden?: GardenDisplay;
+  garden?: GardenDisplayDto;
   isLoading: boolean;
   theme: any;
 }
@@ -47,10 +47,10 @@ export default function WeatherDetailModal({
   isVisible,
   onClose,
   currentWeather,
-  hourlyForecast,
-  dailyForecast,
-  weatherAdvice,
-  optimalTimes,
+  hourlyForecast = [],
+  dailyForecast = [],
+  weatherAdvice = [],
+  optimalTimes = [],
   garden,
   isLoading,
   theme,
@@ -59,51 +59,141 @@ export default function WeatherDetailModal({
     "forecast"
   );
 
-  // Format Hour for Chart Labels
-  const formatHour = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      hour12: false,
-    });
-  };
 
-  // Tạo dữ liệu cho biểu đồ nhiệt độ
-  const temperatureChartData = useMemo(() => {
-    if (!hourlyForecast || hourlyForecast.length === 0) return null;
+  const safeHourlyForecast = useMemo(() => {
+    try {
+      if (!hourlyForecast) return [];
+      if (!Array.isArray(hourlyForecast)) {
+        console.warn("hourlyForecast is not an array");
+        return [];
+      }
+      if (hourlyForecast.length === 0) return [];
 
-    const next24Hours = hourlyForecast.slice(0, 24);
-    return {
-      labels: next24Hours.map((h) => formatHour(h.forecastFor)),
-      datasets: [
-        {
-          data: next24Hours.map((h) => Math.round(h.temp)),
-          color: () => theme.primary,
-          strokeWidth: 2,
-        },
-      ],
-      legend: ["Nhiệt độ (°C)"],
-    };
-  }, [hourlyForecast, theme.primary]);
-
-  // Tạo dữ liệu cho biểu đồ xác suất mưa
-  const rainChartData = useMemo(() => {
-    if (!hourlyForecast || hourlyForecast.length === 0) return null;
-
-    const next24Hours = hourlyForecast.slice(0, 24);
-    return {
-      labels: next24Hours.map((h) => formatHour(h.forecastFor)),
-      datasets: [
-        {
-          data: next24Hours.map((h) => Math.round(h.pop * 100)),
-          color: () => "#4da6ff",
-          strokeWidth: 2,
-        },
-      ],
-      legend: ["Khả năng mưa (%)"],
-    };
+      return hourlyForecast.map((item) => {
+        if (!item || typeof item !== "object") return {} as HourlyForecast;
+        return { ...item } as HourlyForecast;
+      });
+    } catch (error) {
+      console.error("Error creating safeHourlyForecast:", error);
+      return [];
+    }
   }, [hourlyForecast]);
 
-  // Render empty state
+  const safeDailyForecast = useMemo(() => {
+    try {
+      if (!dailyForecast) return [];
+      if (!Array.isArray(dailyForecast)) {
+        console.warn("dailyForecast is not an array");
+        return [];
+      }
+      if (dailyForecast.length === 0) return [];
+
+      return dailyForecast.map((item) => {
+        if (!item || typeof item !== "object") return {} as DailyForecast;
+        return { ...item } as DailyForecast;
+      });
+    } catch (error) {
+      console.error("Error creating safeDailyForecast:", error);
+      return [];
+    }
+  }, [dailyForecast]);
+
+  const safeWeatherAdvice = useMemo(() => {
+    try {
+      if (!weatherAdvice) return [];
+      if (!Array.isArray(weatherAdvice)) {
+        console.warn("weatherAdvice is not an array");
+        return [];
+      }
+      if (weatherAdvice.length === 0) return [];
+
+      return weatherAdvice.map((item) => {
+        if (!item || typeof item !== "object") return {} as WeatherAdvice;
+        return { ...item } as WeatherAdvice;
+      });
+    } catch (error) {
+      console.error("Error creating safeWeatherAdvice:", error);
+      return [];
+    }
+  }, [weatherAdvice]);
+
+  const safeOptimalTimes = useMemo(() => {
+    try {
+      if (!optimalTimes) return [];
+      if (!Array.isArray(optimalTimes)) {
+        console.warn("optimalTimes is not an array");
+        return [];
+      }
+      if (optimalTimes.length === 0) return [];
+
+      return optimalTimes.map((item) => {
+        if (!item || typeof item !== "object") return {} as OptimalGardenTime;
+        return { ...item } as OptimalGardenTime;
+      });
+    } catch (error) {
+      console.error("Error creating safeOptimalTimes:", error);
+      return [];
+    }
+  }, [optimalTimes]);
+
+  const formatHour = (timestamp: string) => {
+    try {
+      return new Date(timestamp).toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        hour12: false,
+      });
+    } catch (error) {
+      console.error("Error formatting hour:", error);
+      return "--";
+    }
+  };
+
+  const temperatureChartData = useMemo(() => {
+    if (!Array.isArray(safeHourlyForecast) || safeHourlyForecast.length === 0)
+      return null;
+
+    try {
+      const next24Hours = safeHourlyForecast.slice(0, 24);
+      return {
+        labels: next24Hours.map((h) => formatHour(h.forecastFor)),
+        datasets: [
+          {
+            data: next24Hours.map((h) => Math.round(h.temp)),
+            color: () => theme.primary,
+            strokeWidth: 2,
+          },
+        ],
+        legend: ["Nhiệt độ (°C)"],
+      };
+    } catch (error) {
+      console.error("Error creating temperature chart data:", error);
+      return null;
+    }
+  }, [safeHourlyForecast, theme.primary]);
+
+  const rainChartData = useMemo(() => {
+    if (!Array.isArray(safeHourlyForecast) || safeHourlyForecast.length === 0)
+      return null;
+
+    try {
+      const next24Hours = safeHourlyForecast.slice(0, 24);
+      return {
+        labels: next24Hours.map((h) => formatHour(h.forecastFor)),
+        datasets: [
+          {
+            data: next24Hours.map((h) => Math.round((h.pop || 0) * 100)),
+            color: () => "#4da6ff",
+            strokeWidth: 2,
+          },
+        ],
+        legend: ["Khả năng mưa (%)"],
+      };
+    } catch (error) {
+      console.error("Error creating rain chart data:", error);
+      return null;
+    }
+  }, [safeHourlyForecast]);
+
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <Ionicons
@@ -121,126 +211,164 @@ export default function WeatherDetailModal({
     </View>
   );
 
-  // Render dự báo theo giờ
   const renderHourlyForecast = () => {
-    if (hourlyForecast.length === 0) return renderEmptyState();
+    try {
+      if (
+        !Array.isArray(safeHourlyForecast) ||
+        safeHourlyForecast.length === 0
+      ) {
+        return renderEmptyState();
+      }
 
-    return (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.hourlyContainer}
-      >
-        {hourlyForecast.slice(0, 24).map((hour, index) => (
-          <View
-            key={`hour-${index}`}
-            style={[
-              styles.hourlyItem,
-              {
-                backgroundColor:
-                  index === 0 ? `${theme.primary}15` : theme.card,
-              },
-            ]}
-          >
-            <Text style={[styles.hourTime, { color: theme.text }]}>
-              {formatHour(hour.forecastFor)}
-            </Text>
-            <Image
-              source={{ uri: weatherService.getWeatherIcon(hour.iconCode) }}
-              style={styles.hourlyIcon}
-            />
-            <Text style={[styles.hourTemp, { color: theme.text }]}>
-              {Math.round(hour.temp)}°C
-            </Text>
-            <View style={styles.precipContainer}>
-              <Ionicons
-                name="water-outline"
-                size={12}
-                color={theme.textSecondary}
-              />
-              <Text style={[styles.precipText, { color: theme.textSecondary }]}>
-                {Math.round(hour.pop * 100)}%
-              </Text>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
-    );
-  };
+      const safeHourlyData = safeHourlyForecast
+        .slice(0, 24)
+        .filter(
+          (hour): hour is HourlyForecast =>
+            hour !== null && typeof hour === "object" && "forecastFor" in hour
+        );
 
-  // Render dự báo theo ngày
-  const renderDailyForecast = () => {
-    if (dailyForecast.length === 0) return null;
+      if (safeHourlyData.length === 0) {
+        return renderEmptyState();
+      }
 
-    return (
-      <View style={styles.dailyContainer}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>
-          Dự báo 7 ngày tới
-        </Text>
-        {dailyForecast.map((day, index) => (
-          <View
-            key={`day-${index}`}
-            style={[
-              styles.dailyItem,
-              { borderBottomColor: `${theme.border}30` },
-            ]}
-          >
-            <Text
+      return (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.hourlyContainer}
+        >
+          {safeHourlyData.map((hour, index) => (
+            <View
+              key={`hour-${index}`}
               style={[
-                styles.dayName,
-                { color: theme.text, flex: 1, marginRight: 8 },
+                styles.hourlyItem,
+                {
+                  backgroundColor:
+                    index === 0 ? `${theme.primary}15` : theme.card,
+                },
               ]}
             >
-              {weatherService.formatDay(day.forecastFor)}
-            </Text>
-            <View style={styles.dayIconContainer}>
+              <Text style={[styles.hourTime, { color: theme.text }]}>
+                {formatHour(hour.forecastFor)}
+              </Text>
               <Image
-                source={{ uri: weatherService.getWeatherIcon(day.iconCode) }}
-                style={styles.dailyIcon}
+                source={{ uri: weatherService.getWeatherIcon(hour.iconCode) }}
+                style={styles.hourlyIcon}
               />
-            </View>
-            <View style={styles.tempRangeContainer}>
-              <Text style={[styles.maxTemp, { color: theme.text }]}>
-                {Math.round(day.tempMax)}°
+              <Text style={[styles.hourTemp, { color: theme.text }]}>
+                {Math.round(hour.temp)}°C
               </Text>
-              <View style={[styles.tempBar, { backgroundColor: theme.border }]}>
-                <View
-                  style={[
-                    styles.tempBarFill,
-                    {
-                      backgroundColor: theme.primary,
-                      width: `${
-                        ((day.tempMax - day.tempMin) /
-                          (day.tempMax - day.tempMin + 5)) *
-                        100
-                      }%`,
-                    },
-                  ]}
+              <View style={styles.precipContainer}>
+                <Ionicons
+                  name="water-outline"
+                  size={12}
+                  color={theme.textSecondary}
                 />
+                <Text
+                  style={[styles.precipText, { color: theme.textSecondary }]}
+                >
+                  {Math.round((hour.pop || 0) * 100)}%
+                </Text>
               </View>
-              <Text style={[styles.minTemp, { color: theme.textSecondary }]}>
-                {Math.round(day.tempMin)}°
-              </Text>
             </View>
-            <View style={styles.precipContainer}>
-              <Ionicons
-                name="water-outline"
-                size={14}
-                color={theme.textSecondary}
-              />
-              <Text
-                style={[styles.dailyPrecip, { color: theme.textSecondary }]}
-              >
-                {Math.round(day.pop * 100)}%
-              </Text>
-            </View>
-          </View>
-        ))}
-      </View>
-    );
+          ))}
+        </ScrollView>
+      );
+    } catch (error) {
+      console.error("Error rendering hourly forecast:", error);
+      return renderEmptyState();
+    }
   };
 
-  // Render biểu đồ
+  const renderDailyForecast = () => {
+    try {
+      if (!Array.isArray(safeDailyForecast) || safeDailyForecast.length === 0) {
+        return renderEmptyState();
+      }
+
+      const safeDailyData = safeDailyForecast.filter(
+        (day): day is DailyForecast =>
+          day !== null && typeof day === "object" && "forecastFor" in day
+      );
+
+      if (safeDailyData.length === 0) {
+        return renderEmptyState();
+      }
+
+      return (
+        <View style={styles.dailyContainer}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            Dự báo 7 ngày tới
+          </Text>
+          {safeDailyData.map((day, index) => (
+            <View
+              key={`day-${index}`}
+              style={[
+                styles.dailyItem,
+                { borderBottomColor: `${theme.border}30` },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.dayName,
+                  { color: theme.text, flex: 1, marginRight: 8 },
+                ]}
+              >
+                {weatherService.formatDay(day.forecastFor)}
+              </Text>
+              <View style={styles.dayIconContainer}>
+                <Image
+                  source={{ uri: weatherService.getWeatherIcon(day.iconCode) }}
+                  style={styles.dailyIcon}
+                />
+              </View>
+              <View style={styles.tempRangeContainer}>
+                <Text style={[styles.maxTemp, { color: theme.text }]}>
+                  {Math.round(day.tempMax)}°
+                </Text>
+                <View
+                  style={[styles.tempBar, { backgroundColor: theme.border }]}
+                >
+                  <View
+                    style={[
+                      styles.tempBarFill,
+                      {
+                        backgroundColor: theme.primary,
+                        width: `${
+                          ((day.tempMax - day.tempMin) /
+                            (day.tempMax - day.tempMin + 5)) *
+                          100
+                        }%`,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={[styles.minTemp, { color: theme.textSecondary }]}>
+                  {Math.round(day.tempMin)}°
+                </Text>
+              </View>
+              <View style={styles.precipContainer}>
+                <Ionicons
+                  name="water-outline"
+                  size={14}
+                  color={theme.textSecondary}
+                />
+                <Text
+                  style={[styles.dailyPrecip, { color: theme.textSecondary }]}
+                >
+                  {Math.round((day.pop || 0) * 100)}%
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      );
+    } catch (error) {
+      console.error("Error rendering daily forecast:", error);
+      return renderEmptyState();
+    }
+  };
+
   const renderCharts = () => {
     if (!temperatureChartData || !rainChartData) return null;
 
@@ -309,268 +437,318 @@ export default function WeatherDetailModal({
     );
   };
 
-  // Render lời khuyên
   const renderAdvice = () => {
-    if (weatherAdvice.length === 0) return renderEmptyState();
+    try {
+      if (!Array.isArray(safeWeatherAdvice) || safeWeatherAdvice.length === 0) {
+        return renderEmptyState();
+      }
 
-    return (
-      <FlatList
-        data={weatherAdvice}
-        keyExtractor={(item) => `advice-${item.id}`}
-        renderItem={({ item }) => (
-          <View
-            style={[
-              styles.adviceItem,
-              { backgroundColor: `${theme.primary}10` },
-            ]}
-          >
-            <View style={styles.adviceHeader}>
-              <View
-                style={[
-                  styles.adviceIconContainer,
-                  { backgroundColor: `${theme.primary}20` },
-                ]}
-              >
-                <Ionicons
-                  name={item.icon as any}
-                  size={24}
-                  color={theme.primary}
-                />
-              </View>
-              <View style={styles.adviceTitleContainer}>
-                <Text style={[styles.adviceTitle, { color: theme.text }]}>
-                  {item.title}
-                </Text>
-                {item.bestTimeOfDay && (
-                  <Text
-                    style={[styles.adviceTime, { color: theme.textSecondary }]}
-                  >
-                    Thời gian tốt nhất: {item.bestTimeOfDay}
+      const validAdvice = safeWeatherAdvice.filter(
+        (item): item is WeatherAdvice =>
+          item !== null &&
+          typeof item === "object" &&
+          "id" in item &&
+          "title" in item
+      );
+
+      if (validAdvice.length === 0) {
+        return renderEmptyState();
+      }
+
+      return (
+        <FlatList
+          data={validAdvice}
+          keyExtractor={(item, index) => `advice-${item.id || index}`}
+          renderItem={({ item }) => (
+            <View
+              style={[
+                styles.adviceItem,
+                { backgroundColor: `${theme.primary}10` },
+              ]}
+            >
+              <View style={styles.adviceHeader}>
+                <View
+                  style={[
+                    styles.adviceIconContainer,
+                    { backgroundColor: `${theme.primary}20` },
+                  ]}
+                >
+                  <Ionicons
+                    name={item.icon as any}
+                    size={24}
+                    color={theme.primary}
+                  />
+                </View>
+                <View style={styles.adviceTitleContainer}>
+                  <Text style={[styles.adviceTitle, { color: theme.text }]}>
+                    {item.title}
                   </Text>
-                )}
+                  {item.bestTimeOfDay && (
+                    <Text
+                      style={[
+                        styles.adviceTime,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      Thời gian tốt nhất: {item.bestTimeOfDay}
+                    </Text>
+                  )}
+                </View>
+                <View
+                  style={[
+                    styles.priorityBadge,
+                    {
+                      backgroundColor:
+                        item.priority >= 4
+                          ? theme.warning
+                          : item.priority >= 3
+                          ? theme.primary
+                          : theme.textSecondary,
+                    },
+                  ]}
+                >
+                  <Text style={styles.priorityText}>
+                    {item.priority >= 4
+                      ? "Quan trọng"
+                      : item.priority >= 3
+                      ? "Đề xuất"
+                      : "Gợi ý"}
+                  </Text>
+                </View>
               </View>
-              <View
+              <Text
                 style={[
-                  styles.priorityBadge,
-                  {
-                    backgroundColor:
-                      item.priority >= 4
-                        ? theme.warning
-                        : item.priority >= 3
-                        ? theme.primary
-                        : theme.textSecondary,
-                  },
+                  styles.adviceDescription,
+                  { color: theme.textSecondary },
                 ]}
               >
-                <Text style={styles.priorityText}>
-                  {item.priority >= 4
-                    ? "Quan trọng"
-                    : item.priority >= 3
-                    ? "Đề xuất"
-                    : "Gợi ý"}
-                </Text>
-              </View>
+                {item.description}
+              </Text>
             </View>
-            <Text
-              style={[styles.adviceDescription, { color: theme.textSecondary }]}
-            >
-              {item.description}
-            </Text>
-          </View>
-        )}
-        contentContainerStyle={styles.adviceContainer}
-        showsVerticalScrollIndicator={false}
-      />
-    );
+          )}
+          contentContainerStyle={styles.adviceContainer}
+          showsVerticalScrollIndicator={false}
+        />
+      );
+    } catch (error) {
+      console.error("Error rendering advice:", error);
+      return renderEmptyState();
+    }
   };
 
-  // Render thời gian tối ưu
   const renderOptimalTimes = () => {
-    if (optimalTimes.length === 0) return renderEmptyState();
+    try {
+      if (!Array.isArray(safeOptimalTimes) || safeOptimalTimes.length === 0) {
+        return renderEmptyState();
+      }
 
-    return (
-      <FlatList
-        data={optimalTimes}
-        keyExtractor={(item, index) => `optimal-${index}`}
-        renderItem={({ item }) => (
-          <View
-            style={[
-              styles.optimalItem,
-              {
-                backgroundColor:
-                  item.score >= 70
-                    ? `${theme.success}15`
-                    : item.score >= 50
-                    ? `${theme.primary}15`
-                    : `${theme.textSecondary}15`,
-              },
-            ]}
-          >
-            <View style={styles.optimalHeader}>
-              <View
-                style={[
-                  styles.optimalScoreBadge,
-                  {
-                    backgroundColor:
-                      item.score >= 70
-                        ? theme.success
-                        : item.score >= 50
-                        ? theme.primary
-                        : theme.textSecondary,
-                  },
-                ]}
-              >
-                <Text style={styles.optimalScoreText}>{item.score}%</Text>
-              </View>
-              <View style={styles.optimalTitleContainer}>
-                <Text style={[styles.optimalTitle, { color: theme.text }]}>
-                  {item.activity}
-                </Text>
-                <Text
-                  style={[
-                    styles.optimalTimeRange,
-                    { color: theme.textSecondary },
-                  ]}
-                >
-                  {weatherService.formatTime(item.startTime)} -{" "}
-                  {weatherService.formatTime(item.endTime)}
-                </Text>
-              </View>
-              <Image
-                source={{
-                  uri: weatherService.getWeatherIcon(
-                    `${
-                      item.weatherCondition === "CLEAR"
-                        ? "01"
-                        : item.weatherCondition === "CLOUDS"
-                        ? "02"
-                        : item.weatherCondition === "RAIN"
-                        ? "10"
-                        : "50"
-                    }d`
-                  ),
-                }}
-                style={styles.optimalIcon}
-              />
-            </View>
-            <View style={styles.optimalDetails}>
-              <View style={styles.optimalDetailItem}>
-                <Ionicons
-                  name="thermometer-outline"
-                  size={16}
-                  color={theme.textSecondary}
-                />
-                <Text
-                  style={[
-                    styles.optimalDetailText,
-                    { color: theme.textSecondary },
-                  ]}
-                >
-                  {Math.round(item.temperature)}°C
-                </Text>
-              </View>
-              <View style={styles.optimalDetailItem}>
-                <Ionicons
-                  name="calendar-outline"
-                  size={16}
-                  color={theme.textSecondary}
-                />
-                <Text
-                  style={[
-                    styles.optimalDetailText,
-                    { color: theme.textSecondary },
-                  ]}
-                >
-                  {new Date(item.startTime).toLocaleDateString("vi-VN", {
-                    weekday: "long",
-                  })}
-                </Text>
-              </View>
-            </View>
-            <Text
-              style={[styles.optimalReason, { color: theme.textSecondary }]}
+      const validOptimalTimes = safeOptimalTimes.filter(
+        (item): item is OptimalGardenTime =>
+          item !== null &&
+          typeof item === "object" &&
+          "activity" in item &&
+          "score" in item
+      );
+
+      if (validOptimalTimes.length === 0) {
+        return renderEmptyState();
+      }
+
+      return (
+        <FlatList
+          data={validOptimalTimes}
+          keyExtractor={(item, index) => `optimal-${index}`}
+          renderItem={({ item }) => (
+            <View
+              style={[
+                styles.optimalItem,
+                {
+                  backgroundColor:
+                    item.score >= 70
+                      ? `${theme.success}15`
+                      : item.score >= 50
+                      ? `${theme.primary}15`
+                      : `${theme.textSecondary}15`,
+                },
+              ]}
             >
-              {item.reason}
-            </Text>
-          </View>
-        )}
-        contentContainerStyle={styles.optimalContainer}
-        showsVerticalScrollIndicator={false}
-      />
-    );
+              <View style={styles.optimalHeader}>
+                <View
+                  style={[
+                    styles.optimalScoreBadge,
+                    {
+                      backgroundColor:
+                        item.score >= 70
+                          ? theme.success
+                          : item.score >= 50
+                          ? theme.primary
+                          : theme.textSecondary,
+                    },
+                  ]}
+                >
+                  <Text style={styles.optimalScoreText}>{item.score}%</Text>
+                </View>
+                <View style={styles.optimalTitleContainer}>
+                  <Text style={[styles.optimalTitle, { color: theme.text }]}>
+                    {item.activity}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.optimalTimeRange,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    {weatherService.formatTime(item.startTime)} -{" "}
+                    {weatherService.formatTime(item.endTime)}
+                  </Text>
+                </View>
+                <Image
+                  source={{
+                    uri: weatherService.getWeatherIcon(
+                      `${
+                        item.weatherCondition === "CLEAR"
+                          ? "01"
+                          : item.weatherCondition === "CLOUDS"
+                          ? "02"
+                          : item.weatherCondition === "RAIN"
+                          ? "10"
+                          : "50"
+                      }d`
+                    ),
+                  }}
+                  style={styles.optimalIcon}
+                />
+              </View>
+              <View style={styles.optimalDetails}>
+                <View style={styles.optimalDetailItem}>
+                  <Ionicons
+                    name="thermometer-outline"
+                    size={16}
+                    color={theme.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.optimalDetailText,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    {Math.round(item.temperature)}°C
+                  </Text>
+                </View>
+                <View style={styles.optimalDetailItem}>
+                  <Ionicons
+                    name="calendar-outline"
+                    size={16}
+                    color={theme.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.optimalDetailText,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    {new Date(item.startTime).toLocaleDateString("vi-VN", {
+                      weekday: "long",
+                    })}
+                  </Text>
+                </View>
+              </View>
+              <Text
+                style={[styles.optimalReason, { color: theme.textSecondary }]}
+              >
+                {item.reason}
+              </Text>
+            </View>
+          )}
+          contentContainerStyle={styles.optimalContainer}
+          showsVerticalScrollIndicator={false}
+        />
+      );
+    } catch (error) {
+      console.error("Error rendering optimal times:", error);
+      return renderEmptyState();
+    }
   };
 
-  // Render current weather
   const renderCurrentWeather = () => {
     if (!currentWeather) return null;
 
-    const weatherColor = weatherService.getWeatherBackgroundColor(
-      currentWeather.weatherMain
-    )[0];
+    try {
+      const weatherColor = weatherService.getWeatherBackgroundColor(
+        currentWeather.weatherMain
+      )[0];
 
-    return (
-      <View
-        style={[
-          styles.currentWeatherContainer,
-          { backgroundColor: weatherColor },
-        ]}
-      >
-        <View style={styles.currentLeftContainer}>
-          <Text style={styles.currentTemp}>
-            {Math.round(currentWeather.temp)}°
-          </Text>
-          <Text style={styles.currentDesc}>
-            {currentWeather.weatherDesc.charAt(0).toUpperCase() +
-              currentWeather.weatherDesc.slice(1)}
-          </Text>
-          <Text style={styles.currentFeelsLike}>
-            Cảm giác như {Math.round(currentWeather.feelsLike)}°
-          </Text>
-        </View>
-        <View style={styles.currentRightContainer}>
-          <Image
-            source={{
-              uri: weatherService.getWeatherIcon(currentWeather.iconCode),
-            }}
-            style={styles.currentIcon}
-          />
-          <View style={styles.currentStatsContainer}>
-            <View style={styles.currentStatItem}>
-              <FontAwesome5 name="wind" size={12} color="#fff" />
-              <Text style={styles.currentStatText}>
-                {currentWeather.windSpeed} m/s{" "}
-                {weatherService.getWindDirection(currentWeather.windDeg)}
-              </Text>
-            </View>
-            <View style={styles.currentStatItem}>
-              <FontAwesome5 name="tint" size={12} color="#fff" />
-              <Text style={styles.currentStatText}>
-                {currentWeather.humidity}%
-              </Text>
+      return (
+        <View
+          style={[
+            styles.currentWeatherContainer,
+            { backgroundColor: weatherColor },
+          ]}
+        >
+          <View style={styles.currentLeftContainer}>
+            <Text style={styles.currentTemp}>
+              {Math.round(currentWeather.temp)}°
+            </Text>
+            <Text style={styles.currentDesc}>
+              {currentWeather.weatherDesc.charAt(0).toUpperCase() +
+                currentWeather.weatherDesc.slice(1)}
+            </Text>
+            <Text style={styles.currentFeelsLike}>
+              Cảm giác như {Math.round(currentWeather.feelsLike)}°
+            </Text>
+          </View>
+          <View style={styles.currentRightContainer}>
+            <Image
+              source={{
+                uri: weatherService.getWeatherIcon(currentWeather.iconCode),
+              }}
+              style={styles.currentIcon}
+            />
+            <View style={styles.currentStatsContainer}>
+              <View style={styles.currentStatItem}>
+                <FontAwesome5 name="wind" size={12} color="#fff" />
+                <Text style={styles.currentStatText}>
+                  {currentWeather.windSpeed} m/s{" "}
+                  {weatherService.getWindDirection(currentWeather.windDeg)}
+                </Text>
+              </View>
+              <View style={styles.currentStatItem}>
+                <FontAwesome5 name="tint" size={12} color="#fff" />
+                <Text style={styles.currentStatText}>
+                  {currentWeather.humidity}%
+                </Text>
+              </View>
             </View>
           </View>
         </View>
-      </View>
-    );
+      );
+    } catch (error) {
+      console.error("Error rendering current weather:", error);
+      return null;
+    }
   };
 
-  // Render tab content
   const renderTabContent = () => {
-    switch (activeTab) {
-      case "forecast":
-        return (
-          <>
-            {renderHourlyForecast()}
-            {renderCharts()}
-            {renderDailyForecast()}
-          </>
-        );
-      case "advice":
-        return renderAdvice();
-      case "optimal":
-        return renderOptimalTimes();
-      default:
-        return null;
+    try {
+      switch (activeTab) {
+        case "forecast":
+          return (
+            <>
+              {renderHourlyForecast()}
+              {renderCharts()}
+              {renderDailyForecast()}
+            </>
+          );
+        case "advice":
+          return renderAdvice();
+        case "optimal":
+          return renderOptimalTimes();
+        default:
+          return null;
+      }
+    } catch (error) {
+      console.error("Error rendering tab content:", error);
+      return renderEmptyState();
     }
   };
 
@@ -587,7 +765,6 @@ export default function WeatherDetailModal({
         <View
           style={[styles.modalContent, { backgroundColor: theme.background }]}
         >
-          {/* Header */}
           <View style={styles.modalHeader}>
             <TouchableOpacity
               style={styles.closeButton}
@@ -613,10 +790,8 @@ export default function WeatherDetailModal({
             </View>
           ) : (
             <>
-              {/* Current Weather */}
               {renderCurrentWeather()}
 
-              {/* Tab Selector */}
               <View style={styles.tabContainer}>
                 <TouchableOpacity
                   style={[
@@ -692,7 +867,6 @@ export default function WeatherDetailModal({
                 </TouchableOpacity>
               </View>
 
-              {/* Tab Content */}
               <ScrollView
                 style={styles.contentScrollView}
                 contentContainerStyle={styles.contentContainer}

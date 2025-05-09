@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   FlexAlignType,
   ScrollView,
+  StyleSheet,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -25,7 +26,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
 // Import custom hooks
-import useHomeData, { getSensorStatus } from "@/hooks/useHomeData";
+import useHomeData from "@/hooks/useHomeData";
 import { useGardenContext } from "@/context/GardenContext";
 
 // Import styles
@@ -33,7 +34,6 @@ import { makeHomeStyles } from "@/components/common/styles";
 
 // Import UI components
 import GardenDisplay from "@/components/common/GardenDisplay";
-import SensorDisplay from "@/components/common/SensorDisplay";
 import WeatherDisplay from "@/components/common/WeatherDisplay";
 import AlertCenter from "@/components/home/AlertCenter";
 import ActivityTimeline from "@/components/home/ActivityTimeline";
@@ -44,20 +44,53 @@ import AdviceModal from "@/components/common/AdviceModal";
 import WeatherDetailModal from "@/components/common/WeatherDetailModal";
 import AlertDetailsModal from "@/components/common/AlertDetailsModal";
 import { GardenProvider } from "@/context/GardenContext";
-import { SensorType } from "@/types/gardens/sensor.types";
+import HomeSections, {
+  SectionType,
+  SectionConfig,
+} from "@/components/sections/HomeSections";
 
-// Define Section Types for the layout
-enum SectionType {
-  GARDENS = "GARDENS",
-  WEATHER = "WEATHER",
-  ALERTS = "ALERTS",
-  ACTIVITY = "ACTIVITY",
-}
+// Import types
+import { SensorType } from "@/types/gardens/sensor.types";
+import { GardenDisplayDto } from "@/types/gardens/dtos";
+import {
+  WeatherObservation,
+  HourlyForecast,
+  DailyForecast,
+  GardenWeatherData,
+  GardenAdvice,
+  WeatherAdvice,
+  OptimalGardenTime,
+} from "@/types/weather/weather.types";
+import { Alert } from "@/types/alerts/alert.types";
+import {
+  ActivityDisplay,
+  ScheduleDisplay,
+} from "@/types/activities/activity.types";
+
+// Import getSensorStatus from the useSensorData hook
+import { getSensorStatus } from "@/hooks/useSensorData";
 
 // Structure for the main FlatList data
 interface Section {
   type: SectionType;
   key: string;
+}
+
+// Define GardenAlert interface for alert display
+interface GardenAlert {
+  id: string | number;
+  type: string;
+  title: string;
+  message: string;
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  timestamp: string;
+  sensorType?: SensorType;
+  sensorId?: string | number;
+  sensorValue?: number;
+  sensorUnit?: string;
+  isRead?: boolean;
+  isResolved?: boolean;
+  gardenId?: number;
 }
 
 // Cập nhật styles để thêm các thuộc tính thiếu với typing đúng
@@ -89,9 +122,9 @@ const extendedHomeStyles = (theme: any) => {
   };
 };
 
-// Thêm interfaces cho props của các memo components
+// Thêm interfaces cho props của các memo components với types cập nhật
 interface GardenSectionProps {
-  gardens: any[];
+  gardens: GardenDisplayDto[];
   onTogglePinGarden: (gardenId: number) => void;
   onShowAdvice: (gardenId: number) => void;
   onShowWeatherDetail: (gardenId: number) => void;
@@ -100,7 +133,7 @@ interface GardenSectionProps {
   sensorDataByGarden: Record<number, Record<string, any[]>>;
   sensorDataLoading: Record<number, boolean>;
   sensorDataError: Record<number, string | null>;
-  weatherDataByGarden: Record<number, any>;
+  weatherDataByGarden: Record<number, GardenWeatherData>;
   adviceLoading: Record<number, boolean>;
   weatherDetailLoading: Record<number, boolean>;
   animationValue: Animated.Value;
@@ -114,28 +147,27 @@ interface GardenSectionProps {
 }
 
 interface WeatherSectionProps {
-  currentWeather: any | null;
-  selectedGarden: any | undefined;
-  hourlyForecast: any[];
-  dailyForecast: any[];
+  currentWeather: WeatherObservation | null;
+  selectedGarden: GardenDisplayDto | undefined;
+  hourlyForecast: HourlyForecast[];
+  dailyForecast: DailyForecast[];
   getWeatherTip: any;
   showFullDetails: boolean;
   onShowWeatherDetail: () => void;
   animationValue: Animated.Value;
   theme: any;
-  gardenWeatherData?: Record<number, any>;
 }
 
 interface AlertSectionProps {
   selectedGardenId: number | null;
-  gardenAlerts: Record<number, any[]>;
+  gardenAlerts: Record<number, Alert[]>;
   animationValue: Animated.Value;
   theme: any;
 }
 
 interface ActivitySectionProps {
-  recentActivities: any[];
-  upcomingSchedules: any[];
+  recentActivities: ActivityDisplay[];
+  upcomingSchedules: ScheduleDisplay[];
   selectedGardenId: number | null;
   animationValue: Animated.Value;
   theme: any;
@@ -144,25 +176,96 @@ interface ActivitySectionProps {
 // Define the props for DynamicSections
 interface DynamicSectionsProps {
   sections: Section[];
-  weatherData: any | null;
+  weatherData: WeatherObservation | null;
   selectedGardenId: number | null;
   sectionAnimations: {
     gardens: Animated.Value;
     weather: Animated.Value;
-    alerts: Animated.Value;
     activity: Animated.Value;
   };
-  gardenAlerts: Record<number, any[]>;
-  recentActivities: any[];
-  upcomingSchedules: any[];
-  gardenWeatherData: Record<number, any>;
+  gardenAlerts: Record<number, Alert[]>;
+  recentActivities: ActivityDisplay[];
+  upcomingSchedules: ScheduleDisplay[];
+  gardenWeatherData: Record<number, GardenWeatherData>;
   theme: any;
   handleShowWeatherDetail: (gardenId: number | null) => void;
-  getWeatherTip: (weather: any) => string;
-  gardens: any[];
+  getWeatherTip: (weather: WeatherObservation) => string;
+  gardens: GardenDisplayDto[];
 }
 
-// Sửa đổi các component memos để sử dụng interfaces
+// Cập nhật các utility functions để kiểm tra thật kỹ
+/**
+ * Kiểm tra xem một đối tượng có phải là mảng hợp lệ hay không
+ */
+const isValidArray = (data: any): boolean => {
+  return Array.isArray(data);
+};
+
+/**
+ * Kiểm tra xem một đối tượng có phải là mảng hợp lệ và có phần tử hay không
+ */
+const hasItems = (data: any): boolean => {
+  return Array.isArray(data) && data.length > 0;
+};
+
+/**
+ * Kiểm tra xem một key có tồn tại trong một đối tượng hay không
+ */
+const hasValidProperty = (obj: any, key: string | number): boolean => {
+  return obj && typeof obj === "object" && key in obj;
+};
+
+/**
+ * Lấy mảng an toàn từ một đối tượng, trả về mảng rỗng nếu không hợp lệ
+ */
+const getSafeArray = (data: any): any[] => {
+  if (!Array.isArray(data)) return [];
+  return data.filter((item: any) => item && typeof item === "object");
+};
+
+/**
+ * Lấy mảng các giá trị từ đối tượng một cách an toàn
+ */
+const getSafeObjectValues = (obj: any): any[] => {
+  if (!obj || typeof obj !== "object") return [];
+  try {
+    const values = Object.values(obj);
+    if (!Array.isArray(values)) return [];
+    return values;
+  } catch (error) {
+    console.error("Error in getSafeObjectValues:", error);
+    return [];
+  }
+};
+
+/**
+ * Làm phẳng mảng một cách an toàn
+ */
+const safeArrayFlat = (arr: any[]): any[] => {
+  if (!Array.isArray(arr)) return [];
+  try {
+    // Cách an toàn hơn để làm phẳng mảng
+    const result: any[] = [];
+    for (let i = 0; i < arr.length; i++) {
+      const item = arr[i];
+      if (Array.isArray(item)) {
+        for (let j = 0; j < item.length; j++) {
+          if (item[j] !== undefined && item[j] !== null) {
+            result.push(item[j]);
+          }
+        }
+      } else if (item !== undefined && item !== null) {
+        result.push(item);
+      }
+    }
+    return result;
+  } catch (error) {
+    console.error("Error in safeArrayFlat:", error);
+    return [];
+  }
+};
+
+// Sửa đổi các component memos để sử dụng interfaces và các utility functions
 const GardenSection = memo((props: GardenSectionProps) => {
   const {
     gardens,
@@ -198,6 +301,42 @@ const GardenSection = memo((props: GardenSectionProps) => {
     ],
   };
 
+  // Xác thực dữ liệu sensor để đảm bảo hiển thị đúng trong garden card
+  const validatedSensorData = useMemo(() => {
+    // Đảm bảo sensorDataByGarden là một object hợp lệ
+    if (!sensorDataByGarden || typeof sensorDataByGarden !== "object") {
+      return {};
+    }
+
+    // Tạo một đối tượng mới để tránh thay đổi object gốc
+    const result: Record<number, Record<string, any[]>> = {};
+
+    // Duyệt qua tất cả các garden id trong sensorDataByGarden
+    Object.keys(sensorDataByGarden).forEach((gardenIdStr) => {
+      const gardenId = Number(gardenIdStr);
+      if (!isNaN(gardenId)) {
+        // Đảm bảo dữ liệu sensor cho mỗi garden là hợp lệ
+        const gardenSensors = sensorDataByGarden[gardenId];
+        if (gardenSensors && typeof gardenSensors === "object") {
+          result[gardenId] = {};
+
+          // Duyệt qua các loại sensor
+          Object.keys(gardenSensors).forEach((sensorType) => {
+            // Đảm bảo dữ liệu của mỗi loại sensor là một mảng
+            const sensorData = gardenSensors[sensorType];
+            if (Array.isArray(sensorData)) {
+              result[gardenId][sensorType] = [...sensorData];
+            } else {
+              result[gardenId][sensorType] = [];
+            }
+          });
+        }
+      }
+    });
+
+    return result;
+  }, [sensorDataByGarden]);
+
   return (
     <Animated.View style={[styles.section, animatedStyle]}>
       <GardenDisplay
@@ -207,7 +346,7 @@ const GardenSection = memo((props: GardenSectionProps) => {
         onShowWeatherDetail={onShowWeatherDetail}
         onScrollToWeatherSection={onScrollToWeatherSection}
         onShowAlertDetails={onShowAlertDetails}
-        sensorDataByGarden={sensorDataByGarden}
+        sensorDataByGarden={validatedSensorData}
         sensorDataLoading={sensorDataLoading}
         sensorDataError={sensorDataError}
         weatherDataByGarden={weatherDataByGarden}
@@ -232,7 +371,6 @@ const WeatherSection = memo((props: WeatherSectionProps) => {
     onShowWeatherDetail,
     animationValue,
     theme,
-    gardenWeatherData,
   } = props;
 
   const styles = useMemo(() => extendedHomeStyles(theme), [theme]);
@@ -249,24 +387,13 @@ const WeatherSection = memo((props: WeatherSectionProps) => {
     ],
   };
 
-  // Get weather data for selected garden
   const weatherData = useMemo(() => {
-    if (selectedGarden?.id && gardenWeatherData?.[selectedGarden.id]) {
-      return gardenWeatherData[selectedGarden.id].current;
-    }
-    return currentWeather;
-  }, [selectedGarden, gardenWeatherData, currentWeather]);
-
-  // Get forecast data for selected garden
-  const forecastData = useMemo(() => {
-    if (selectedGarden?.id && gardenWeatherData?.[selectedGarden.id]) {
-      return {
-        hourly: gardenWeatherData[selectedGarden.id].hourly || [],
-        daily: gardenWeatherData[selectedGarden.id].daily || [],
-      };
-    }
-    return { hourly: hourlyForecast || [], daily: dailyForecast || [] };
-  }, [selectedGarden, gardenWeatherData, hourlyForecast, dailyForecast]);
+    return {
+      current: currentWeather,
+      hourly: Array.isArray(hourlyForecast) ? hourlyForecast : [],
+      daily: Array.isArray(dailyForecast) ? dailyForecast : [],
+    };
+  }, [currentWeather, hourlyForecast, dailyForecast]);
 
   return (
     <Animated.View style={[styles.section, animatedStyle]}>
@@ -287,10 +414,10 @@ const WeatherSection = memo((props: WeatherSectionProps) => {
         )}
       </View>
       <WeatherDisplay
-        currentWeather={weatherData}
+        currentWeather={weatherData.current}
         selectedGarden={selectedGarden}
-        hourlyForecast={forecastData.hourly}
-        dailyForecast={forecastData.daily}
+        hourlyForecast={weatherData.hourly}
+        dailyForecast={weatherData.daily}
         getWeatherTip={getWeatherTip}
         showFullDetails={showFullDetails}
         onShowDetail={onShowWeatherDetail}
@@ -316,6 +443,24 @@ const AlertSection = memo((props: AlertSectionProps) => {
     ],
   };
 
+  const safeAlerts = useMemo(() => {
+    if (
+      !gardenAlerts ||
+      typeof gardenAlerts !== "object" ||
+      selectedGardenId === null
+    ) {
+      return {};
+    }
+
+    const result: Record<number, Alert[]> = {};
+    if (selectedGardenId in gardenAlerts) {
+      const alerts = gardenAlerts[selectedGardenId];
+      result[selectedGardenId] = Array.isArray(alerts) ? [...alerts] : [];
+    }
+
+    return result;
+  }, [gardenAlerts, selectedGardenId]);
+
   return (
     <Animated.View style={[styles.section, animatedStyle]}>
       <View style={styles.sectionHeader}>
@@ -323,7 +468,7 @@ const AlertSection = memo((props: AlertSectionProps) => {
           Thông báo
         </Text>
       </View>
-      <AlertCenter selectedGardenId={selectedGardenId} alerts={gardenAlerts} />
+      <AlertCenter selectedGardenId={selectedGardenId} alerts={safeAlerts} />
     </Animated.View>
   );
 });
@@ -351,6 +496,14 @@ const ActivitySection = memo((props: ActivitySectionProps) => {
     ],
   };
 
+  const safeRecentActivities = useMemo(() => {
+    return Array.isArray(recentActivities) ? recentActivities : [];
+  }, [recentActivities]);
+
+  const safeUpcomingSchedules = useMemo(() => {
+    return Array.isArray(upcomingSchedules) ? upcomingSchedules : [];
+  }, [upcomingSchedules]);
+
   return (
     <Animated.View style={[styles.section, animatedStyle]}>
       <View style={styles.sectionHeader}>
@@ -359,8 +512,8 @@ const ActivitySection = memo((props: ActivitySectionProps) => {
         </Text>
       </View>
       <ActivityTimeline
-        recentActivities={recentActivities}
-        upcomingSchedules={upcomingSchedules}
+        recentActivities={safeRecentActivities}
+        upcomingSchedules={safeUpcomingSchedules}
         selectedGardenId={selectedGardenId}
       />
     </Animated.View>
@@ -385,46 +538,95 @@ const DynamicSections = memo((props: DynamicSectionsProps) => {
   } = props;
 
   // Tối ưu: Tách logic lấy selected garden ra khỏi render
-  const selectedGarden = useMemo(
-    () => gardens.find((g) => g.id === selectedGardenId),
-    [gardens, selectedGardenId]
-  );
-
-  // Tối ưu: Tách logic lấy weather data ra khỏi render
-  const currentWeatherData = useMemo(() => {
-    if (selectedGardenId && gardenWeatherData[selectedGardenId]) {
-      return gardenWeatherData[selectedGardenId].current;
+  const selectedGarden = useMemo(() => {
+    // Đảm bảo gardens là một mảng hợp lệ
+    if (!Array.isArray(gardens) || gardens.length === 0) {
+      return undefined;
     }
-    return weatherData;
+    // Đảm bảo selectedGardenId không phải là null hoặc undefined
+    if (selectedGardenId === null || selectedGardenId === undefined) {
+      return undefined;
+    }
+    return gardens.find((g) => g.id === selectedGardenId);
+  }, [gardens, selectedGardenId]);
+
+  // Tối ưu: Tách logic lấy weather data ra khỏi render với kiểm tra an toàn
+  const currentWeatherData = useMemo(() => {
+    try {
+      // Kiểm tra kỹ lưỡng các giá trị null và undefined
+      if (
+        selectedGardenId === null ||
+        selectedGardenId === undefined ||
+        !gardenWeatherData ||
+        typeof gardenWeatherData !== "object"
+      ) {
+        return weatherData || null;
+      }
+
+      // Kiểm tra an toàn khi truy cập gardenWeatherData[selectedGardenId]
+      const hasGardenData = Object.prototype.hasOwnProperty.call(
+        gardenWeatherData,
+        selectedGardenId
+      );
+      if (!hasGardenData || !gardenWeatherData[selectedGardenId]?.current) {
+        return weatherData || null;
+      }
+
+      return gardenWeatherData[selectedGardenId].current;
+    } catch (error) {
+      console.error("Error getting current weather data:", error);
+      return weatherData || null;
+    }
   }, [selectedGardenId, gardenWeatherData, weatherData]);
 
-  // Tối ưu: Tách logic lấy forecast data ra khỏi render
+  // Tối ưu: Tách logic lấy forecast data ra khỏi render với kiểm tra an toàn
   const forecastData = useMemo(() => {
-    if (selectedGardenId && gardenWeatherData[selectedGardenId]) {
-      return {
-        hourly: gardenWeatherData[selectedGardenId].hourly || [],
-        daily: gardenWeatherData[selectedGardenId].daily || [],
-      };
+    try {
+      const defaultData = { hourly: [], daily: [] };
+
+      if (
+        !selectedGardenId ||
+        !gardenWeatherData ||
+        typeof gardenWeatherData !== "object" ||
+        !(selectedGardenId in gardenWeatherData)
+      ) {
+        return defaultData;
+      }
+
+      const garden = gardenWeatherData[selectedGardenId];
+
+      // Safe check for hourly data
+      const hourly =
+        garden.hourly && Array.isArray(garden.hourly) ? [...garden.hourly] : [];
+
+      // Safe check for daily data
+      const daily =
+        garden.daily && Array.isArray(garden.daily) ? [...garden.daily] : [];
+
+      return { hourly, daily };
+    } catch (error) {
+      console.error("Error getting forecast data:", error);
+      return { hourly: [], daily: [] };
     }
-    return { hourly: [], daily: [] };
   }, [selectedGardenId, gardenWeatherData]);
 
-  // Tối ưu: Tách logic render từng section ra các components riêng
+  // Cập nhật renderWeatherSection để kiểm tra an toàn selectedGarden
   const renderWeatherSection = useCallback(() => {
-    const isSelectedGarden = !!selectedGardenId;
+    const isSelectedGarden = !!selectedGardenId && !!selectedGarden;
 
     return (
       <WeatherSection
         currentWeather={currentWeatherData}
         selectedGarden={selectedGarden}
-        hourlyForecast={forecastData.hourly}
-        dailyForecast={forecastData.daily}
+        hourlyForecast={forecastData.hourly || []}
+        dailyForecast={forecastData.daily || []}
         getWeatherTip={getWeatherTip}
         showFullDetails={isSelectedGarden}
-        onShowWeatherDetail={() => handleShowWeatherDetail(selectedGardenId)}
+        onShowWeatherDetail={() =>
+          selectedGardenId ? handleShowWeatherDetail(selectedGardenId) : null
+        }
         animationValue={sectionAnimations.weather}
         theme={theme}
-        gardenWeatherData={gardenWeatherData}
       />
     );
   }, [
@@ -436,25 +638,21 @@ const DynamicSections = memo((props: DynamicSectionsProps) => {
     handleShowWeatherDetail,
     sectionAnimations.weather,
     theme,
-    gardenWeatherData,
   ]);
 
-  const renderAlertSection = useCallback(() => {
-    return (
-      <AlertSection
-        selectedGardenId={selectedGardenId}
-        gardenAlerts={gardenAlerts}
-        animationValue={sectionAnimations.alerts}
-        theme={theme}
-      />
-    );
-  }, [selectedGardenId, gardenAlerts, sectionAnimations.alerts, theme]);
-
   const renderActivitySection = useCallback(() => {
+    // Ensure recentActivities and upcomingSchedules are arrays
+    const safeRecentActivities = Array.isArray(recentActivities)
+      ? recentActivities
+      : [];
+    const safeUpcomingSchedules = Array.isArray(upcomingSchedules)
+      ? upcomingSchedules
+      : [];
+
     return (
       <ActivitySection
-        recentActivities={recentActivities}
-        upcomingSchedules={upcomingSchedules}
+        recentActivities={safeRecentActivities}
+        upcomingSchedules={safeUpcomingSchedules}
         selectedGardenId={selectedGardenId}
         animationValue={sectionAnimations.activity}
         theme={theme}
@@ -473,28 +671,32 @@ const DynamicSections = memo((props: DynamicSectionsProps) => {
       switch (item.type) {
         case SectionType.WEATHER:
           return renderWeatherSection();
-        case SectionType.ALERTS:
-          return renderAlertSection();
         case SectionType.ACTIVITY:
           return renderActivitySection();
         default:
           return null;
       }
     },
-    [renderWeatherSection, renderAlertSection, renderActivitySection]
+    [renderWeatherSection, renderActivitySection]
   );
 
-  return (
-    <>
-      {sections
-        .filter((section: Section) => section.type !== SectionType.GARDENS)
-        .map((section: Section, index: number) => (
-          <React.Fragment key={`section-${section.type}-${index}`}>
-            {renderSection({ item: section, index })}
-          </React.Fragment>
-        ))}
-    </>
-  );
+  // Use try-catch to protect against any iteration errors
+  try {
+    return (
+      <>
+        {sections
+          .filter((section: Section) => section.type !== SectionType.GARDENS)
+          .map((section: Section, index: number) => (
+            <React.Fragment key={`section-${section.type}-${index}`}>
+              {renderSection({ item: section, index })}
+            </React.Fragment>
+          ))}
+      </>
+    );
+  } catch (error) {
+    console.error("Error rendering DynamicSections:", error);
+    return null; // Return empty if there's an error
+  }
 });
 
 // Tạo một wrapper component cho HomeScreen
@@ -509,7 +711,7 @@ const HomeScreenWrapper = () => {
 // Rename HomeScreen thành HomeScreenContent và giữ lại logic
 function HomeScreenContent() {
   const theme = useAppTheme();
-  const styles = useMemo(() => makeHomeStyles(theme), [theme]);
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   // Use ScrollView ref instead of FlatList
   const scrollViewRef = useRef<ScrollView>(null);
@@ -529,28 +731,24 @@ function HomeScreenContent() {
     refreshing,
     gardens,
     weatherData,
-    sensorDataByType,
     gardenAlerts,
     getWeatherTip,
     getSensorIconName,
-    handleTogglePinGarden,
+    togglePinGarden,
     recentActivities,
     upcomingSchedules,
-    refresh,
+    handleRefresh,
     sensorDataLoading,
     sensorDataError,
     gardenSensorData,
-    gardenAdvice,
-    fetchGardenAdvice,
-    adviceLoading,
-    adviceError,
-    gardenWeatherData,
     weatherAdviceByGarden,
-    optimalGardenTimes,
+    fetchWeatherAdvice,
     weatherDetailLoading,
     weatherDetailError,
-    fetchWeatherAdvice,
+    gardenWeatherData,
+    optimalGardenTimes,
     calculateOptimalTimes,
+    fetchCompleteWeatherData,
   } = useHomeData();
 
   // State for modals
@@ -574,7 +772,6 @@ function HomeScreenContent() {
   const sectionAnimations = {
     gardens: useRef(new Animated.Value(0)).current,
     weather: useRef(new Animated.Value(0)).current,
-    alerts: useRef(new Animated.Value(0)).current,
     activity: useRef(new Animated.Value(0)).current,
   };
 
@@ -589,11 +786,6 @@ function HomeScreenContent() {
           useNativeDriver: true,
         }),
         Animated.timing(sectionAnimations.weather, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(sectionAnimations.alerts, {
           toValue: 1,
           duration: 400,
           useNativeDriver: true,
@@ -629,10 +821,21 @@ function HomeScreenContent() {
 
     lastFetchTime.current = now;
     animateRefresh();
-    await refresh();
+    await handleRefresh();
 
-    // Reset animations after refresh
-    Object.values(sectionAnimations).forEach((anim) => anim.setValue(0));
+    // Reset animations after refresh - safer approach
+    if (sectionAnimations && typeof sectionAnimations === "object") {
+      try {
+        const animValues = getSafeObjectValues(sectionAnimations);
+        animValues.forEach((anim) => {
+          if (anim && typeof anim.setValue === "function") {
+            anim.setValue(0);
+          }
+        });
+      } catch (error) {
+        console.error("Error resetting animations:", error);
+      }
+    }
 
     // Re-animate sections after data loads
     setTimeout(() => {
@@ -648,11 +851,6 @@ function HomeScreenContent() {
           duration: 400,
           useNativeDriver: true,
         }),
-        Animated.timing(sectionAnimations.alerts, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
         Animated.timing(sectionAnimations.activity, {
           toValue: 1,
           duration: 400,
@@ -660,7 +858,7 @@ function HomeScreenContent() {
         }),
       ]).start();
     }, 100);
-  }, [refresh, animateRefresh, sectionAnimations]);
+  }, [handleRefresh, animateRefresh, sectionAnimations]);
 
   // Initial fetch when component mounts
   useEffect(() => {
@@ -672,76 +870,153 @@ function HomeScreenContent() {
         return;
       }
 
-      console.log("Performing initial fetch");
       lastFetchTime.current = now;
       hasInitialFetch.current = true;
-      refresh();
+      handleRefresh();
     }
-  }, [refresh, loading, refreshing]);
+  }, [handleRefresh, loading, refreshing]);
 
   // Auto-fetch weather data when selecting a new garden
   useEffect(() => {
     if (selectedGardenId) {
-      const fetchWeatherForGarden = async () => {
-        try {
-          // Always fetch fresh weather data when garden is selected
-          await fetchWeatherAdvice(selectedGardenId);
-          await calculateOptimalTimes(selectedGardenId, "WATERING");
-        } catch (error) {
-          console.error("Error fetching weather data:", error);
-        }
-      };
-      fetchWeatherForGarden();
+      fetchWeatherForGarden(selectedGardenId);
     }
-  }, [selectedGardenId, fetchWeatherAdvice, calculateOptimalTimes]);
+  }, [selectedGardenId]);
+
+  // Handler for fetching weather data for a garden
+  const fetchWeatherForGarden = useCallback(
+    async (gardenId: number) => {
+      try {
+        // Kiểm tra gardenId có hợp lệ không
+        if (gardenId === null || gardenId === undefined || isNaN(gardenId)) {
+          console.log("Invalid garden ID, skipping weather fetch");
+          return;
+        }
+
+        // Kiểm tra gardenWeatherData có tồn tại không
+        if (!gardenWeatherData || typeof gardenWeatherData !== "object") {
+          await fetchCompleteWeatherData(gardenId);
+        }
+        // Nếu gardenWeatherData tồn tại, kiểm tra xem có dữ liệu cho garden id này không
+        else if (!(gardenId in gardenWeatherData)) {
+          await fetchCompleteWeatherData(gardenId);
+        }
+
+        // Fetch weather advice nếu cần
+        if (
+          !weatherAdviceByGarden ||
+          typeof weatherAdviceByGarden !== "object" ||
+          (!weatherAdviceByGarden[gardenId] &&
+            (!weatherDetailLoading || !weatherDetailLoading[gardenId]))
+        ) {
+          await fetchWeatherAdvice(gardenId);
+        }
+
+        // Calculate optimal times nếu có hourly data
+        if (
+          gardenWeatherData &&
+          typeof gardenWeatherData === "object" &&
+          gardenId in gardenWeatherData &&
+          gardenWeatherData[gardenId]?.hourly &&
+          (!optimalGardenTimes ||
+            typeof optimalGardenTimes !== "object" ||
+            !optimalGardenTimes[gardenId] ||
+            !optimalGardenTimes[gardenId]?.WATERING)
+        ) {
+          await calculateOptimalTimes(gardenId, "WATERING");
+        }
+      } catch (error) {
+        console.error("Error in fetchWeatherForGarden:", error);
+      }
+    },
+    [
+      fetchCompleteWeatherData,
+      fetchWeatherAdvice,
+      calculateOptimalTimes,
+      gardenWeatherData,
+      weatherAdviceByGarden,
+      weatherDetailLoading,
+      optimalGardenTimes,
+    ]
+  );
 
   // Handle showing advice modal
   const handleShowAdvice = useCallback(
     async (gardenId: number) => {
+      // Kiểm tra gardenId có hợp lệ không
+      if (gardenId === null || gardenId === undefined || isNaN(gardenId)) {
+        console.log("Invalid garden ID, skipping advice modal");
+        return;
+      }
+
       setSelectedGardenForAdvice(gardenId);
 
       // Fetch advice data if needed
-      if (!gardenAdvice[gardenId] && !adviceLoading[gardenId]) {
-        await fetchGardenAdvice(gardenId);
+      if (
+        !weatherAdviceByGarden ||
+        typeof weatherAdviceByGarden !== "object" ||
+        (!weatherAdviceByGarden[gardenId] &&
+          (!weatherDetailLoading || !weatherDetailLoading[gardenId]))
+      ) {
+        await fetchWeatherAdvice(gardenId);
       }
 
       setAdviceModalVisible(true);
     },
-    [gardenAdvice, adviceLoading, fetchGardenAdvice]
+    [weatherAdviceByGarden, weatherDetailLoading, fetchWeatherAdvice]
   );
 
   // Handle showing weather detail modal
   const handleShowWeatherDetail = useCallback(
-    async (gardenId: number | null = null) => {
-      // Use current selectedGardenId if none provided
-      const targetGardenId = gardenId !== null ? gardenId : selectedGardenId;
-      setSelectedGardenForWeather(targetGardenId);
-
-      // Fetch weather advice if needed
-      if (
-        targetGardenId !== null &&
-        !weatherAdviceByGarden[targetGardenId] &&
-        !weatherDetailLoading[targetGardenId]
-      ) {
-        fetchWeatherAdvice(targetGardenId);
+    async (gardenId: number) => {
+      // Kiểm tra gardenId có hợp lệ không
+      if (gardenId === null || gardenId === undefined || isNaN(gardenId)) {
+        console.log("Invalid garden ID, skipping weather detail");
+        return;
       }
 
-      // Calculate optimal times for common activities if needed
+      setSelectedGardenForWeather(gardenId);
+
+      // Đảm bảo gardenWeatherData hợp lệ
+      if (!gardenWeatherData || typeof gardenWeatherData !== "object") {
+        await fetchCompleteWeatherData(gardenId);
+      }
+      // Fetch complete weather data if needed
+      else if (!gardenWeatherData[gardenId]?.current) {
+        await fetchCompleteWeatherData(gardenId);
+      }
+
+      // Đảm bảo weatherAdviceByGarden hợp lệ
       if (
-        targetGardenId !== null &&
-        !optimalGardenTimes[targetGardenId]?.WATERING &&
-        !weatherDetailLoading[targetGardenId]
+        !weatherAdviceByGarden ||
+        typeof weatherAdviceByGarden !== "object" ||
+        (!weatherAdviceByGarden[gardenId] &&
+          (!weatherDetailLoading || !weatherDetailLoading[gardenId]))
       ) {
-        calculateOptimalTimes(targetGardenId, "WATERING");
+        await fetchWeatherAdvice(gardenId);
+      }
+
+      // Đảm bảo optimalGardenTimes hợp lệ
+      if (
+        gardenWeatherData &&
+        typeof gardenWeatherData === "object" &&
+        gardenId in gardenWeatherData &&
+        gardenWeatherData[gardenId]?.hourly &&
+        (!optimalGardenTimes ||
+          typeof optimalGardenTimes !== "object" ||
+          !optimalGardenTimes[gardenId] ||
+          !optimalGardenTimes[gardenId]?.WATERING)
+      ) {
+        await calculateOptimalTimes(gardenId, "WATERING");
       }
 
       setWeatherDetailVisible(true);
     },
     [
-      selectedGardenId,
       gardenWeatherData,
       weatherAdviceByGarden,
       weatherDetailLoading,
+      fetchCompleteWeatherData,
       fetchWeatherAdvice,
       calculateOptimalTimes,
       optimalGardenTimes,
@@ -750,22 +1025,34 @@ function HomeScreenContent() {
 
   // Handle showing alert details modal
   const handleShowAlertDetails = useCallback((gardenId: number) => {
+    // Kiểm tra gardenId có hợp lệ không
+    if (gardenId === null || gardenId === undefined || isNaN(gardenId)) {
+      console.log("Invalid garden ID, skipping alert details");
+      return;
+    }
+
     setSelectedGardenForAlerts(gardenId);
     setAlertDetailVisible(true);
   }, []);
 
-  // Scroll to weather section function
+  // Scroll to weather section
   const handleScrollToWeatherSection = useCallback(
     (gardenId: number) => {
+      // Kiểm tra gardenId có hợp lệ không
+      if (gardenId === null || gardenId === undefined || isNaN(gardenId)) {
+        console.log("Invalid garden ID, skipping scroll to weather");
+        return;
+      }
+
       // Select garden to display its weather
       selectGarden(gardenId);
 
-      // Use timeout to ensure garden selection is processed and UI is updated
+      // Use timeout to ensure garden selection is processed
       setTimeout(() => {
-        // Simply scroll down to where weather section would be - approximate position
+        // Scroll down to where weather section would be
         if (scrollViewRef.current) {
           scrollViewRef.current.scrollTo({
-            y: 300, // Approximate position where weather section would be
+            y: 300, // Approximate position of weather section
             animated: true,
           });
         }
@@ -774,109 +1061,70 @@ function HomeScreenContent() {
     [selectGarden]
   );
 
-  // Define sections to render
+  // Cập nhật sections để kiểm tra rõ ràng hơn khi không có vườn được chọn
   const sections = useMemo(() => {
-    const constructedSections: Section[] = [
-      { type: SectionType.GARDENS, key: "gardens" },
+    // Danh sách các sections sẽ hiển thị
+    const visibleSections: SectionConfig[] = [
+      { type: SectionType.GARDENS, visible: true },
     ];
 
-    // Add weather section if we have weather data or garden weather data
+    // Kiểm tra kỹ lưỡng nếu có một vườn được chọn hợp lệ
+    const hasValidGardenSelected =
+      selectedGardenId !== null &&
+      selectedGardenId !== undefined &&
+      Array.isArray(gardens) &&
+      gardens.some((g) => g.id === selectedGardenId);
+
+    // Luôn hiển thị phần thời tiết khi có một vườn được chọn hợp lệ
+    if (hasValidGardenSelected) {
+      visibleSections.push({ type: SectionType.WEATHER, visible: true });
+    }
+
+    // Show activity section if there are activities or schedules và có vườn được chọn hợp lệ
     if (
-      weatherData ||
-      (selectedGardenId && gardenWeatherData[selectedGardenId])
+      hasValidGardenSelected &&
+      ((Array.isArray(recentActivities) && recentActivities.length > 0) ||
+        (Array.isArray(upcomingSchedules) && upcomingSchedules.length > 0))
     ) {
-      constructedSections.push({ type: SectionType.WEATHER, key: "weather" });
+      visibleSections.push({ type: SectionType.ACTIVITY, visible: true });
     }
 
-    // Add alerts section if there are alerts
-    if (selectedGardenId && Object.values(gardenAlerts).flat().length > 0) {
-      constructedSections.push({ type: SectionType.ALERTS, key: "alerts" });
-    }
+    return visibleSections;
+  }, [selectedGardenId, gardens, recentActivities, upcomingSchedules]);
 
-    // Add activity timeline section if there are activities or schedules
-    if (
-      selectedGardenId &&
-      (recentActivities.length > 0 || upcomingSchedules.length > 0)
-    ) {
-      constructedSections.push({ type: SectionType.ACTIVITY, key: "activity" });
-    }
-
-    return constructedSections;
-  }, [
-    weatherData,
-    selectedGardenId,
-    gardenWeatherData,
-    gardenAlerts,
-    recentActivities,
-    upcomingSchedules,
-  ]);
-
-  // Key extractor for sections
-  const keyExtractor = useCallback((item: Section) => item.key, []);
-
-  // Get current selected garden name for advice modal
+  // Get selected garden for display in modals
   const selectedGardenName = useMemo(() => {
-    if (!selectedGardenForAdvice) return "";
+    if (!selectedGardenForAdvice || !Array.isArray(gardens)) return "";
     const garden = gardens.find((g) => g.id === selectedGardenForAdvice);
     return garden ? garden.name : "";
   }, [selectedGardenForAdvice, gardens]);
 
-  // Get garden name for weather detail modal
-  const selectedGardenNameForWeather = useMemo(() => {
-    if (!selectedGardenForWeather) return "";
-    const garden = gardens.find((g) => g.id === selectedGardenForWeather);
-    return garden ? garden.name : "";
+  const selectedGardenForModal = useMemo(() => {
+    if (!selectedGardenForWeather || !Array.isArray(gardens)) return undefined;
+    return gardens.find((g) => g.id === selectedGardenForWeather);
   }, [selectedGardenForWeather, gardens]);
 
-  // Render Garden Section with reduced props
-  const renderGardenSection = useMemo(() => {
-    return (
-      <GardenSection
-        gardens={gardens}
-        onTogglePinGarden={handleTogglePinGarden}
-        onShowAdvice={handleShowAdvice}
-        onShowWeatherDetail={handleShowWeatherDetail}
-        onScrollToWeatherSection={handleScrollToWeatherSection}
-        onShowAlertDetails={handleShowAlertDetails}
-        sensorDataByGarden={gardenSensorData}
-        sensorDataLoading={sensorDataLoading}
-        sensorDataError={sensorDataError}
-        weatherDataByGarden={gardenWeatherData}
-        adviceLoading={adviceLoading}
-        weatherDetailLoading={weatherDetailLoading}
-        animationValue={sectionAnimations.gardens}
-        theme={theme}
-        getSensorStatus={getSensorStatus}
-        showLargeCards={gardens.length <= 2}
-        onSelectGarden={(gardenId) => selectGarden(gardenId)}
-      />
-    );
-  }, [
-    gardens,
-    handleTogglePinGarden,
-    handleShowAdvice,
-    handleShowWeatherDetail,
-    handleScrollToWeatherSection,
-    handleShowAlertDetails,
-    gardenSensorData,
-    sensorDataLoading,
-    sensorDataError,
-    gardenWeatherData,
-    adviceLoading,
-    weatherDetailLoading,
-    sectionAnimations.gardens,
-    theme,
-    getSensorStatus,
-    selectGarden,
-  ]);
+  // Transform alerts to GardenAlert format if needed
+  const getFormattedAlerts = useCallback((alerts: Alert[]): GardenAlert[] => {
+    // Kiểm tra alerts có phải là một mảng hợp lệ không
+    if (!Array.isArray(alerts)) return [];
 
-  // Render key for Dynamic Sections
-  const [renderKey, setRenderKey] = useState(0);
-
-  useEffect(() => {
-    // Only trigger re-renders for Dynamic Sections when selectedGardenId changes
-    setRenderKey((prevKey) => prevKey + 1);
-  }, [selectedGardenId]);
+    return alerts.map((alert) => ({
+      id: alert.id || Date.now(),
+      type: alert.type || "SENSOR_THRESHOLD",
+      title: alert.message,
+      message: alert.message,
+      severity: (alert.severity || "LOW") as
+        | "LOW"
+        | "MEDIUM"
+        | "HIGH"
+        | "CRITICAL",
+      timestamp: alert.createdAt || new Date().toISOString(),
+      sensorType:
+        alert.type === "SENSOR_ERROR" ? SensorType.TEMPERATURE : undefined,
+      gardenId: alert.gardenId,
+    }));
+  }, []);
 
   // If loading, show loading indicator
   if (loading && !refreshing) {
@@ -885,7 +1133,7 @@ function HomeScreenContent() {
 
   // If there's an error, show error view
   if (error) {
-    return <ErrorView message={error} onRetry={refresh} />;
+    return <ErrorView message={error} onRetry={handleRefresh} />;
   }
 
   // If there are no gardens and we're not loading, show empty gardens view
@@ -894,241 +1142,165 @@ function HomeScreenContent() {
   }
 
   return (
-    <SafeAreaView
-      style={[
-        styles.container,
-        {
-          backgroundColor: theme.background,
-        },
-      ]}
-    >
-      {loading && !refreshing ? (
-        <LoadingView message="Đang tải dữ liệu..." />
-      ) : error ? (
-        <ErrorView message={error} onRetry={refresh} />
-      ) : gardens.length === 0 ? (
-        <EmptyGardensView />
-      ) : (
-        <ScrollView
-          ref={scrollViewRef}
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: 20 }}
-          showsVerticalScrollIndicator={true}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[theme.primary]}
-              tintColor={theme.primary}
-            />
+    <SafeAreaView style={styles.container}>
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={true}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[theme.primary]}
+            tintColor={theme.primary}
+          />
+        }
+      >
+        {/* Render all sections using the new HomeSections component */}
+        <HomeSections
+          gardens={Array.isArray(gardens) ? gardens : []}
+          selectedGardenId={selectedGardenId}
+          onSelectGarden={selectGarden}
+          onTogglePinGarden={togglePinGarden}
+          sections={sections}
+          sensorDataByGarden={gardenSensorData || {}}
+          sensorDataLoading={sensorDataLoading || {}}
+          sensorDataError={sensorDataError || {}}
+          weatherData={weatherData}
+          gardenWeatherData={gardenWeatherData || {}}
+          gardenAlerts={gardenAlerts || {}}
+          recentActivities={
+            Array.isArray(recentActivities) ? recentActivities : []
           }
-        >
-          {/* Garden Section */}
-          {renderGardenSection}
+          upcomingSchedules={
+            Array.isArray(upcomingSchedules) ? upcomingSchedules : []
+          }
+          onShowAdvice={handleShowAdvice}
+          onShowWeatherDetail={handleShowWeatherDetail}
+          onScrollToWeatherSection={handleScrollToWeatherSection}
+          onShowAlertDetails={handleShowAlertDetails}
+          adviceLoading={weatherDetailLoading || {}}
+          weatherDetailLoading={weatherDetailLoading || {}}
+          getSensorStatus={getSensorStatus}
+        />
+      </ScrollView>
 
-          {/* Weather Section */}
-          {(weatherData ||
-            (selectedGardenId && gardenWeatherData[selectedGardenId])) && (
-            <Animated.View
-              style={[
-                styles.section,
-                {
-                  opacity: sectionAnimations.weather,
-                  transform: [
-                    {
-                      translateY: sectionAnimations.weather.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [20, 0],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                  {selectedGardenId
-                    ? `Thời tiết - ${
-                        gardens.find((g) => g.id === selectedGardenId)?.name ||
-                        ""
-                      }`
-                    : "Thời tiết"}
-                </Text>
-                {selectedGardenId && (
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      paddingVertical: 4,
-                      paddingHorizontal: 8,
-                    }}
-                    onPress={() => handleShowWeatherDetail(selectedGardenId)}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        fontFamily: "Inter-Medium",
-                        marginRight: 4,
-                        color: theme.primary,
-                      }}
-                    >
-                      Chi tiết
-                    </Text>
-                    <Ionicons
-                      name="chevron-forward"
-                      size={16}
-                      color={theme.primary}
-                    />
-                  </TouchableOpacity>
-                )}
-              </View>
-              <WeatherDisplay
-                currentWeather={
-                  selectedGardenId && gardenWeatherData[selectedGardenId]
-                    ? gardenWeatherData[selectedGardenId].current
-                    : weatherData
-                }
-                selectedGarden={
-                  selectedGardenId
-                    ? gardens.find((g) => g.id === selectedGardenId)
-                    : undefined
-                }
-                hourlyForecast={
-                  selectedGardenId && gardenWeatherData[selectedGardenId]
-                    ? gardenWeatherData[selectedGardenId].hourly || []
-                    : []
-                }
-                dailyForecast={
-                  selectedGardenId && gardenWeatherData[selectedGardenId]
-                    ? gardenWeatherData[selectedGardenId].daily || []
-                    : []
-                }
-                getWeatherTip={getWeatherTip}
-                showFullDetails={!!selectedGardenId}
-                onShowDetail={() => handleShowWeatherDetail(selectedGardenId)}
-              />
-            </Animated.View>
-          )}
-
-          {/* Alert Section */}
-          {selectedGardenId &&
-            Object.values(gardenAlerts).flat().length > 0 && (
-              <AlertSection
-                selectedGardenId={selectedGardenId}
-                gardenAlerts={gardenAlerts}
-                animationValue={sectionAnimations.alerts}
-                theme={theme}
-              />
-            )}
-
-          {/* Activity Section */}
-          {selectedGardenId &&
-            (recentActivities.length > 0 || upcomingSchedules.length > 0) && (
-              <ActivitySection
-                recentActivities={recentActivities}
-                upcomingSchedules={upcomingSchedules}
-                selectedGardenId={selectedGardenId}
-                animationValue={sectionAnimations.activity}
-                theme={theme}
-              />
-            )}
-        </ScrollView>
-      )}
-
-      {/* Advice Modal */}
+      {/* Modals */}
       <AdviceModal
         isVisible={adviceModalVisible}
         onClose={() => setAdviceModalVisible(false)}
         advice={
-          selectedGardenForAdvice !== null
-            ? gardenAdvice[selectedGardenForAdvice] || []
+          selectedGardenForAdvice !== null &&
+          weatherAdviceByGarden &&
+          typeof weatherAdviceByGarden === "object" &&
+          selectedGardenForAdvice in weatherAdviceByGarden
+            ? weatherAdviceByGarden[selectedGardenForAdvice]
             : []
         }
         isLoading={
-          selectedGardenForAdvice !== null
-            ? adviceLoading[selectedGardenForAdvice] || false
+          selectedGardenForAdvice !== null &&
+          weatherDetailLoading &&
+          typeof weatherDetailLoading === "object" &&
+          selectedGardenForAdvice in weatherDetailLoading
+            ? weatherDetailLoading[selectedGardenForAdvice]
             : false
         }
         error={
-          selectedGardenForAdvice !== null
-            ? adviceError[selectedGardenForAdvice] || null
+          selectedGardenForAdvice !== null &&
+          weatherDetailError &&
+          typeof weatherDetailError === "object" &&
+          selectedGardenForAdvice in weatherDetailError
+            ? weatherDetailError[selectedGardenForAdvice]
             : null
         }
         gardenName={selectedGardenName}
         theme={theme}
       />
 
-      {/* Weather Detail Modal */}
       <WeatherDetailModal
         isVisible={weatherDetailVisible}
         onClose={() => setWeatherDetailVisible(false)}
         currentWeather={
           selectedGardenForWeather !== null &&
-          gardenWeatherData[selectedGardenForWeather]
+          gardenWeatherData &&
+          typeof gardenWeatherData === "object" &&
+          selectedGardenForWeather in gardenWeatherData
             ? gardenWeatherData[selectedGardenForWeather].current
             : null
         }
         hourlyForecast={
           selectedGardenForWeather !== null &&
-          gardenWeatherData[selectedGardenForWeather]
+          gardenWeatherData &&
+          typeof gardenWeatherData === "object" &&
+          selectedGardenForWeather in gardenWeatherData &&
+          Array.isArray(gardenWeatherData[selectedGardenForWeather].hourly)
             ? gardenWeatherData[selectedGardenForWeather].hourly
             : []
         }
         dailyForecast={
           selectedGardenForWeather !== null &&
-          gardenWeatherData[selectedGardenForWeather]
+          gardenWeatherData &&
+          typeof gardenWeatherData === "object" &&
+          selectedGardenForWeather in gardenWeatherData &&
+          Array.isArray(gardenWeatherData[selectedGardenForWeather].daily)
             ? gardenWeatherData[selectedGardenForWeather].daily
             : []
         }
         weatherAdvice={
-          selectedGardenForWeather !== null
-            ? weatherAdviceByGarden[selectedGardenForWeather] || []
+          selectedGardenForWeather !== null &&
+          weatherAdviceByGarden &&
+          typeof weatherAdviceByGarden === "object" &&
+          selectedGardenForWeather in weatherAdviceByGarden &&
+          Array.isArray(weatherAdviceByGarden[selectedGardenForWeather])
+            ? weatherAdviceByGarden[selectedGardenForWeather]
             : []
         }
         optimalTimes={
-          selectedGardenForWeather !== null
-            ? optimalGardenTimes[selectedGardenForWeather]?.WATERING || []
+          selectedGardenForWeather !== null &&
+          optimalGardenTimes &&
+          typeof optimalGardenTimes === "object" &&
+          selectedGardenForWeather in optimalGardenTimes &&
+          optimalGardenTimes[selectedGardenForWeather]?.WATERING &&
+          Array.isArray(optimalGardenTimes[selectedGardenForWeather].WATERING)
+            ? optimalGardenTimes[selectedGardenForWeather].WATERING
             : []
         }
-        garden={
-          selectedGardenForWeather !== null
-            ? gardens.find((g) => g.id === selectedGardenForWeather) ||
-              undefined
-            : undefined
-        }
+        garden={selectedGardenForModal}
         isLoading={
-          selectedGardenForWeather !== null
-            ? weatherDetailLoading[selectedGardenForWeather] || false
+          selectedGardenForWeather !== null &&
+          weatherDetailLoading &&
+          typeof weatherDetailLoading === "object" &&
+          selectedGardenForWeather in weatherDetailLoading
+            ? weatherDetailLoading[selectedGardenForWeather]
             : false
         }
         theme={theme}
       />
 
-      {/* Alert Details Modal */}
       <AlertDetailsModal
         isVisible={alertDetailVisible}
         onClose={() => setAlertDetailVisible(false)}
         alerts={
-          selectedGardenForAlerts !== null
-            ? (gardenAlerts[selectedGardenForAlerts] || [])
-                .filter((alert) => alert.gardenId)
-                .map((alert) => ({
-                  ...alert,
-                  severity: alert.severity || "LOW",
-                  title: alert.message,
-                  timestamp: alert.createdAt,
-                }))
+          selectedGardenForAlerts !== null &&
+          gardenAlerts &&
+          typeof gardenAlerts === "object" &&
+          selectedGardenForAlerts in gardenAlerts &&
+          Array.isArray(gardenAlerts[selectedGardenForAlerts])
+            ? getFormattedAlerts(gardenAlerts[selectedGardenForAlerts])
             : []
         }
         gardenName={
-          selectedGardenForAlerts !== null &&
-          gardens.find((g) => g.id === selectedGardenForAlerts)
+          selectedGardenForAlerts !== null
             ? gardens.find((g) => g.id === selectedGardenForAlerts)?.name || ""
             : ""
         }
         sensorData={
-          selectedGardenForAlerts !== null
-            ? gardenSensorData[selectedGardenForAlerts] || {}
+          selectedGardenForAlerts !== null &&
+          gardenSensorData &&
+          typeof gardenSensorData === "object" &&
+          selectedGardenForAlerts in gardenSensorData
+            ? gardenSensorData[selectedGardenForAlerts]
             : {}
         }
         theme={theme}
@@ -1137,5 +1309,28 @@ function HomeScreenContent() {
   );
 }
 
-// Export HomeScreenWrapper thay vì HomeScreen
-export default HomeScreenWrapper;
+// Make styles function
+const makeStyles = (theme: any) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingBottom: 20,
+    },
+  });
+
+// Wrapper component with Garden Provider
+function HomeScreen() {
+  return (
+    <GardenProvider>
+      <HomeScreenContent />
+    </GardenProvider>
+  );
+}
+
+export default HomeScreen;

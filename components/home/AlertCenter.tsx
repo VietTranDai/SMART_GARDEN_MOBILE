@@ -26,6 +26,42 @@ interface AlertCenterProps {
   selectedGardenId?: number | null;
 }
 
+// Utility functions for safer data handling
+const isValidArray = (data: any): boolean => {
+  return Array.isArray(data);
+};
+
+const getSafeObjectValues = (obj: any): any[] => {
+  if (!obj || typeof obj !== "object") return [];
+  try {
+    const values = Object.values(obj);
+    if (!isValidArray(values)) return [];
+    return values;
+  } catch (error) {
+    console.error("Error in getSafeObjectValues:", error);
+    return [];
+  }
+};
+
+const safeArrayFlat = (arr: any[]): any[] => {
+  if (!isValidArray(arr)) return [];
+  try {
+    // Some environments may not support flat(), so we implement it manually
+    const result: any[] = [];
+    arr.forEach((item) => {
+      if (isValidArray(item)) {
+        result.push(...item);
+      } else if (item !== undefined && item !== null) {
+        result.push(item);
+      }
+    });
+    return result;
+  } catch (error) {
+    console.error("Error in safeArrayFlat:", error);
+    return [];
+  }
+};
+
 export default function AlertCenter({
   alerts,
   selectedGardenId,
@@ -33,9 +69,8 @@ export default function AlertCenter({
   const theme = useAppTheme();
   const { getAnimatedStyle } = useSectionAnimation("alerts");
 
-  // Flatten and sort alerts by severity
-  const flattenedAlerts = Object.values(alerts)
-    .flat()
+  // Safely get and flatten alerts using utility functions
+  const flattenedAlerts = safeArrayFlat(getSafeObjectValues(alerts))
     .sort((a, b) => {
       // Sort by severity (CRITICAL > HIGH > MEDIUM > LOW)
       const severityOrder = {
@@ -44,9 +79,14 @@ export default function AlertCenter({
         MEDIUM: 1,
         LOW: 0,
       };
+
+      // Safely access severity with fallback
+      const aSeverity = a && a.severity ? a.severity : "LOW";
+      const bSeverity = b && b.severity ? b.severity : "LOW";
+
       return (
-        severityOrder[b.severity as keyof typeof severityOrder] -
-        severityOrder[a.severity as keyof typeof severityOrder]
+        severityOrder[bSeverity as keyof typeof severityOrder] -
+        severityOrder[aSeverity as keyof typeof severityOrder]
       );
     })
     .slice(0, 3); // Show only top 3 alerts
@@ -82,27 +122,37 @@ export default function AlertCenter({
   };
 
   const renderAlertItem = (alert: any) => {
-    const iconName = getSeverityIcon(alert.severity);
-    const color = getSeverityColor(alert.severity);
+    if (!alert || typeof alert !== "object") {
+      return null;
+    }
+
+    // Safely get properties with defaults
+    const id = alert.id || Math.random().toString();
+    const message = alert.message || "Unknown alert";
+    const severity = alert.severity || "LOW";
+    const suggestion = alert.suggestion;
+
+    const iconName = getSeverityIcon(severity);
+    const color = getSeverityColor(severity);
 
     return (
       <TouchableOpacity
-        key={alert.id}
+        key={id}
         style={[styles.alertItem, { backgroundColor: color + "10" }]}
-        onPress={() => router.push(`/alert/${alert.id}`)}
+        onPress={() => router.push(`/alert/${id}`)}
       >
         <View style={[styles.iconContainer, { backgroundColor: color + "20" }]}>
           <Ionicons name={iconName as any} size={20} color={color} />
         </View>
         <View style={styles.alertContent}>
           <Text style={[styles.alertMessage, { color: theme.text }]}>
-            {alert.message}
+            {message}
           </Text>
-          {alert.suggestion && (
+          {suggestion && (
             <Text
               style={[styles.alertSuggestion, { color: theme.textSecondary }]}
             >
-              {alert.suggestion}
+              {suggestion}
             </Text>
           )}
         </View>
@@ -110,7 +160,7 @@ export default function AlertCenter({
     );
   };
 
-  if (!selectedGardenId || flattenedAlerts.length === 0) {
+  if (!selectedGardenId || !flattenedAlerts || flattenedAlerts.length === 0) {
     return null;
   }
 

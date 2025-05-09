@@ -90,40 +90,58 @@ export default function WeatherDisplay({
           </View>
         </View>
 
-        {hourlyForecast.length > 0 && (
-          <View style={styles.forecastSection}>
-            <Text style={styles.forecastTitle}>Dự báo 24 giờ tới</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.horizontalScroll}
-            >
-              {hourlyForecast.slice(0, 24).map((item, index) => (
-                <View
-                  key={`hourly-${item.forecastFor}-${index}`}
-                  style={styles.hourItem}
-                >
-                  <Text style={styles.hourText}>
-                    {weatherService.formatTime(item.forecastFor)}
-                  </Text>
-                  <Image
-                    source={{
-                      uri: weatherService.getWeatherIcon(item.iconCode),
-                    }}
-                    style={styles.smallIcon}
-                  />
-                  <Text style={styles.hourTemp}>{Math.round(item.temp)}°</Text>
-                  <View style={styles.precipContainer}>
-                    <FontAwesome5 name="tint" size={12} color="#fff" />
-                    <Text style={styles.precipChance}>
-                      {Math.round(item.pop * 100)}%
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+        {!isCompact &&
+          Array.isArray(hourlyForecast) &&
+          hourlyForecast.length > 0 && (
+            <View style={styles.forecastSection}>
+              <Text style={styles.forecastTitle}>Dự báo 24 giờ tới</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.horizontalScroll}
+              >
+                {(() => {
+                  try {
+                    // Ensure we have a valid array with a safe length
+                    const safeHourlyData = Array.isArray(hourlyForecast)
+                      ? hourlyForecast.slice(0, 24)
+                      : [];
+
+                    // Map over the safe array with item validation
+                    return safeHourlyData.map((item, index) => {
+                      if (!item || typeof item !== "object") return null;
+
+                      return (
+                        <View key={`hourly-${index}`} style={styles.hourItem}>
+                          <Text style={styles.hourText}>
+                            {weatherService.formatTime(item.forecastFor)}
+                          </Text>
+                          <Image
+                            source={{
+                              uri: weatherService.getWeatherIcon(item.iconCode),
+                            }}
+                            style={styles.smallIcon}
+                          />
+                          <Text style={styles.hourTemp}>
+                            {Math.round(item.temp)}°
+                          </Text>
+                          <View style={styles.precipContainer}>
+                            <FontAwesome5 name="tint" size={12} color="#fff" />
+                            <Text style={styles.precipChance}>
+                              {Math.round((item.pop || 0) * 100)}%
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    });
+                  } catch (error) {
+                    console.error("Error rendering hourly forecast:", error);
+                    return null;
+                  }
+                })()}
+              </ScrollView>
+            </View>
+          )}
 
         {tip && (
           <View style={styles.tipContainer}>

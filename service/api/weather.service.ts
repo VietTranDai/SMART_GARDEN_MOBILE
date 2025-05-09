@@ -6,15 +6,10 @@ import {
   WeatherMain,
   WeatherAdvice,
   OptimalGardenTime,
+  GardenWeatherData,
 } from "@/types/weather/weather.types";
 import { WEATHER_ENDPOINTS } from "../endpoints";
 import { GardenType } from "@/types/gardens/garden.types";
-
-export interface GardenWeatherData {
-  current: WeatherObservation;
-  hourly: HourlyForecast[];
-  daily: DailyForecast[];
-}
 
 /**
  * Weather Service
@@ -119,7 +114,26 @@ class WeatherService {
       const response = await apiClient.get<any>(
         WEATHER_ENDPOINTS.HOURLY_FORECAST(gardenId)
       );
-      return response.data.data || [];
+
+      // Kiểm tra dữ liệu trả về từ API
+      if (!response || !response.data) {
+        console.warn("Invalid API response format in getHourlyForecast");
+        return [];
+      }
+
+      const data = response.data.data;
+
+      // Kiểm tra xem data có phải là mảng không, nếu không thì trả về mảng rỗng
+      if (!data) return [];
+      if (!Array.isArray(data)) {
+        console.warn(
+          "API returned non-array data in getHourlyForecast:",
+          typeof data
+        );
+        return [];
+      }
+
+      return data;
     } catch (error) {
       console.error("Error fetching hourly forecast:", error);
       return [];
@@ -134,7 +148,26 @@ class WeatherService {
       const response = await apiClient.get<any>(
         WEATHER_ENDPOINTS.DAILY_FORECAST(gardenId)
       );
-      return response.data.data || [];
+
+      // Kiểm tra dữ liệu trả về từ API
+      if (!response || !response.data) {
+        console.warn("Invalid API response format in getDailyForecast");
+        return [];
+      }
+
+      const data = response.data.data;
+
+      // Kiểm tra xem data có phải là mảng không, nếu không thì trả về mảng rỗng
+      if (!data) return [];
+      if (!Array.isArray(data)) {
+        console.warn(
+          "API returned non-array data in getDailyForecast:",
+          typeof data
+        );
+        return [];
+      }
+
+      return data;
     } catch (error) {
       console.error("Error fetching daily forecast:", error);
       return [];
@@ -414,14 +447,35 @@ class WeatherService {
   }
 
   /**
-   * Calculate optimal times based on activity type and forecast
-   * This is a helper method that would ideally be on the server
+   * Calculate optimal gardening times based on hourly forecast
    * @private
    */
   private calculateOptimalTimes(
     forecast: HourlyForecast[],
     activityType: string
   ): OptimalGardenTime[] {
+    if (!forecast) {
+      console.warn(
+        "Null or undefined forecast provided to calculateOptimalTimes"
+      );
+      return [];
+    }
+
+    // Ensure forecast is an array
+    if (!Array.isArray(forecast)) {
+      console.error(
+        "Non-array forecast provided to calculateOptimalTimes:",
+        typeof forecast
+      );
+      return [];
+    }
+
+    // Check if the array is empty
+    if (forecast.length === 0) {
+      console.warn("Empty forecast array provided to calculateOptimalTimes");
+      return [];
+    }
+
     const optimalTimes: OptimalGardenTime[] = [];
 
     // Define optimal conditions for different activities
@@ -435,22 +489,6 @@ class WeatherService {
       }
     > = {
       WATERING: {
-        preferredWeather: [WeatherMain.CLEAR, WeatherMain.CLOUDS],
-        avoidWeather: [
-          WeatherMain.RAIN,
-          WeatherMain.THUNDERSTORM,
-          WeatherMain.DRIZZLE,
-        ],
-        idealTempRange: { min: 15, max: 28 },
-        idealTimeRange: { startHour: 6, endHour: 9 }, // Early morning
-      },
-      FERTILIZING: {
-        preferredWeather: [WeatherMain.CLEAR, WeatherMain.CLOUDS],
-        avoidWeather: [WeatherMain.RAIN, WeatherMain.THUNDERSTORM],
-        idealTempRange: { min: 18, max: 26 },
-        idealTimeRange: { startHour: 7, endHour: 10 }, // Morning
-      },
-      PRUNING: {
         preferredWeather: [WeatherMain.CLEAR, WeatherMain.CLOUDS],
         avoidWeather: [WeatherMain.RAIN, WeatherMain.THUNDERSTORM],
         idealTempRange: { min: 10, max: 25 },
@@ -478,9 +516,19 @@ class WeatherService {
       idealTimeRange: { startHour: 8, endHour: 17 },
     };
 
+    // Create a safe copy of the forecast array to iterate over
+    const safeForecast = [...forecast];
+
     // Find optimal time slots
-    for (let i = 0; i < forecast.length; i++) {
-      const hour = forecast[i];
+    for (let i = 0; i < safeForecast.length; i++) {
+      const hour = safeForecast[i];
+
+      // Skip if the hour data is invalid
+      if (!hour || !hour.forecastFor) {
+        console.warn(`Invalid hour data at index ${i}:`, hour);
+        continue;
+      }
+
       const hourDate = new Date(hour.forecastFor);
       const hourNumber = hourDate.getHours();
 
@@ -488,27 +536,36 @@ class WeatherService {
       let score = 0;
 
       // Preferred weather conditions
-      if (conditions.preferredWeather.includes(hour.weatherMain)) {
+      if (
+        hour.weatherMain &&
+        conditions.preferredWeather.includes(hour.weatherMain)
+      ) {
         score += 30;
       }
 
       // Avoid bad weather conditions
-      if (conditions.avoidWeather.includes(hour.weatherMain)) {
+      if (
+        hour.weatherMain &&
+        conditions.avoidWeather.includes(hour.weatherMain)
+      ) {
         score -= 50;
       }
 
       // Temperature score
-      const tempScore =
-        100 -
-        Math.min(
-          100,
-          Math.abs(
-            hour.temp -
-              (conditions.idealTempRange.min + conditions.idealTempRange.max) /
-                2
-          ) * 5
-        );
-      score += tempScore * 0.4;
+      if (typeof hour.temp === "number") {
+        const tempScore =
+          100 -
+          Math.min(
+            100,
+            Math.abs(
+              hour.temp -
+                (conditions.idealTempRange.min +
+                  conditions.idealTempRange.max) /
+                  2
+            ) * 5
+          );
+        score += tempScore * 0.4;
+      }
 
       // Time of day score
       if (
@@ -525,34 +582,48 @@ class WeatherService {
         let slotScore = score;
 
         // Check up to 3 consecutive hours
-        for (let j = 1; j <= 2 && i + j < forecast.length; j++) {
-          const nextHour = forecast[i + j];
+        for (let j = 1; j <= 2 && i + j < safeForecast.length; j++) {
+          const nextHour = safeForecast[i + j];
+
+          // Skip if the next hour data is invalid
+          if (!nextHour || !nextHour.forecastFor) {
+            continue;
+          }
+
           const nextHourDate = new Date(nextHour.forecastFor);
           const nextHourNumber = nextHourDate.getHours();
 
           // Calculate score for next hour
           let nextScore = 0;
 
-          if (conditions.preferredWeather.includes(nextHour.weatherMain)) {
+          if (
+            nextHour.weatherMain &&
+            conditions.preferredWeather.includes(nextHour.weatherMain)
+          ) {
             nextScore += 30;
           }
 
-          if (conditions.avoidWeather.includes(nextHour.weatherMain)) {
+          if (
+            nextHour.weatherMain &&
+            conditions.avoidWeather.includes(nextHour.weatherMain)
+          ) {
             nextScore -= 50;
           }
 
-          const nextTempScore =
-            100 -
-            Math.min(
-              100,
-              Math.abs(
-                nextHour.temp -
-                  (conditions.idealTempRange.min +
-                    conditions.idealTempRange.max) /
-                    2
-              ) * 5
-            );
-          nextScore += nextTempScore * 0.4;
+          if (typeof nextHour.temp === "number") {
+            const nextTempScore =
+              100 -
+              Math.min(
+                100,
+                Math.abs(
+                  nextHour.temp -
+                    (conditions.idealTempRange.min +
+                      conditions.idealTempRange.max) /
+                      2
+                ) * 5
+              );
+            nextScore += nextTempScore * 0.4;
+          }
 
           if (
             nextHourNumber >= conditions.idealTimeRange.startHour &&
@@ -571,10 +642,14 @@ class WeatherService {
         }
 
         // Add time slot if it's at least 1 hour long
-        if (endHour >= i) {
+        if (
+          endHour >= i &&
+          safeForecast[endHour] &&
+          safeForecast[endHour].forecastFor
+        ) {
           optimalTimes.push({
             startTime: hour.forecastFor,
-            endTime: forecast[endHour].forecastFor,
+            endTime: safeForecast[endHour].forecastFor,
             activity: activityType,
             reason: `Thời tiết thuận lợi cho hoạt động ${activityType.toLowerCase()}`,
             score: Math.round(slotScore),
@@ -587,8 +662,6 @@ class WeatherService {
         }
       }
     }
-
-    // Sort by score (highest first)
     return optimalTimes.sort((a, b) => b.score - a.score);
   }
 
@@ -737,6 +810,275 @@ class WeatherService {
 
     // Default tip
     return "Thời tiết tốt cho cây trồng, nên chú ý theo dõi độ ẩm đất.";
+  }
+
+  /**
+   * Lấy và theo dõi dữ liệu thời tiết chi tiết cho một khu vườn
+   * Phương thức mới nâng cao dành cho các hook
+   */
+  async fetchAndTrackWeatherData(
+    gardenId: number,
+    lastFetchTime: Record<number, number> = {},
+    debounceTime: number = 60000
+  ): Promise<{
+    weatherData: GardenWeatherData | null;
+    error: string | null;
+    newLastFetchTime: number;
+  }> {
+    try {
+      // Kiểm tra thời gian gọi API để tránh gọi quá thường xuyên
+      const now = Date.now();
+      const lastFetch = lastFetchTime[gardenId] || 0;
+
+      // Nếu gọi trong thời gian debounce, trả về null
+      if (now - lastFetch < debounceTime) {
+        return {
+          weatherData: null,
+          error: null,
+          newLastFetchTime: lastFetch,
+        };
+      }
+
+      // Lấy dữ liệu thời tiết
+      const weatherData = await this.getCompleteWeatherData(gardenId);
+
+      return {
+        weatherData,
+        error: null,
+        newLastFetchTime: now,
+      };
+    } catch (error) {
+      console.error(
+        `Error in fetchAndTrackWeatherData for garden ${gardenId}:`,
+        error
+      );
+      return {
+        weatherData: null,
+        error: `Không thể tải dữ liệu thời tiết: ${error}`,
+        newLastFetchTime: lastFetchTime[gardenId] || 0,
+      };
+    }
+  }
+
+  /**
+   * Lấy lời khuyên thời tiết cho một khu vườn dựa trên dữ liệu thời tiết hiện có
+   * hoặc tự động lấy dữ liệu thời tiết nếu chưa có
+   * Phương thức mới nâng cao dành cho các hook
+   */
+  async fetchAndTrackWeatherAdvice(
+    gardenId: number,
+    existingWeatherData: GardenWeatherData | null,
+    gardenType?: GardenType
+  ): Promise<{
+    advice: WeatherAdvice[];
+    weatherData: WeatherObservation | null;
+    error: string | null;
+  }> {
+    try {
+      // Lấy dữ liệu thời tiết hiện tại, nếu không có sẽ fetch mới
+      let currentWeather = existingWeatherData?.current;
+
+      // Nếu không có dữ liệu thời tiết, lấy mới
+      if (!currentWeather) {
+        const completeData = await this.getCompleteWeatherData(gardenId);
+        currentWeather = completeData?.current || null;
+      }
+
+      // Không thể lấy lời khuyên nếu không có dữ liệu thời tiết
+      if (!currentWeather) {
+        return {
+          advice: [],
+          weatherData: null,
+          error: "Không có dữ liệu thời tiết",
+        };
+      }
+
+      // Lấy lời khuyên
+      const advice = await this.getWeatherAdvice(
+        gardenId,
+        currentWeather,
+        gardenType
+      );
+
+      return {
+        advice,
+        weatherData: currentWeather,
+        error: null,
+      };
+    } catch (error) {
+      console.error(
+        `Error in fetchAndTrackWeatherAdvice for garden ${gardenId}:`,
+        error
+      );
+      return {
+        advice: [],
+        weatherData: null,
+        error: `Không thể tải lời khuyên thời tiết: ${error}`,
+      };
+    }
+  }
+
+  /**
+   * Tính toán và trả về thời gian tối ưu cho một hoạt động cụ thể
+   * sử dụng dữ liệu dự báo thời tiết theo giờ
+   * Phương thức mới nâng cao dành cho các hook
+   */
+  async fetchAndTrackOptimalTimes(
+    gardenId: number,
+    activityType: string,
+    existingWeatherData: GardenWeatherData | null
+  ): Promise<{
+    optimalTimes: OptimalGardenTime[];
+    error: string | null;
+  }> {
+    try {
+      // Super defensive validation of input data
+      if (!existingWeatherData || typeof existingWeatherData !== "object") {
+        existingWeatherData = { current: null, hourly: [], daily: [] };
+      }
+
+      // Lấy dữ liệu dự báo theo giờ với kiểm tra an toàn nhiều lớp
+      let hourlyForecast: HourlyForecast[] = [];
+
+      // Validate hourly forecast data explicitly before attempting to use it
+      const hasValidHourlyForecast =
+        existingWeatherData.hourly !== undefined &&
+        existingWeatherData.hourly !== null &&
+        Array.isArray(existingWeatherData.hourly);
+
+      if (hasValidHourlyForecast) {
+        try {
+          // Create defensive copy with explicit validation
+          hourlyForecast = [];
+          const sourceArray = existingWeatherData.hourly;
+
+          // Loop instead of spread to ensure each item is valid
+          for (let i = 0; i < sourceArray.length; i++) {
+            const item = sourceArray[i];
+            if (item && typeof item === "object") {
+              hourlyForecast.push({ ...item });
+            }
+          }
+        } catch (copyError) {
+          console.error("Error safely copying hourly forecast:", copyError);
+          hourlyForecast = [];
+        }
+      } else {
+        console.log("No valid hourly forecast found in provided data");
+      }
+
+      // Nếu không có dữ liệu dự báo hợp lệ, lấy mới
+      if (hourlyForecast.length === 0) {
+        console.log("Fetching new forecast data for optimal times calculation");
+        try {
+          const completeData = await this.getCompleteWeatherData(gardenId);
+
+          if (completeData?.hourly && Array.isArray(completeData.hourly)) {
+            // Same safe copy approach
+            const sourceArray = completeData.hourly;
+            for (let i = 0; i < sourceArray.length; i++) {
+              const item = sourceArray[i];
+              if (item && typeof item === "object") {
+                hourlyForecast.push({ ...item });
+              }
+            }
+          } else {
+            console.warn("Fetched data does not contain valid hourly forecast");
+          }
+        } catch (fetchError) {
+          console.error("Error fetching weather data:", fetchError);
+        }
+      }
+
+      // Multiple validation checks to ensure array is valid
+      const isValidArray =
+        hourlyForecast !== undefined &&
+        hourlyForecast !== null &&
+        Array.isArray(hourlyForecast);
+
+      if (!isValidArray) {
+        console.error(
+          "hourlyForecast is not an array after all processing steps"
+        );
+        return {
+          optimalTimes: [],
+          error: "Dữ liệu dự báo không hợp lệ sau khi xử lý an toàn",
+        };
+      }
+
+      // Không thể tính thời gian tối ưu nếu không có dữ liệu dự báo
+      if (hourlyForecast.length === 0) {
+        console.log(
+          "Empty forecast array after validation - cannot calculate optimal times"
+        );
+        return {
+          optimalTimes: [],
+          error: "Không có dữ liệu dự báo thời tiết",
+        };
+      }
+
+      // Bảo vệ calculateOptimalTimes từ dữ liệu không hợp lệ
+      try {
+        // One final check before calculation
+        if (!Array.isArray(hourlyForecast) || hourlyForecast.length === 0) {
+          throw new Error("Invalid forecast array before calculation");
+        }
+
+        // Use explicitly created array rather than spread to avoid iterator issues
+        const verifiedForecast: HourlyForecast[] = [];
+
+        for (let i = 0; i < hourlyForecast.length; i++) {
+          const hour = hourlyForecast[i];
+          if (hour && typeof hour === "object") {
+            verifiedForecast.push({ ...hour });
+          }
+        }
+
+        // Extra safety before calculation
+        if (verifiedForecast.length === 0) {
+          console.warn("No valid forecast data after verification");
+          return {
+            optimalTimes: [],
+            error: "Dữ liệu dự báo không hợp lệ sau khi kiểm tra",
+          };
+        }
+
+        // Final calculation with verified data
+        const optimalTimes = this.calculateOptimalTimes(
+          verifiedForecast,
+          activityType
+        );
+
+        // Đảm bảo kết quả luôn là mảng
+        if (!Array.isArray(optimalTimes)) {
+          console.error("calculateOptimalTimes did not return an array!");
+          return {
+            optimalTimes: [],
+            error: "Kết quả tính toán không hợp lệ",
+          };
+        }
+
+        return {
+          optimalTimes,
+          error: null,
+        };
+      } catch (calcError) {
+        console.error("Error in calculateOptimalTimes:", calcError);
+        return {
+          optimalTimes: [],
+          error: `Lỗi khi tính toán: ${calcError}`,
+        };
+      }
+    } catch (error) {
+      console.error(
+        `Error in fetchAndTrackOptimalTimes for garden ${gardenId}:`,
+        error
+      );
+      return {
+        optimalTimes: [],
+        error: `Không thể tính toán thời gian tối ưu cho ${activityType}: ${error}`,
+      };
+    }
   }
 }
 

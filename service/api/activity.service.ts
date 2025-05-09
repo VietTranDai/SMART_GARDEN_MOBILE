@@ -119,6 +119,97 @@ class ActivityService {
       return null;
     }
   }
+
+  /**
+   * Get recent activities for a garden
+   * @param gardenId Garden ID
+   * @param limit Maximum number of activities to return
+   * @returns List of recent activities
+   */
+  async getRecentActivities(
+    gardenId: number | string,
+    limit: number = 5
+  ): Promise<any[]> {
+    try {
+      const activities = await this.getActivitiesByGarden(gardenId, {
+        endDate: new Date().toISOString(),
+      });
+
+      // Sort by date (newest first) and limit results
+      return activities
+        .sort((a, b) => {
+          const dateA = new Date(a.timestamp).getTime();
+          const dateB = new Date(b.timestamp).getTime();
+          return dateB - dateA;
+        })
+        .slice(0, limit)
+        .map((activity) => ({
+          ...activity,
+          completed: true, // Recent activities are already completed
+        }));
+    } catch (error) {
+      console.error(
+        `Error fetching recent activities for garden ${gardenId}:`,
+        error
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Get upcoming scheduled activities for a garden
+   * @param gardenId Garden ID
+   * @param limit Maximum number of activities to return
+   * @returns List of upcoming scheduled activities
+   */
+  async getUpcomingSchedules(
+    gardenId: number | string,
+    limit: number = 5
+  ): Promise<any[]> {
+    try {
+      // This would typically come from a different endpoint in production
+      // For now, we'll return mock data
+      return [];
+    } catch (error) {
+      console.error(
+        `Error fetching upcoming schedules for garden ${gardenId}:`,
+        error
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Complete an activity
+   * @param activityId Activity ID
+   * @returns Whether the operation was successful
+   */
+  async completeActivity(activityId: number | string): Promise<boolean> {
+    try {
+      // In a real implementation, this would call an API endpoint
+      // For now, we'll simulate success
+      return true;
+    } catch (error) {
+      console.error(`Error completing activity ${activityId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Skip a scheduled activity
+   * @param scheduleId Schedule ID
+   * @returns Whether the operation was successful
+   */
+  async skipScheduledActivity(scheduleId: number | string): Promise<boolean> {
+    try {
+      // In a real implementation, this would call an API endpoint
+      // For now, we'll simulate success
+      return true;
+    } catch (error) {
+      console.error(`Error skipping scheduled activity ${scheduleId}:`, error);
+      return false;
+    }
+  }
 }
 
 export default new ActivityService();

@@ -128,6 +128,31 @@ export interface OptimalGardenTime {
 }
 
 /**
+ * Interface for garden weather data with all weather-related information
+ */
+export interface GardenWeatherData {
+  current: WeatherObservation | null;
+  hourly: HourlyForecast[];
+  daily: DailyForecast[];
+}
+
+/**
+ * Interface for garden advice data
+ */
+export interface GardenAdvice {
+  id: number;
+  gardenId: number;
+  action: string;
+  description: string;
+  reason: string;
+  priority: number; // 1-5, 5 là cao nhất
+  suggestedTime: string;
+  category: string; // WATERING, FERTILIZING, PRUNING, PEST_CONTROL, etc.
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
  * Interface for UI display components
  */
 export interface WeatherDisplayProps {

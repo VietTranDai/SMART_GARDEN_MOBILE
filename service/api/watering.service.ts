@@ -178,6 +178,52 @@ class WateringService {
       return false;
     }
   }
+
+  /**
+   * Get upcoming watering schedules for a garden
+   * @param gardenId Garden ID
+   * @param limit Maximum number of schedules to return
+   * @returns List of upcoming watering schedules
+   */
+  async getUpcomingWateringSchedules(
+    gardenId: number | string,
+    limit: number = 5
+  ): Promise<any[]> {
+    try {
+      const now = new Date();
+
+      // Get all schedules for this garden
+      const schedules = await this.getGardenWateringSchedules(gardenId, {
+        status: TaskStatus.PENDING, // Only get pending schedules
+      });
+
+      // Filter for future schedules and sort by scheduled time
+      return schedules
+        .filter((schedule) => {
+          const scheduleDate = new Date(schedule.scheduledAt);
+          return scheduleDate > now;
+        })
+        .sort((a, b) => {
+          const dateA = new Date(a.scheduledAt).getTime();
+          const dateB = new Date(b.scheduledAt).getTime();
+          return dateA - dateB; // Sort by earliest first
+        })
+        .slice(0, limit)
+        .map((schedule) => ({
+          id: schedule.id,
+          activityType: "WATERING",
+          name: "Tưới nước",
+          scheduledTime: schedule.scheduledAt,
+          gardenId: schedule.gardenId,
+        }));
+    } catch (error) {
+      console.error(
+        `Error fetching upcoming watering schedules for garden ${gardenId}:`,
+        error
+      );
+      return [];
+    }
+  }
 }
 
 export default new WateringService();

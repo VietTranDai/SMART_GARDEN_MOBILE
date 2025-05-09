@@ -104,6 +104,30 @@ class AlertService {
       return 0;
     }
   }
+
+  /**
+   * Get alerts for a specific garden
+   */
+  async getGardenAlerts(gardenId: string | number): Promise<Alert[]> {
+    try {
+      return this.getAlertsByGarden(gardenId);
+    } catch (error) {
+      console.error(`Error in getGardenAlerts for garden ${gardenId}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Ignore an alert
+   */
+  async ignoreAlert(alertId: string | number): Promise<Alert | null> {
+    try {
+      return this.updateAlertStatus(alertId, AlertStatus.IGNORED);
+    } catch (error) {
+      console.error(`Error ignoring alert ${alertId}:`, error);
+      return null;
+    }
+  }
 }
 
 export default new AlertService();
