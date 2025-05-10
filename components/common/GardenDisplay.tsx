@@ -14,41 +14,57 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import useSectionAnimation from "@/hooks/useSectionAnimation";
-import { GardenDisplay as GardenDisplayType } from "@/hooks/useHomeData";
 import { GardenType } from "@/types/gardens/garden.types";
+import { GardenDisplayDto } from "@/types/gardens/dtos";
 import { SensorType, SensorData } from "@/types/gardens/sensor.types";
-import SensorStrip from "./SensorStrip";
 import { makeHomeStyles } from "../common/styles";
 import { LinearGradient } from "expo-linear-gradient";
-import { useGardenContext } from "@/context/GardenContext";
-import { sensorService, gardenService } from "@/service/api";
+import { useGardenContext } from "@/contexts/GardenContext";
+import gardenService from "@/service/api/garden.service";
+import sensorService from "@/service/api/sensor.service";
+import SensorStrip from "./SensorStrip";
+import env from "@/config/environment";
 
-// Mở rộng interface GardenDisplay để thêm các thuộc tính thiếu
-interface ExtendedGardenDisplay extends GardenDisplayType {
-  imageUrl?: string;
-  profilePicture?: string;
-  plantCount?: number;
+// Extend GardenDisplayDto with optional properties needed
+interface ExtendedGardenDisplayDto extends GardenDisplayDto {
   sensorCount?: number;
-  area?: number;
-  createdAt?: string;
-  daysUntilHarvest?: number;
-  growthProgress?: number;
-  plantStartDate?: string;
-  plantName?: string;
-  plantGrowStage?: string;
-  description?: string;
+}
+
+// Interface cho GardenCard props
+interface GardenCardProps {
+  garden: ExtendedGardenDisplayDto;
+  index: number;
+  isSelected: boolean;
+  onSelect: (gardenId: number, index: number) => void;
+  onShowAdvice?: (gardenId: number) => void;
+  onShowWeatherDetail?: (gardenId: number) => void;
+  gardenSensorData: Record<string, SensorData[]>;
+  gardenWeather: any | null;
+  getSensorStatus?: (
+    value: number,
+    type: SensorType
+  ) => "normal" | "warning" | "critical";
+  theme: any;
+  showLargeCards: boolean;
+  getGardenIcon: (type: GardenType) => string;
+  getGardenTypeText: (type: GardenType) => string;
+  getDefaultGardenImage: (type: GardenType) => { uri: string };
+  formatDate: (dateString?: string) => string;
+  adviceLoading?: boolean;
+  weatherLoading?: boolean;
+  onShowAlertDetails?: (gardenId: number) => void;
 }
 
 interface GardenDisplayProps {
-  gardens: ExtendedGardenDisplay[];
+  gardens: ExtendedGardenDisplayDto[];
   selectedGardenId?: number | null;
   onSelectGarden: (gardenId: number) => void;
-  onTogglePinGarden: (gardenId: number) => void;
   showFullDetails?: boolean;
-  sensorDataByGarden?: Record<number, Record<SensorType, SensorData[]>>;
+  sensorDataByGarden?: Record<number, Record<string, SensorData[]>>;
   sensorDataLoading?: Record<number, boolean>;
   sensorDataError?: Record<number, string | null>;
   onShowAdvice?: (gardenId: number) => void;
+  onTogglePinGarden?: (gardenId: number) => void;
   weatherDataByGarden?: Record<number, any>;
   showLargeCards?: boolean;
   getSensorStatus?: (
@@ -62,34 +78,6 @@ interface GardenDisplayProps {
   onShowAlertDetails?: (gardenId: number) => void;
 }
 
-// Interface cho GardenCard props
-interface GardenCardProps {
-  garden: ExtendedGardenDisplay;
-  index: number;
-  isSelected: boolean;
-  onSelect: (gardenId: number, index: number) => void;
-  onTogglePinGarden: (gardenId: number) => void;
-  onShowAdvice?: (gardenId: number) => void;
-  onShowWeatherDetail?: (gardenId: number) => void;
-  gardenSensorData: Record<string, SensorData[]>;
-  isLoadingSensorData: boolean;
-  sensorDataErrorMsg: string | null;
-  gardenWeather: any | null;
-  getSensorStatus?: (
-    value: number,
-    type: SensorType
-  ) => "normal" | "warning" | "critical";
-  theme: any;
-  showLargeCards: boolean;
-  getGardenIcon: (type: GardenType) => any;
-  getGardenTypeText: (type: GardenType) => string;
-  getDefaultGardenImage: (type: GardenType) => { uri: string };
-  formatDate: (dateString?: string) => string;
-  adviceLoading?: boolean;
-  weatherLoading?: boolean;
-  onShowAlertDetails?: (gardenId: number) => void;
-}
-
 // Tối ưu component với memo
 const GardenCard = memo(
   ({
@@ -97,12 +85,9 @@ const GardenCard = memo(
     index,
     isSelected,
     onSelect,
-    onTogglePinGarden,
     onShowAdvice,
     onShowWeatherDetail,
     gardenSensorData = {},
-    isLoadingSensorData = false,
-    sensorDataErrorMsg = null,
     gardenWeather = null,
     getSensorStatus,
     theme,
@@ -121,6 +106,12 @@ const GardenCard = memo(
     // Xác định số cảnh báo từ sensor data
     const getSensorAlerts = useCallback(() => {
       let alertCount = 0;
+
+      // Kiểm tra nếu gardenSensorData không phải là object hợp lệ
+      if (!gardenSensorData || typeof gardenSensorData !== "object") {
+        return 0;
+      }
+
       // Kiểm tra các loại cảm biến phổ biến
       const sensorTypes = [
         SensorType.TEMPERATURE,
@@ -130,10 +121,14 @@ const GardenCard = memo(
       ];
 
       sensorTypes.forEach((type) => {
-        if (gardenSensorData[type]?.length) {
-          const latestReading = gardenSensorData[type][0]; // Lấy chỉ số mới nhất
+        // Chuyển đổi enum thành string để sử dụng làm key
+        const typeKey = type.toString();
+
+        // Kiểm tra an toàn trước khi truy cập
+        if (gardenSensorData[typeKey]?.length) {
+          const latestReading = gardenSensorData[typeKey][0]; // Lấy chỉ số mới nhất
           if (latestReading) {
-            // Giả định rằng có một hàm kiểm tra giá trị cảm biến có vượt ngưỡng không
+            // Kiểm tra giá trị cảm biến có vượt ngưỡng không
             const status = getSensorStatus
               ? getSensorStatus(latestReading.value, type)
               : "normal";
@@ -146,10 +141,10 @@ const GardenCard = memo(
       });
 
       return alertCount;
-    }, [gardenSensorData, getSensorStatus]);
+    }, [gardenSensorData, getSensorStatus, garden.id]);
 
     // Lấy tổng số cảnh báo (kết hợp giữa alert từ backend và sensor alerts)
-    const totalAlerts = garden.alertCount + getSensorAlerts();
+    const totalAlerts = (garden.alertCount || 0) + getSensorAlerts();
 
     const handlePress = useCallback(() => {
       Animated.sequence([
@@ -209,7 +204,7 @@ const GardenCard = memo(
           <View style={styles.imageContainer}>
             {garden.profilePicture ? (
               <Image
-                source={{ uri: garden.profilePicture }}
+                source={{ uri: `${env.apiUrl}${garden.profilePicture}` }}
                 style={styles.gardenImage}
                 defaultSource={getDefaultGardenImage(garden.type)}
               />
@@ -230,27 +225,8 @@ const GardenCard = memo(
 
             {/* Icon Garden Type */}
             <View style={styles.gardenTypeIconContainer}>
-              <Ionicons name={iconName} size={14} color="#fff" />
+              <Ionicons name={iconName as any} size={14} color="#fff" />
             </View>
-
-            {/* Pin Button */}
-            <TouchableOpacity
-              style={[
-                styles.pinButton,
-                {
-                  backgroundColor: garden.isPinned
-                    ? `${theme.primary}40`
-                    : "rgba(255,255,255,0.3)",
-                },
-              ]}
-              onPress={() => onTogglePinGarden(garden.id)}
-            >
-              <Ionicons
-                name={garden.isPinned ? "pin" : "pin-outline"}
-                size={16}
-                color={garden.isPinned ? "#fff" : "#fff"}
-              />
-            </TouchableOpacity>
 
             {/* Garden name over image */}
             <View style={styles.gardenNameContainer}>
@@ -407,9 +383,7 @@ const GardenCard = memo(
 
             {/* Direct Sensor Data Display - Đặt thứ ba */}
             <SensorStrip
-              sensorData={gardenSensorData}
-              isLoading={isLoadingSensorData}
-              error={sensorDataErrorMsg}
+              sensorData={gardenSensorData || {}}
               theme={theme}
               compact={true}
             />
@@ -518,7 +492,6 @@ const GardenCard = memo(
     return (
       prevProps.isSelected === nextProps.isSelected &&
       prevProps.gardenSensorData === nextProps.gardenSensorData &&
-      prevProps.isLoadingSensorData === nextProps.isLoadingSensorData &&
       prevProps.adviceLoading === nextProps.adviceLoading &&
       prevProps.weatherLoading === nextProps.weatherLoading &&
       prevProps.gardenWeather === nextProps.gardenWeather
@@ -531,12 +504,12 @@ const GardenDisplay = memo(function GardenDisplay({
   gardens,
   selectedGardenId: propSelectedGardenId,
   onSelectGarden: propOnSelectGarden,
-  onTogglePinGarden,
   showFullDetails = false,
   sensorDataByGarden = {},
   sensorDataLoading = {},
   sensorDataError = {},
   onShowAdvice,
+  onTogglePinGarden,
   weatherDataByGarden = {},
   showLargeCards = false,
   getSensorStatus,
@@ -580,91 +553,19 @@ const GardenDisplay = memo(function GardenDisplay({
 
   // Các utility functions đã memoize
   const getGardenIcon = useCallback((type: GardenType) => {
-    switch (type) {
-      case "OUTDOOR":
-        return "flower";
-      case "INDOOR":
-        return "home";
-      case "BALCONY":
-        return "grid";
-      case "ROOFTOP":
-        return "sunny";
-      case "COMMUNITY" as GardenType:
-        return "people";
-      case "HYDROPONIC" as GardenType:
-        return "water";
-      default:
-        return "leaf";
-    }
+    return gardenService.getGardenIconName(type);
   }, []);
 
   const getGardenTypeText = useCallback((type: GardenType) => {
-    switch (type) {
-      case "OUTDOOR":
-        return "Vườn ngoài trời";
-      case "INDOOR":
-        return "Vườn trong nhà";
-      case "BALCONY":
-        return "Vườn ban công";
-      case "ROOFTOP":
-        return "Vườn sân thượng";
-      case "COMMUNITY" as GardenType:
-        return "Vườn cộng đồng";
-      case "HYDROPONIC" as GardenType:
-        return "Vườn thủy canh";
-      default:
-        return "Vườn";
-    }
+    return gardenService.getGardenTypeText(type);
   }, []);
 
   const getDefaultGardenImage = useCallback((type: GardenType) => {
-    // Trả về ảnh mặc định dựa trên loại vườn
-    switch (type) {
-      case "OUTDOOR":
-        return {
-          uri: "https://images.unsplash.com/photo-1624438246237-8b8c2e213a5b",
-        };
-      case "INDOOR":
-        return {
-          uri: "https://images.unsplash.com/photo-1627910080621-031a7ab8e769",
-        };
-      case "BALCONY":
-        return {
-          uri: "https://images.unsplash.com/photo-1545319261-f3760f9dd54c",
-        };
-      case "ROOFTOP":
-        return {
-          uri: "https://images.unsplash.com/photo-1599076482136-e8c25bfa85e7",
-        };
-      case "COMMUNITY" as GardenType:
-        return {
-          uri: "https://images.unsplash.com/photo-1621955584212-66e5976feab3",
-        };
-      case "HYDROPONIC" as GardenType:
-        return {
-          uri: "https://images.unsplash.com/photo-1553025484-cee7712bc812",
-        };
-      default:
-        return {
-          uri: "https://images.unsplash.com/photo-1622383563672-fc05f9d99dd7",
-        };
-    }
+    return gardenService.getDefaultGardenImage(type);
   }, []);
 
   const formatDate = useCallback((dateString?: string) => {
-    if (!dateString) return "";
-
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("vi-VN", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-    } catch (error) {
-      console.error("Error formatting date:", error);
-      return dateString;
-    }
+    return gardenService.formatDate(dateString || "");
   }, []);
 
   // Luôn duy trì vị trí scroll khi component re-render
@@ -774,13 +675,10 @@ const GardenDisplay = memo(function GardenDisplay({
             index={gardens.indexOf(garden)}
             isSelected={garden.id === selectedGardenId}
             onSelect={handleSelectGarden}
-            onTogglePinGarden={onTogglePinGarden}
             onShowAdvice={onShowAdvice}
             onShowWeatherDetail={onShowWeatherDetail}
             onShowAlertDetails={onShowAlertDetails}
             gardenSensorData={sensorDataByGarden[garden.id] || {}}
-            isLoadingSensorData={sensorDataLoading[garden.id] || false}
-            sensorDataErrorMsg={sensorDataError[garden.id] || null}
             gardenWeather={weatherDataByGarden[garden.id] || null}
             getSensorStatus={getSensorStatus}
             theme={theme}
@@ -836,7 +734,7 @@ const styles = StyleSheet.create({
   },
   gardenCard: {
     width: 300,
-    height: 520,
+    height: 580,
     borderRadius: 16,
     overflow: "hidden",
     borderWidth: 0,
@@ -844,7 +742,7 @@ const styles = StyleSheet.create({
   },
   largeGardenCard: {
     width: 390,
-    height: 550,
+    height: 620,
   },
   imageContainer: {
     height: 165,

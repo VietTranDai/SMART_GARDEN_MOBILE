@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useUser } from "@/contexts/UserContext";
-import { useGardenContext } from "@/context/GardenContext";
+import { useGardenContext } from "@/contexts/GardenContext";
 import { SensorType } from "@/types/gardens/sensor.types";
 
 // Import custom hooks
@@ -9,6 +9,7 @@ import useSensorData, { getSensorStatus } from "./useSensorData";
 import useWeatherData from "./useWeatherData";
 import useAlertData from "./useAlertData";
 import useActivityData from "./useActivityData";
+import gardenService from "@/service/api/garden.service";
 
 /**
  * Main hook for Home screen data management
@@ -98,26 +99,11 @@ export default function useHomeData() {
       try {
         // Fetch sensor data
         await sensorData.fetchSensorData(gardenId);
+        
 
         const weatherResult = await weatherData.fetchCompleteWeatherData(
           gardenId
         );
-
-        // // Debug if weather data was fetched correctly
-        // console.log(`useHomeData: Weather data fetched result:`, {
-        //   success: !!weatherResult,
-        //   hasGardenWeatherData:
-        //     weatherData.gardenWeatherData &&
-        //     gardenId in weatherData.gardenWeatherData,
-        //   dataType: weatherResult ? typeof weatherResult : "undefined",
-        //   hasHourly: weatherResult && "hourly" in weatherResult,
-        //   hourlyType: weatherResult?.hourly
-        //     ? typeof weatherResult.hourly
-        //     : "undefined",
-        //   isHourlyArray: weatherResult?.hourly
-        //     ? Array.isArray(weatherResult.hourly)
-        //     : false,
-        // });
 
         // Fetch weather advice
         await weatherData.fetchWeatherAdvice(gardenId);
@@ -182,6 +168,21 @@ export default function useHomeData() {
     [setSelectedGardenId]
   );
 
+  /**
+   * Fetch garden advice for a specific garden
+   */
+  const fetchGardenAdvice = useCallback(async (gardenId: number) => {
+    try {
+      return await gardenService.getGardenAdvice(gardenId);
+    } catch (error) {
+      console.error(
+        `Error fetching garden advice for garden ${gardenId}:`,
+        error
+      );
+      return [];
+    }
+  }, []);
+
   return {
     // User and context data
     user,
@@ -194,7 +195,6 @@ export default function useHomeData() {
 
     // Gardens
     gardens: gardenData.gardens,
-    togglePinGarden: gardenData.togglePinGarden,
 
     // Sensors
     gardenSensorData: sensorData.gardenSensorData,
@@ -228,6 +228,7 @@ export default function useHomeData() {
     handleRefresh,
     fetchCompleteWeatherData: weatherData.fetchCompleteWeatherData,
     fetchWeatherAdvice: weatherData.fetchWeatherAdvice,
+    fetchGardenAdvice,
     calculateOptimalTimes: weatherData.calculateOptimalTimes,
     resolveAlert: alertData.resolveAlert,
     ignoreAlert: alertData.ignoreAlert,

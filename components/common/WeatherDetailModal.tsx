@@ -37,6 +37,7 @@ interface WeatherDetailModalProps {
   hourlyForecast: HourlyForecast[];
   dailyForecast: DailyForecast[];
   weatherAdvice: WeatherAdvice[];
+  adviceType?: "garden" | "weather";
   optimalTimes: OptimalGardenTime[];
   garden?: GardenDisplayDto;
   isLoading: boolean;
@@ -50,6 +51,7 @@ export default function WeatherDetailModal({
   hourlyForecast = [],
   dailyForecast = [],
   weatherAdvice = [],
+  adviceType,
   optimalTimes = [],
   garden,
   isLoading,
@@ -58,7 +60,6 @@ export default function WeatherDetailModal({
   const [activeTab, setActiveTab] = useState<"forecast" | "advice" | "optimal">(
     "forecast"
   );
-
 
   const safeHourlyForecast = useMemo(() => {
     try {

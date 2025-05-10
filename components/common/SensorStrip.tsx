@@ -19,9 +19,7 @@ import {
 } from "@/types/gardens/sensor.types";
 
 interface SensorStripProps {
-  sensorData: Record<SensorType, SensorData[]>;
-  isLoading?: boolean;
-  error?: string | null;
+  sensorData: Record<string, SensorData[]>;
   theme: any;
   compact?: boolean;
 }
@@ -367,15 +365,31 @@ const SensorItem = memo(
   }
 );
 
-// Main component - cập nhật để hiển thị theo 2 dòng
 const SensorStrip = memo(
-  ({
-    sensorData,
-    isLoading,
-    error,
-    theme,
-    compact = false,
-  }: SensorStripProps) => {
+  ({ sensorData, theme, compact = false }: SensorStripProps) => {
+    const processedData = useMemo(() => {
+      if (!sensorData || typeof sensorData !== "object") {
+        console.log("SensorStrip: Invalid sensor data");
+        return {} as Record<string, SensorData[]>;
+      }
+
+      // Tạo đối tượng mới với các key là string (đại diện cho SensorType)
+      const result: Record<string, SensorData[]> = {};
+
+      // Xử lý dữ liệu theo từng loại
+      Object.keys(sensorData).forEach((typeKey) => {
+        // Kiểm tra xem giá trị có phải là mảng không
+        if (
+          Array.isArray(sensorData[typeKey]) &&
+          sensorData[typeKey].length > 0
+        ) {
+          result[typeKey] = sensorData[typeKey];
+        }
+      });
+
+      return result;
+    }, [sensorData]);
+
     // State to track previous values for animation
     const [previousValues, setPreviousValues] = useState<
       Record<SensorType, number | null>
@@ -403,18 +417,28 @@ const SensorStrip = memo(
     // Get latest value for each sensor type - memoized
     const getLatestValue = useCallback(
       (type: SensorType): number | null => {
-        const typeData = sensorData[type];
-        if (!typeData || typeData.length === 0) return null;
+        const typeKey = type.toString();
+        if (!processedData[typeKey] || !Array.isArray(processedData[typeKey])) {
+          return null;
+        }
+
+        const typeData = processedData[typeKey];
+        if (typeData.length === 0) return null;
 
         // Sort by timestamp and get the latest
-        const sorted = [...typeData].sort(
-          (a, b) =>
-            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
+        try {
+          const sorted = [...typeData].sort(
+            (a, b) =>
+              new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          );
 
-        return sorted[0].value;
+          return sorted[0].value;
+        } catch (error) {
+          console.error(`Error sorting sensor data for ${typeKey}:`, error);
+          return typeData[0]?.value ?? null;
+        }
       },
-      [sensorData]
+      [processedData]
     );
 
     // Update previous values when current values change
@@ -441,7 +465,7 @@ const SensorStrip = memo(
         }
         return prevState;
       });
-    }, [sensorData, getLatestValue, importantSensorTypes]);
+    }, [processedData, getLatestValue, importantSensorTypes]);
 
     // Chia dữ liệu cảm biến thành 2 dòng
     const getRowSensorData = useCallback(() => {

@@ -13,31 +13,6 @@ import {
 } from "@/types/gardens/sensor-dtos";
 import { SENSOR_ENDPOINTS } from "../endpoints";
 import { Platform } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
-// Cache keys
-const CACHE_KEYS = {
-  SENSOR_LIST: (gardenId: number | string) => `sensors_garden_${gardenId}`,
-  SENSOR_DETAIL: (sensorId: number | string) => `sensor_${sensorId}`,
-  SENSOR_DATA: (sensorId: number | string, params?: any) =>
-    `sensor_data_${sensorId}_${params ? JSON.stringify(params) : "default"}`,
-  GARDEN_SENSOR_DATA: (gardenId: number | string, params?: any) =>
-    `garden_data_${gardenId}_${params ? JSON.stringify(params) : "default"}`,
-};
-
-// Cache expiration times (in milliseconds)
-const CACHE_EXPIRY = {
-  SENSOR_LIST: 5 * 60 * 1000, // 5 minutes
-  SENSOR_DETAIL: 10 * 60 * 1000, // 10 minutes
-  SENSOR_DATA: 2 * 60 * 1000, // 2 minutes
-  GARDEN_SENSOR_DATA: 2 * 60 * 1000, // 2 minutes
-};
-
-// Cache interface
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-}
 
 /**
  * Sensor Service
@@ -48,31 +23,13 @@ class SensorService {
   /**
    * Get all sensors for a garden
    * @param gardenId Garden ID
-   * @param forceRefresh Force refresh data from API
    * @returns List of sensors
    */
-  async getSensorsByGarden(
-    gardenId: number | string,
-    forceRefresh = false
-  ): Promise<Sensor[]> {
-    const cacheKey = CACHE_KEYS.SENSOR_LIST(gardenId);
-
-    // Try to get from cache first if not forcing refresh
-    if (!forceRefresh) {
-      const cachedData = await this.getFromCache<Sensor[]>(
-        cacheKey,
-        CACHE_EXPIRY.SENSOR_LIST
-      );
-      if (cachedData) return cachedData;
-    }
-
+  async getSensorsByGarden(gardenId: number | string): Promise<Sensor[]> {
     // Fetch from API with retry mechanism
     const response = await this.retryApiCall(() =>
       apiClient.get(SENSOR_ENDPOINTS.LIST_BY_GARDEN(gardenId))
     );
-
-    // Store in cache
-    await this.saveToCache(cacheKey, response.data.data);
 
     return response.data.data;
   }
@@ -80,31 +37,13 @@ class SensorService {
   /**
    * Get sensor by id
    * @param sensorId Sensor id
-   * @param forceRefresh Force refresh data from API
    * @returns Sensor data
    */
-  async getSensorById(
-    sensorId: number | string,
-    forceRefresh = false
-  ): Promise<Sensor> {
-    const cacheKey = CACHE_KEYS.SENSOR_DETAIL(sensorId);
-
-    // Try to get from cache first if not forcing refresh
-    if (!forceRefresh) {
-      const cachedData = await this.getFromCache<Sensor>(
-        cacheKey,
-        CACHE_EXPIRY.SENSOR_DETAIL
-      );
-      if (cachedData) return cachedData;
-    }
-
+  async getSensorById(sensorId: number | string): Promise<Sensor> {
     // Fetch from API with retry mechanism
     const response = await this.retryApiCall(() =>
       apiClient.get(SENSOR_ENDPOINTS.DETAIL(sensorId))
     );
-
-    // Store in cache
-    await this.saveToCache(cacheKey, response.data.data);
 
     return response.data.data;
   }
@@ -118,9 +57,6 @@ class SensorService {
     const response = await this.retryApiCall(() =>
       apiClient.post(SENSOR_ENDPOINTS.CREATE(sensorData.gardenId), sensorData)
     );
-
-    // Invalidate relevant caches
-    await this.invalidateCache(CACHE_KEYS.SENSOR_LIST(sensorData.gardenId));
 
     return response.data.data;
   }
@@ -139,77 +75,33 @@ class SensorService {
       apiClient.put(SENSOR_ENDPOINTS.DETAIL(sensorId), sensorData)
     );
 
-    // Invalidate relevant caches
-    await this.invalidateCache(CACHE_KEYS.SENSOR_DETAIL(sensorId));
-    if (response.data.data.gardenId) {
-      await this.invalidateCache(
-        CACHE_KEYS.SENSOR_LIST(response.data.data.gardenId)
-      );
-    }
-
     return response.data.data;
   }
 
   /**
    * Delete sensor
    * @param sensorId Sensor id
-   * @param gardenId Garden id (optional, for cache invalidation)
    */
-  async deleteSensor(
-    sensorId: number | string,
-    gardenId?: number | string
-  ): Promise<void> {
-    // Get garden ID first if not provided (for cache invalidation)
-    if (!gardenId) {
-      try {
-        const sensor = await this.getSensorById(sensorId);
-        gardenId = sensor.gardenId;
-      } catch (err) {
-        console.error("Error getting sensor for cache invalidation:", err);
-      }
-    }
-
+  async deleteSensor(sensorId: number | string): Promise<void> {
     await this.retryApiCall(() =>
       apiClient.delete(SENSOR_ENDPOINTS.DELETE(sensorId))
     );
-
-    // Invalidate relevant caches
-    await this.invalidateCache(CACHE_KEYS.SENSOR_DETAIL(sensorId));
-    if (gardenId) {
-      await this.invalidateCache(CACHE_KEYS.SENSOR_LIST(gardenId));
-    }
   }
 
   /**
    * Get sensor data for a specific sensor
    * @param sensorId Sensor id
    * @param params Query parameters
-   * @param forceRefresh Force refresh data from API
    * @returns Sensor data
    */
   async getSensorData(
     sensorId: number | string,
-    params?: SensorDataQueryParams,
-    forceRefresh = false
+    params?: SensorDataQueryParams
   ): Promise<SensorData[]> {
-    const cacheKey = CACHE_KEYS.SENSOR_DATA(sensorId, params);
-
-    // Try to get from cache first if not forcing refresh
-    if (!forceRefresh) {
-      const cachedData = await this.getFromCache<SensorData[]>(
-        cacheKey,
-        CACHE_EXPIRY.SENSOR_DATA
-      );
-      if (cachedData) return cachedData;
-    }
-
     // Fetch from API with retry mechanism
     const response = await this.retryApiCall(() =>
       apiClient.get(SENSOR_ENDPOINTS.SENSOR_DATA(sensorId), { params })
     );
-
-    // Store in cache
-    await this.saveToCache(cacheKey, response.data.data);
 
     return response.data.data;
   }
@@ -218,116 +110,78 @@ class SensorService {
    * Get all sensor data for a garden (across all sensors)
    * @param gardenId Garden id
    * @param params Query parameters
-   * @param forceRefresh Force refresh data from API
    * @returns Garden sensor data
    */
   async getGardenSensorData(
     gardenId: number | string,
-    params?: SensorDataQueryParams & { sensorType?: SensorType },
-    forceRefresh = false
-  ): Promise<Record<SensorType, SensorData[]>> {
-    const cacheKey = CACHE_KEYS.GARDEN_SENSOR_DATA(gardenId, params);
-
-    // Try to get from cache first if not forcing refresh
-    if (!forceRefresh) {
-      const cachedData = await this.getFromCache<
-        Record<SensorType, SensorData[]>
-      >(cacheKey, CACHE_EXPIRY.GARDEN_SENSOR_DATA);
-      if (cachedData) return cachedData;
-    }
-
+    params?: SensorDataQueryParams & { sensorType?: SensorType }
+  ): Promise<Record<string, SensorData[]>> {
     // Fetch from API with retry mechanism
     const response = await this.retryApiCall(() =>
       apiClient.get(SENSOR_ENDPOINTS.GARDEN_SENSOR_DATA(gardenId), { params })
     );
+    const validatedData = this.validateSensorData(response.data.data);
 
-    // Store in cache
-    await this.saveToCache(cacheKey, response.data.data);
-    
-    return response.data.data;
+    return validatedData;
   }
 
   /**
-   * Clears all sensor-related cache entries
+   * Validates and converts sensor data to format needed by components
+   * @param data Raw sensor data from API
+   * @returns Formatted sensor data
+   */
+  validateSensorData(data: any): Record<string, SensorData[]> {
+    // Khởi tạo một đối tượng rỗng với các khóa là chuỗi
+    const result: Record<string, SensorData[]> = {};
+
+    // Nếu dữ liệu không phải là object, trả về đối tượng rỗng
+    if (!data || typeof data !== "object") {
+      return result;
+    }
+
+    // Duyệt qua tất cả các thuộc tính của dữ liệu
+    Object.keys(data).forEach((key) => {
+      // Kiểm tra xem key có phải là kiểu SensorType không
+      const sensorType = key as SensorType;
+
+      // Kiểm tra xem giá trị có phải là mảng không
+      if (Array.isArray(data[key])) {
+        // Biến đổi mảng để đảm bảo mỗi phần tử có định dạng đúng
+        const sensorDataArray = data[key]
+          .map((item: any) => {
+            return {
+              id: item.id || 0,
+              sensorId: item.sensorId || 0,
+              type: sensorType,
+              value: item.value || 0,
+              unit: item.unit || this.getSensorUnitForType(sensorType),
+              timestamp: item.timestamp || new Date().toISOString(),
+              gardenId: item.gardenId,
+              createdAt: item.createdAt || new Date().toISOString(),
+              updatedAt: item.updatedAt || new Date().toISOString(),
+            };
+          })
+          .filter(
+            (item: any) => item.value !== undefined && item.value !== null
+          );
+
+        // Chỉ thêm vào kết quả nếu mảng không rỗng
+        if (sensorDataArray.length > 0) {
+          // Sử dụng chuỗi đại diện cho SensorType làm khóa
+          result[sensorType.toString()] = sensorDataArray;
+        }
+      }
+    });
+
+    return result;
+  }
+
+  /**
+   * Clears all sensor-related cache entries - now a no-op
    */
   async clearCache(): Promise<void> {
-    try {
-      const keys = await AsyncStorage.getAllKeys();
-      const sensorKeys = keys.filter(
-        (key) =>
-          key.startsWith("sensors_") ||
-          key.startsWith("sensor_") ||
-          key.startsWith("garden_data_")
-      );
-
-      if (sensorKeys.length > 0) {
-        await AsyncStorage.multiRemove(sensorKeys);
-      }
-    } catch (err) {
-      console.error("Error clearing sensor cache:", err);
-    }
-  }
-
-  // Helper methods for caching
-
-  /**
-   * Save data to cache
-   * @param key Cache key
-   * @param data Data to cache
-   */
-  private async saveToCache<T>(key: string, data: T): Promise<void> {
-    try {
-      const cacheEntry: CacheEntry<T> = {
-        data,
-        timestamp: Date.now(),
-      };
-      await AsyncStorage.setItem(key, JSON.stringify(cacheEntry));
-    } catch (err) {
-      console.error("Error saving to cache:", err);
-    }
-  }
-
-  /**
-   * Get data from cache if not expired
-   * @param key Cache key
-   * @param expiryTime Expiry time in milliseconds
-   * @returns Cached data or null if expired/not found
-   */
-  private async getFromCache<T>(
-    key: string,
-    expiryTime: number
-  ): Promise<T | null> {
-    try {
-      const cachedDataString = await AsyncStorage.getItem(key);
-      if (!cachedDataString) return null;
-
-      const cachedEntry = JSON.parse(cachedDataString) as CacheEntry<T>;
-      const now = Date.now();
-
-      // Return data if not expired
-      if (now - cachedEntry.timestamp < expiryTime) {
-        return cachedEntry.data;
-      }
-
-      // If expired, remove from cache
-      await AsyncStorage.removeItem(key);
-      return null;
-    } catch (err) {
-      console.error("Error getting from cache:", err);
-      return null;
-    }
-  }
-
-  /**
-   * Invalidate a cache entry
-   * @param key Cache key
-   */
-  private async invalidateCache(key: string): Promise<void> {
-    try {
-      await AsyncStorage.removeItem(key);
-    } catch (err) {
-      console.error("Error invalidating cache:", err);
-    }
+    // No-op since we removed caching
+    return;
   }
 
   /**
@@ -447,6 +301,8 @@ class SensorService {
         return "Độ pH";
       case SensorType.WATER_LEVEL:
         return "Mực nước";
+      case SensorType.RAINFALL:
+        return "Lượng mưa";
       default:
         return "Cảm biến";
     }
@@ -467,6 +323,31 @@ class SensorService {
         return "pH";
       case SensorUnit.LITER:
         return "L";
+      case SensorUnit.MILLIMETER:
+        return "mm";
+      default:
+        return "";
+    }
+  }
+
+  /**
+   * Get the unit for a sensor type
+   */
+  getSensorUnitForType(type: SensorType): string {
+    switch (type) {
+      case SensorType.TEMPERATURE:
+        return SensorUnit.CELSIUS;
+      case SensorType.HUMIDITY:
+      case SensorType.SOIL_MOISTURE:
+        return SensorUnit.PERCENT;
+      case SensorType.LIGHT:
+        return SensorUnit.LUX;
+      case SensorType.SOIL_PH:
+        return SensorUnit.PH;
+      case SensorType.WATER_LEVEL:
+        return SensorUnit.LITER;
+      case SensorType.RAINFALL:
+        return SensorUnit.MILLIMETER;
       default:
         return "";
     }
@@ -489,6 +370,8 @@ class SensorService {
         return "flask-outline";
       case SensorType.WATER_LEVEL:
         return "beaker-outline";
+      case SensorType.RAINFALL:
+        return "rainy-outline";
       default:
         return "hardware-chip-outline";
     }
@@ -515,7 +398,7 @@ class SensorService {
    * Format data for SensorDisplay component
    */
   formatSensorDataForDisplay(
-    sensorData: Record<SensorType, SensorData[]>
+    sensorData: Record<string, SensorData[]>
   ): Record<string, SensorDataExtended[]> {
     const result: Record<string, SensorDataExtended[]> = {};
 
@@ -540,27 +423,6 @@ class SensorService {
     });
 
     return result;
-  }
-
-  /**
-   * Helper to get the appropriate unit for a sensor type
-   */
-  private getSensorUnitForType(type: SensorType): string {
-    switch (type) {
-      case SensorType.TEMPERATURE:
-        return SensorUnit.CELSIUS;
-      case SensorType.HUMIDITY:
-      case SensorType.SOIL_MOISTURE:
-        return SensorUnit.PERCENT;
-      case SensorType.LIGHT:
-        return SensorUnit.LUX;
-      case SensorType.SOIL_PH:
-        return SensorUnit.PH;
-      case SensorType.WATER_LEVEL:
-        return SensorUnit.LITER;
-      default:
-        return "";
-    }
   }
 }
 

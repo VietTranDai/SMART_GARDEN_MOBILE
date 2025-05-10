@@ -208,42 +208,6 @@ export default function useGardenData() {
   }, []);
 
   /**
-   * Toggle pinned status for a garden
-   */
-  const togglePinGarden = useCallback(
-    (gardenId: number) => {
-      // Update preferences
-      togglePinnedGarden(gardenId);
-
-      // Update local state
-      setGardens((prev) =>
-        prev
-          .map((garden) =>
-            garden.id === gardenId
-              ? { ...garden, isPinned: !garden.isPinned }
-              : garden
-          )
-          .sort((a, b) => {
-            // Pinned gardens come first
-            if (a.isPinned !== b.isPinned) {
-              return a.isPinned ? -1 : 1;
-            }
-
-            // Then sort by last visited (most recent first)
-            const aTime = a.lastVisitedAt
-              ? new Date(a.lastVisitedAt).getTime()
-              : 0;
-            const bTime = b.lastVisitedAt
-              ? new Date(b.lastVisitedAt).getTime()
-              : 0;
-            return bTime - aTime;
-          })
-      );
-    },
-    [togglePinnedGarden]
-  );
-
-  /**
    * Mark a garden as visited
    */
   const markGardenVisited = useCallback(
@@ -305,7 +269,6 @@ export default function useGardenData() {
     createGarden,
     updateGarden,
     deleteGarden,
-    togglePinGarden,
     markGardenVisited,
     updateGardenSensorData,
     updateGardenAlertCount,

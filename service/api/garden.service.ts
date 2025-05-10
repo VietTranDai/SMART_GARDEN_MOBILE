@@ -1,4 +1,4 @@
-import { CreateGardenDto, UpdateGardenDto } from "@/types";
+import { CreateGardenDto, UpdateGardenDto, GardenDisplayDto } from "@/types";
 import apiClient from "../apiClient";
 import { GARDEN_ENDPOINTS } from "../endpoints";
 import { Garden, GardenType, GardenStatus } from "@/types/gardens/garden.types";
@@ -158,6 +158,10 @@ class GardenService {
         return "sunny";
       case "WINDOW_SILL":
         return "apps";
+      case "COMMUNITY" as GardenType:
+        return "people";
+      case "HYDROPONIC" as GardenType:
+        return "water";
       default:
         return "leaf";
     }
@@ -188,6 +192,14 @@ class GardenService {
         return {
           uri: "https://images.unsplash.com/photo-1622383563672-fc05f9d99dd7",
         };
+      case "COMMUNITY" as GardenType:
+        return {
+          uri: "https://images.unsplash.com/photo-1621955584212-66e5976feab3",
+        };
+      case "HYDROPONIC" as GardenType:
+        return {
+          uri: "https://images.unsplash.com/photo-1553025484-cee7712bc812",
+        };
       default:
         return {
           uri: "https://images.unsplash.com/photo-1622383563672-fc05f9d99dd7",
@@ -202,15 +214,12 @@ class GardenService {
    */
   async getGardenAdvice(gardenId: number | string): Promise<GardenAdvice[]> {
     try {
-      // This would be replaced with a real API endpoint in production
-      // For now, we'll simulate an API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Generate mock advice
-      return this.generateMockAdvice(gardenId);
+      const response = await apiClient.get(GARDEN_ENDPOINTS.ADVICE(gardenId));
+      return response.data.data || this.generateMockAdvice(gardenId);
     } catch (error) {
       console.error(`Error fetching garden advice ${gardenId}:`, error);
-      return [];
+      // Fallback to mock data if API fails
+      return this.generateMockAdvice(gardenId);
     }
   }
 

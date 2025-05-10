@@ -22,6 +22,7 @@ export enum SensorUnit {
   LITER = "L",
   M = "m",
   MM = "mm",
+  MILLIMETER = "mm",
 }
 
 export interface Sensor {

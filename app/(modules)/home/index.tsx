@@ -7,14 +7,10 @@ import React, {
   memo,
 } from "react";
 import {
-  FlatList,
   RefreshControl,
   Animated,
   Text,
   View,
-  Platform,
-  StyleProp,
-  ViewStyle,
   TouchableOpacity,
   FlexAlignType,
   ScrollView,
@@ -23,11 +19,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 
 // Import custom hooks
 import useHomeData from "@/hooks/useHomeData";
-import { useGardenContext } from "@/context/GardenContext";
+import { useGardenContext } from "@/contexts/GardenContext";
 
 // Import styles
 import { makeHomeStyles } from "@/components/common/styles";
@@ -43,14 +38,14 @@ import EmptyGardensView from "@/components/common/EmptyGardensView";
 import AdviceModal from "@/components/common/AdviceModal";
 import WeatherDetailModal from "@/components/common/WeatherDetailModal";
 import AlertDetailsModal from "@/components/common/AlertDetailsModal";
-import { GardenProvider } from "@/context/GardenContext";
+import { GardenProvider } from "@/contexts/GardenContext";
 import HomeSections, {
   SectionType,
   SectionConfig,
-} from "@/components/sections/HomeSections";
+} from "@/components/home/HomeSections";
 
 // Import types
-import { SensorType } from "@/types/gardens/sensor.types";
+import { SensorData, SensorType } from "@/types/gardens/sensor.types";
 import { GardenDisplayDto } from "@/types/gardens/dtos";
 import {
   WeatherObservation,
@@ -58,8 +53,6 @@ import {
   DailyForecast,
   GardenWeatherData,
   GardenAdvice,
-  WeatherAdvice,
-  OptimalGardenTime,
 } from "@/types/weather/weather.types";
 import { Alert } from "@/types/alerts/alert.types";
 import {
@@ -130,9 +123,7 @@ interface GardenSectionProps {
   onShowWeatherDetail: (gardenId: number) => void;
   onScrollToWeatherSection: (gardenId: number) => void;
   onShowAlertDetails: (gardenId: number) => void;
-  sensorDataByGarden: Record<number, Record<string, any[]>>;
-  sensorDataLoading: Record<number, boolean>;
-  sensorDataError: Record<number, string | null>;
+  sensorDataByGarden: Record<number, Record<string, SensorData[]>>;
   weatherDataByGarden: Record<number, GardenWeatherData>;
   adviceLoading: Record<number, boolean>;
   weatherDetailLoading: Record<number, boolean>;
@@ -275,8 +266,6 @@ const GardenSection = memo((props: GardenSectionProps) => {
     onScrollToWeatherSection,
     onShowAlertDetails,
     sensorDataByGarden,
-    sensorDataLoading,
-    sensorDataError,
     weatherDataByGarden,
     adviceLoading,
     weatherDetailLoading,
@@ -303,10 +292,12 @@ const GardenSection = memo((props: GardenSectionProps) => {
 
   // Xác thực dữ liệu sensor để đảm bảo hiển thị đúng trong garden card
   const validatedSensorData = useMemo(() => {
-    // Đảm bảo sensorDataByGarden là một object hợp lệ
     if (!sensorDataByGarden || typeof sensorDataByGarden !== "object") {
+      console.log("sensorDataByGarden is invalid:", sensorDataByGarden);
       return {};
     }
+
+    console.log("sensorDataByGarden", sensorDataByGarden);
 
     // Tạo một đối tượng mới để tránh thay đổi object gốc
     const result: Record<number, Record<string, any[]>> = {};
@@ -321,13 +312,26 @@ const GardenSection = memo((props: GardenSectionProps) => {
           result[gardenId] = {};
 
           // Duyệt qua các loại sensor
-          Object.keys(gardenSensors).forEach((sensorType) => {
+          Object.keys(gardenSensors).forEach((sensorTypeKey) => {
             // Đảm bảo dữ liệu của mỗi loại sensor là một mảng
-            const sensorData = gardenSensors[sensorType];
+            const sensorData = gardenSensors[sensorTypeKey];
+
+            // Nếu sensorTypeKey là SensorType enum, chuyển nó thành string
+            const typeKey = sensorTypeKey.toString();
+
             if (Array.isArray(sensorData)) {
-              result[gardenId][sensorType] = [...sensorData];
+              // Lọc những sensor data không hợp lệ
+              const validSensorData = sensorData.filter(
+                (item) =>
+                  item &&
+                  typeof item === "object" &&
+                  "value" in item &&
+                  typeof item.value === "number"
+              );
+
+              result[gardenId][typeKey] = validSensorData;
             } else {
-              result[gardenId][sensorType] = [];
+              result[gardenId][typeKey] = [];
             }
           });
         }
@@ -347,8 +351,6 @@ const GardenSection = memo((props: GardenSectionProps) => {
         onScrollToWeatherSection={onScrollToWeatherSection}
         onShowAlertDetails={onShowAlertDetails}
         sensorDataByGarden={validatedSensorData}
-        sensorDataLoading={sensorDataLoading}
-        sensorDataError={sensorDataError}
         weatherDataByGarden={weatherDataByGarden}
         getSensorStatus={getSensorStatus}
         showLargeCards={showLargeCards}
@@ -725,7 +727,6 @@ function HomeScreenContent() {
 
   // Get all data from our custom hook
   const {
-    user,
     loading,
     error,
     refreshing,
@@ -734,12 +735,9 @@ function HomeScreenContent() {
     gardenAlerts,
     getWeatherTip,
     getSensorIconName,
-    togglePinGarden,
     recentActivities,
     upcomingSchedules,
     handleRefresh,
-    sensorDataLoading,
-    sensorDataError,
     gardenSensorData,
     weatherAdviceByGarden,
     fetchWeatherAdvice,
@@ -749,6 +747,7 @@ function HomeScreenContent() {
     optimalGardenTimes,
     calculateOptimalTimes,
     fetchCompleteWeatherData,
+    fetchGardenAdvice,
   } = useHomeData();
 
   // State for modals
@@ -951,19 +950,47 @@ function HomeScreenContent() {
 
       setSelectedGardenForAdvice(gardenId);
 
-      // Fetch advice data if needed
-      if (
-        !weatherAdviceByGarden ||
-        typeof weatherAdviceByGarden !== "object" ||
-        (!weatherAdviceByGarden[gardenId] &&
-          (!weatherDetailLoading || !weatherDetailLoading[gardenId]))
-      ) {
-        await fetchWeatherAdvice(gardenId);
+      // Set loading state
+      setGardenAdviceLoading((prev) => ({
+        ...prev,
+        [gardenId]: true,
+      }));
+
+      try {
+        // Fetch garden advice (not weather advice)
+        const advice = await fetchGardenAdvice(gardenId);
+
+        // Store advice in state
+        setGardenAdviceByGarden((prev) => ({
+          ...prev,
+          [gardenId]: advice,
+        }));
+
+        // Clear any errors
+        setGardenAdviceError((prev) => ({
+          ...prev,
+          [gardenId]: null,
+        }));
+      } catch (error) {
+        console.error(
+          `Error fetching garden advice for garden ${gardenId}:`,
+          error
+        );
+        setGardenAdviceError((prev) => ({
+          ...prev,
+          [gardenId]: `Không thể tải lời khuyên: ${error}`,
+        }));
+      } finally {
+        // Clear loading state
+        setGardenAdviceLoading((prev) => ({
+          ...prev,
+          [gardenId]: false,
+        }));
       }
 
       setAdviceModalVisible(true);
     },
-    [weatherAdviceByGarden, weatherDetailLoading, fetchWeatherAdvice]
+    [fetchGardenAdvice]
   );
 
   // Handle showing weather detail modal
@@ -1126,6 +1153,17 @@ function HomeScreenContent() {
     }));
   }, []);
 
+  // After the existing state declarations, add:
+  const [gardenAdviceByGarden, setGardenAdviceByGarden] = useState<
+    Record<number, GardenAdvice[]>
+  >({});
+  const [gardenAdviceLoading, setGardenAdviceLoading] = useState<
+    Record<number, boolean>
+  >({});
+  const [gardenAdviceError, setGardenAdviceError] = useState<
+    Record<number, string | null>
+  >({});
+
   // If loading, show loading indicator
   if (loading && !refreshing) {
     return <LoadingView message="Đang tải dữ liệu..." />;
@@ -1162,11 +1200,8 @@ function HomeScreenContent() {
           gardens={Array.isArray(gardens) ? gardens : []}
           selectedGardenId={selectedGardenId}
           onSelectGarden={selectGarden}
-          onTogglePinGarden={togglePinGarden}
           sections={sections}
           sensorDataByGarden={gardenSensorData || {}}
-          sensorDataLoading={sensorDataLoading || {}}
-          sensorDataError={sensorDataError || {}}
           weatherData={weatherData}
           gardenWeatherData={gardenWeatherData || {}}
           gardenAlerts={gardenAlerts || {}}
@@ -1192,26 +1227,27 @@ function HomeScreenContent() {
         onClose={() => setAdviceModalVisible(false)}
         advice={
           selectedGardenForAdvice !== null &&
-          weatherAdviceByGarden &&
-          typeof weatherAdviceByGarden === "object" &&
-          selectedGardenForAdvice in weatherAdviceByGarden
-            ? weatherAdviceByGarden[selectedGardenForAdvice]
+          gardenAdviceByGarden &&
+          typeof gardenAdviceByGarden === "object" &&
+          selectedGardenForAdvice in gardenAdviceByGarden
+            ? gardenAdviceByGarden[selectedGardenForAdvice]
             : []
         }
+        adviceType="garden"
         isLoading={
           selectedGardenForAdvice !== null &&
-          weatherDetailLoading &&
-          typeof weatherDetailLoading === "object" &&
-          selectedGardenForAdvice in weatherDetailLoading
-            ? weatherDetailLoading[selectedGardenForAdvice]
+          gardenAdviceLoading &&
+          typeof gardenAdviceLoading === "object" &&
+          selectedGardenForAdvice in gardenAdviceLoading
+            ? gardenAdviceLoading[selectedGardenForAdvice]
             : false
         }
         error={
           selectedGardenForAdvice !== null &&
-          weatherDetailError &&
-          typeof weatherDetailError === "object" &&
-          selectedGardenForAdvice in weatherDetailError
-            ? weatherDetailError[selectedGardenForAdvice]
+          gardenAdviceError &&
+          typeof gardenAdviceError === "object" &&
+          selectedGardenForAdvice in gardenAdviceError
+            ? gardenAdviceError[selectedGardenForAdvice]
             : null
         }
         gardenName={selectedGardenName}
@@ -1256,6 +1292,7 @@ function HomeScreenContent() {
             ? weatherAdviceByGarden[selectedGardenForWeather]
             : []
         }
+        adviceType="weather"
         optimalTimes={
           selectedGardenForWeather !== null &&
           optimalGardenTimes &&

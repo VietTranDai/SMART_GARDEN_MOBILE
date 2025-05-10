@@ -10,6 +10,7 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
+  Animated,
 } from "react-native";
 import { useUser } from "@/contexts/UserContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -20,12 +21,14 @@ import {
   MaterialCommunityIcons,
   MaterialIcons,
   Feather,
+  FontAwesome5,
 } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { removeItem } from "@/utils/asyncStorage";
 import { userService } from "@/service/api";
 import { isGardener } from "@/types/users/user.types";
 import env from "@/config/environment";
+import { LinearGradient } from "expo-linear-gradient";
 
 const CustomSwitch = ({
   value,
@@ -74,6 +77,10 @@ export default function ProfileScreen() {
   const [experienceProgress, setExperienceProgress] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Animation values
+  const profileScale = useRef(new Animated.Value(0.95)).current;
+  const expBarWidth = useRef(new Animated.Value(0)).current;
+
   const darkModeInteractingRef = useRef(false);
   const systemThemeInteractingRef = useRef(false);
   const lastSwitchTimeRef = useRef(0);
@@ -87,15 +94,30 @@ export default function ProfileScreen() {
         setLoading(true);
         const progress = await userService.getExperienceProgress();
         setExperienceProgress(progress);
+
+        // Animate experience bar
+        Animated.timing(expBarWidth, {
+          toValue: progress?.percentToNextLevel || 0,
+          duration: 1000,
+          useNativeDriver: false,
+        }).start();
       } catch (err) {
-        console.error("Failed to fetch experience progress:", err);
-        setError("Could not load experience data");
+        console.error("Không thể tải dữ liệu kinh nghiệm:", err);
+        setError("Không thể tải dữ liệu kinh nghiệm");
       } finally {
         setLoading(false);
       }
     };
 
     fetchExperienceProgress();
+
+    // Animate profile card entrance
+    Animated.spring(profileScale, {
+      toValue: 1,
+      friction: 8,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
   }, [user]);
 
   useEffect(() => {
@@ -149,20 +171,20 @@ export default function ProfileScreen() {
     try {
       await signOut();
     } catch (error) {
-      console.error("Failed to sign out:", error);
-      Alert.alert("Error", "Failed to sign out. Please try again.");
+      console.error("Đăng xuất thất bại:", error);
+      Alert.alert("Lỗi", "Đăng xuất thất bại. Vui lòng thử lại.");
     }
   };
 
   const resetOnboarding = async () => {
     try {
       Alert.alert(
-        "Reset Onboarding",
-        "This will reset the onboarding screens and sign you out. Continue?",
+        "Đặt lại hướng dẫn",
+        "Thao tác này sẽ đặt lại màn hình hướng dẫn và đăng xuất tài khoản của bạn. Bạn có chắc chắn không?",
         [
-          { text: "Cancel", style: "cancel" },
+          { text: "Hủy", style: "cancel" },
           {
-            text: "OK",
+            text: "Xác nhận",
             onPress: async () => {
               await removeItem("@onboarding_completed");
               handleSignOut();
@@ -172,7 +194,7 @@ export default function ProfileScreen() {
         ]
       );
     } catch (error) {
-      Alert.alert("Error", "Failed to reset onboarding status");
+      Alert.alert("Lỗi", "Không thể đặt lại trạng thái hướng dẫn");
     }
   };
 
@@ -186,6 +208,22 @@ export default function ProfileScreen() {
     return 0;
   };
 
+  // Chuyển đổi cấp độ thành văn bản tiếng Việt
+  const getVietnameseLevel = (level: string) => {
+    const levelMap: Record<string, string> = {
+      "Novice Gardener": "Người Làm Vườn Tập Sự",
+      "Amateur Gardener": "Người Làm Vườn Nghiệp Dư",
+      "Gardening Enthusiast": "Người Đam Mê Làm Vườn",
+      "Green Thumb": "Người Có Bàn Tay Xanh",
+      "Garden Master": "Bậc Thầy Làm Vườn",
+      "Plant Expert": "Chuyên Gia Cây Trồng",
+      "Master Gardener": "Bậc Thầy Làm Vườn",
+      "Garden Guru": "Đại Sư Làm Vườn",
+    };
+
+    return levelMap[level] || level;
+  };
+
   return (
     <SafeAreaView
       style={[
@@ -194,11 +232,22 @@ export default function ProfileScreen() {
       ]}
       edges={["bottom"]}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View
-          style={[styles.profileHeader, { backgroundColor: appTheme.primary }]}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <LinearGradient
+          colors={[appTheme.primary, appTheme.primary + "CC"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.profileHeader}
         >
-          <View style={styles.profileImageContainer}>
+          <Animated.View
+            style={[
+              styles.profileImageContainer,
+              { transform: [{ scale: profileScale }] },
+            ]}
+          >
             <Image
               source={{
                 uri:
@@ -218,38 +267,61 @@ export default function ProfileScreen() {
                 {user && isGardener(user) ? user?.experienceLevel?.level : 1}
               </Text>
             </View>
-          </View>
+          </Animated.View>
 
           <Text style={styles.profileName}>
-            {user ? `${user.firstName} ${user.lastName}` : "Garden Enthusiast"}
+            {user ? `${user.firstName} ${user.lastName}` : "Người Yêu Cây"}
           </Text>
           <Text style={styles.profileRole}>
-            {user?.role?.name || "GARDENER"}
+            {user?.role?.name === "GARDENER"
+              ? "NGƯỜI LÀM VƯỜN"
+              : user?.role?.name || "NGƯỜI LÀM VƯỜN"}
           </Text>
 
           {user && isGardener(user) && (
             <View style={styles.experienceContainer}>
               <View style={styles.experienceBar}>
-                <View
+                <Animated.View
                   style={[
                     styles.experienceFill,
-                    { width: `${progressToNextLevel()}%` },
+                    {
+                      width: expBarWidth.interpolate({
+                        inputRange: [0, 100],
+                        outputRange: ["0%", "100%"],
+                      }),
+                    },
                   ]}
-                />
+                >
+                  <LinearGradient
+                    colors={["#FFFFFF", "#F0F0F0"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.experienceGradient}
+                  />
+                </Animated.View>
               </View>
               <Text style={styles.experienceText}>
-                {user.experienceLevel?.title || "Novice Gardener"} •{" "}
-                {user.experiencePoints} XP
+                {getVietnameseLevel(
+                  user.experienceLevel?.title || "Người Làm Vườn Tập Sự"
+                )}{" "}
+                • {user.experiencePoints} XP
               </Text>
             </View>
           )}
-        </View>
+        </LinearGradient>
 
-        <View
-          style={[styles.detailsContainer, { backgroundColor: appTheme.card }]}
+        <Animated.View
+          style={[
+            styles.detailsContainer,
+            {
+              backgroundColor: appTheme.card,
+              transform: [{ scale: profileScale }],
+              opacity: profileScale,
+            },
+          ]}
         >
           <Text style={[styles.sectionTitle, { color: appTheme.text }]}>
-            Personal Information
+            Thông Tin Cá Nhân
           </Text>
 
           <View style={styles.infoRow}>
@@ -284,10 +356,10 @@ export default function ProfileScreen() {
               <Text
                 style={[styles.infoLabel, { color: appTheme.textSecondary }]}
               >
-                Phone
+                Điện Thoại
               </Text>
               <Text style={[styles.infoValue, { color: appTheme.text }]}>
-                {user?.phoneNumber || "Not provided"}
+                {user?.phoneNumber || "Chưa cung cấp"}
               </Text>
             </View>
           </View>
@@ -304,12 +376,12 @@ export default function ProfileScreen() {
               <Text
                 style={[styles.infoLabel, { color: appTheme.textSecondary }]}
               >
-                Date of Birth
+                Ngày Sinh
               </Text>
               <Text style={[styles.infoValue, { color: appTheme.text }]}>
                 {user?.dateOfBirth
-                  ? new Date(user.dateOfBirth).toLocaleDateString()
-                  : "Not provided"}
+                  ? new Date(user.dateOfBirth).toLocaleDateString("vi-VN")
+                  : "Chưa cung cấp"}
               </Text>
             </View>
           </View>
@@ -326,10 +398,10 @@ export default function ProfileScreen() {
               <Text
                 style={[styles.infoLabel, { color: appTheme.textSecondary }]}
               >
-                Address
+                Địa Chỉ
               </Text>
               <Text style={[styles.infoValue, { color: appTheme.text }]}>
-                {user?.address || "Not provided"}
+                {user?.address || "Chưa cung cấp"}
               </Text>
             </View>
           </View>
@@ -340,16 +412,23 @@ export default function ProfileScreen() {
           >
             <Feather name="edit-2" size={16} color={appTheme.primary} />
             <Text style={[styles.editDetailsText, { color: appTheme.primary }]}>
-              Edit Details
+              Chỉnh Sửa Thông Tin
             </Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
 
-        <View
-          style={[styles.statsContainer, { backgroundColor: appTheme.card }]}
+        <Animated.View
+          style={[
+            styles.statsContainer,
+            {
+              backgroundColor: appTheme.card,
+              transform: [{ scale: profileScale }],
+              opacity: profileScale,
+            },
+          ]}
         >
           <Text style={[styles.sectionTitle, { color: appTheme.text }]}>
-            Gardener Statistics
+            Thống Kê Vườn
           </Text>
 
           <View style={styles.statsRow}>
@@ -372,7 +451,7 @@ export default function ProfileScreen() {
               <Text
                 style={[styles.statLabel, { color: appTheme.textSecondary }]}
               >
-                Gardens
+                Khu Vườn
               </Text>
             </View>
 
@@ -395,7 +474,7 @@ export default function ProfileScreen() {
               <Text
                 style={[styles.statLabel, { color: appTheme.textSecondary }]}
               >
-                Plants
+                Cây Trồng
               </Text>
             </View>
 
@@ -407,39 +486,38 @@ export default function ProfileScreen() {
                 ]}
               >
                 <MaterialCommunityIcons
-                  name="calendar-check"
+                  name="clock-outline"
                   size={24}
                   color={appTheme.primary}
                 />
               </View>
               <Text style={[styles.statValue, { color: appTheme.text }]}>
-                {(user as any)?.gardener?.completedTasks ?? 0}
+                {experienceProgress?.daysActive ?? 0}
               </Text>
               <Text
                 style={[styles.statLabel, { color: appTheme.textSecondary }]}
               >
-                Tasks Completed
+                Ngày Hoạt Động
               </Text>
             </View>
           </View>
-        </View>
+        </Animated.View>
 
         <View
           style={[styles.settingsSection, { backgroundColor: appTheme.card }]}
         >
           <Text style={[styles.sectionTitle, { color: appTheme.text }]}>
-            Settings & More
+            Cài Đặt
           </Text>
-
-          <View style={[styles.menuItem]}>
-            <Feather
-              name="moon"
+          <View style={styles.menuItem}>
+            <Ionicons
+              name="moon-outline"
               size={20}
               color={appTheme.primary}
               style={styles.menuIcon}
             />
             <Text style={[styles.menuText, { color: appTheme.text }]}>
-              Dark Mode
+              Chế Độ Tối
             </Text>
             <CustomSwitch
               value={isDarkMode}
@@ -449,15 +527,15 @@ export default function ProfileScreen() {
               theme={appTheme}
             />
           </View>
-          <View style={[styles.menuItem]}>
-            <Feather
-              name="smartphone"
+          <View style={styles.menuItem}>
+            <Ionicons
+              name="color-palette-outline"
               size={20}
               color={appTheme.primary}
               style={styles.menuIcon}
             />
             <Text style={[styles.menuText, { color: appTheme.text }]}>
-              Use System Settings
+              Theo Giao Diện Hệ Thống
             </Text>
             <CustomSwitch
               value={themeMode === "system"}
@@ -467,19 +545,56 @@ export default function ProfileScreen() {
               theme={appTheme}
             />
           </View>
-
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => router.push("/profile/help")}
+            onPress={() => router.push("/profile/notification-settings")}
           >
             <Ionicons
-              name="help-circle-outline"
+              name="notifications-outline"
               size={20}
               color={appTheme.primary}
               style={styles.menuIcon}
             />
             <Text style={[styles.menuText, { color: appTheme.text }]}>
-              Help & Support
+              Thông Báo
+            </Text>
+            <MaterialIcons
+              name="chevron-right"
+              size={24}
+              color={appTheme.textTertiary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push("/profile/privacy")}
+          >
+            <MaterialCommunityIcons
+              name="shield-account-outline"
+              size={20}
+              color={appTheme.primary}
+              style={styles.menuIcon}
+            />
+            <Text style={[styles.menuText, { color: appTheme.text }]}>
+              Quyền Riêng Tư
+            </Text>
+            <MaterialIcons
+              name="chevron-right"
+              size={24}
+              color={appTheme.textTertiary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push("/profile/help")}
+          >
+            <Ionicons
+              name="help-buoy-outline"
+              size={20}
+              color={appTheme.primary}
+              style={styles.menuIcon}
+            />
+            <Text style={[styles.menuText, { color: appTheme.text }]}>
+              Trợ Giúp & Hỗ Trợ
             </Text>
             <MaterialIcons
               name="chevron-right"
@@ -498,7 +613,7 @@ export default function ProfileScreen() {
               style={styles.menuIcon}
             />
             <Text style={[styles.menuText, { color: appTheme.text }]}>
-              About
+              Về Ứng Dụng
             </Text>
             <MaterialIcons
               name="chevron-right"
@@ -510,7 +625,7 @@ export default function ProfileScreen() {
 
         <View style={[styles.dangerZone, { backgroundColor: appTheme.card }]}>
           <Text style={[styles.sectionTitle, { color: appTheme.error }]}>
-            Danger Zone
+            Vùng Nguy Hiểm
           </Text>
           <TouchableOpacity style={styles.menuItem} onPress={resetOnboarding}>
             <Ionicons
@@ -520,7 +635,7 @@ export default function ProfileScreen() {
               style={styles.menuIcon}
             />
             <Text style={[styles.menuText, { color: appTheme.error }]}>
-              Reset Onboarding
+              Đặt Lại Hướng Dẫn
             </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem} onPress={handleSignOut}>
@@ -531,7 +646,7 @@ export default function ProfileScreen() {
               style={styles.menuIcon}
             />
             <Text style={[styles.menuText, { color: appTheme.error }]}>
-              Sign Out
+              Đăng Xuất
             </Text>
           </TouchableOpacity>
         </View>
@@ -557,6 +672,11 @@ const styles = StyleSheet.create({
   profileImageContainer: {
     position: "relative",
     marginBottom: 15,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
   },
   profileImage: {
     width: 100,
@@ -574,16 +694,26 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#FFF",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   levelText: {
     fontSize: 12,
     fontWeight: "bold",
+    fontFamily: "Inter-Bold",
   },
   profileName: {
     fontSize: 22,
     fontWeight: "bold",
     color: "#FFFFFF",
     marginBottom: 4,
+    fontFamily: "Inter-Bold",
+    textShadowColor: "rgba(0,0,0,0.2)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   profileRole: {
     fontSize: 14,
@@ -591,6 +721,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     textTransform: "uppercase",
     letterSpacing: 1,
+    fontFamily: "Inter-SemiBold",
   },
   experienceContainer: {
     width: "80%",
@@ -598,42 +729,50 @@ const styles = StyleSheet.create({
   },
   experienceBar: {
     width: "100%",
-    height: 8,
+    height: 10,
     backgroundColor: "#FFFFFF40",
-    borderRadius: 4,
+    borderRadius: 6,
     overflow: "hidden",
     marginBottom: 6,
+    borderWidth: 1,
+    borderColor: "#FFFFFF30",
   },
   experienceFill: {
     height: "100%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 4,
+    borderRadius: 6,
+  },
+  experienceGradient: {
+    width: "100%",
+    height: "100%",
   },
   experienceText: {
     fontSize: 12,
     color: "#FFFFFFB3",
+    fontFamily: "Inter-Medium",
   },
   detailsContainer: {
     marginHorizontal: 15,
     marginTop: -20,
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 20,
     marginBottom: 15,
-    elevation: 3,
+    elevation: 4,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "bold",
     marginBottom: 15,
+    fontFamily: "Inter-Bold",
   },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 15,
+    paddingHorizontal: 4,
   },
   infoIcon: {
     width: 30,
@@ -646,10 +785,12 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontSize: 12,
     marginBottom: 2,
+    fontFamily: "Inter-Regular",
   },
   infoValue: {
     fontSize: 14,
     fontWeight: "500",
+    fontFamily: "Inter-Medium",
   },
   editDetailsButton: {
     flexDirection: "row",
@@ -657,22 +798,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 10,
     paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: "rgba(0,0,0,0.03)",
   },
   editDetailsText: {
     marginLeft: 8,
     fontSize: 14,
     fontWeight: "600",
+    fontFamily: "Inter-SemiBold",
   },
   statsContainer: {
     marginHorizontal: 15,
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 20,
     marginBottom: 15,
-    elevation: 3,
+    elevation: 4,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
   },
   statsRow: {
     flexDirection: "row",
@@ -694,14 +838,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 2,
+    fontFamily: "Inter-Bold",
   },
   statLabel: {
     fontSize: 12,
     textAlign: "center",
+    fontFamily: "Inter-Regular",
   },
   settingsSection: {
     marginHorizontal: 15,
-    borderRadius: 12,
+    borderRadius: 20,
     paddingVertical: 10,
     paddingHorizontal: 20,
     marginBottom: 15,
@@ -713,7 +859,7 @@ const styles = StyleSheet.create({
   },
   dangerZone: {
     marginHorizontal: 15,
-    borderRadius: 12,
+    borderRadius: 20,
     paddingVertical: 10,
     paddingHorizontal: 20,
     marginBottom: 15,
@@ -727,15 +873,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#EEEEEE",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "rgba(0,0,0,0.05)",
   },
   menuIcon: {
-    width: 30,
-    marginRight: 15,
+    marginRight: 16,
   },
   menuText: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
+    fontFamily: "Inter-Medium",
   },
 });

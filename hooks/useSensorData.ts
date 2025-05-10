@@ -166,15 +166,15 @@ export default function useSensorData() {
    * Fetch dữ liệu cảm biến cho một vườn cụ thể với loading indicator
    */
   const fetchSensorData = useCallback(
-    async (gardenId: number) => {
+    async (gardenId: number, forceRefresh = false) => {
       // Kiểm tra gardenId hợp lệ
       if (typeof gardenId !== "number" || isNaN(gardenId)) {
         console.warn("Invalid garden ID passed to fetchSensorData");
         return null;
       }
 
-      // Ngăn fetch nếu đang loading
-      if (sensorDataLoading[gardenId]) return null;
+      // Ngăn fetch nếu đang loading và không force refresh
+      if (sensorDataLoading[gardenId] && !forceRefresh) return null;
 
       try {
         // Set loading state

@@ -12,15 +12,19 @@ import {
   Dimensions,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { GardenAdvice } from "@/hooks/useHomeData";
+import { GardenAdvice, WeatherAdvice } from "@/types/weather/weather.types";
 import { LinearGradient } from "expo-linear-gradient";
 
 const { width } = Dimensions.get("window");
 
+// Union type to handle both types of advice
+type AdviceItem = GardenAdvice | WeatherAdvice;
+
 interface AdviceModalProps {
   isVisible: boolean;
   onClose: () => void;
-  advice: GardenAdvice[];
+  advice: AdviceItem[];
+  adviceType?: "garden" | "weather"; // Added type property to distinguish advice types
   isLoading: boolean;
   error: string | null;
   gardenName: string;
@@ -31,63 +35,138 @@ const AdviceModal = ({
   isVisible,
   onClose,
   advice,
+  adviceType = "garden", // Default to garden advice
   isLoading,
   error,
   gardenName,
   theme,
 }: AdviceModalProps) => {
-  // Helper function to get icon based on category
-  const getIconForCategory = useCallback(
-    (category: string) => {
-      switch (category) {
-        case "WATERING":
+  // Helper function to check if item is GardenAdvice or WeatherAdvice
+  const isGardenAdvice = (item: AdviceItem): item is GardenAdvice => {
+    return (
+      "category" in item &&
+      "action" in item &&
+      "reason" in item &&
+      "suggestedTime" in item
+    );
+  };
+
+  const isWeatherAdvice = (item: AdviceItem): item is WeatherAdvice => {
+    return (
+      "weatherCondition" in item && "title" in item && "description" in item
+    );
+  };
+
+  // Helper function to get icon based on category or advice type
+  const getIconForAdvice = useCallback(
+    (item: AdviceItem) => {
+      if (isGardenAdvice(item)) {
+        // Handle GardenAdvice
+        switch (item.category) {
+          case "WATERING":
+            return {
+              icon: <Ionicons name="water-outline" size={22} color="#fff" />,
+              backgroundColor: "#3498db",
+              label: "Tưới nước",
+            };
+          case "FERTILIZING":
+            return {
+              icon: (
+                <MaterialCommunityIcons
+                  name="leaf-circle"
+                  size={22}
+                  color="#fff"
+                />
+              ),
+              backgroundColor: "#27ae60",
+              label: "Bón phân",
+            };
+          case "PRUNING":
+            return {
+              icon: (
+                <MaterialCommunityIcons
+                  name="scissors-cutting"
+                  size={22}
+                  color="#fff"
+                />
+              ),
+              backgroundColor: "#e67e22",
+              label: "Tỉa cây",
+            };
+          case "PEST_CONTROL":
+            return {
+              icon: (
+                <MaterialCommunityIcons
+                  name="bug-outline"
+                  size={22}
+                  color="#fff"
+                />
+              ),
+              backgroundColor: "#e74c3c",
+              label: "Diệt côn trùng",
+            };
+          default:
+            return {
+              icon: <Ionicons name="leaf-outline" size={22} color="#fff" />,
+              backgroundColor: theme.primary,
+              label: "Chăm sóc",
+            };
+        }
+      } else if (isWeatherAdvice(item)) {
+        // Handle WeatherAdvice
+        if (item.icon) {
           return {
-            icon: <Ionicons name="water-outline" size={22} color="#fff" />,
+            icon: <Ionicons name={item.icon} size={22} color="#fff" />,
             backgroundColor: "#3498db",
-            label: "Tưới nước",
+            label: "Thời tiết",
           };
-        case "FERTILIZING":
-          return {
-            icon: (
-              <MaterialCommunityIcons
-                name="leaf-circle"
-                size={22}
-                color="#fff"
-              />
-            ),
-            backgroundColor: "#27ae60",
-            label: "Bón phân",
-          };
-        case "PRUNING":
-          return {
-            icon: (
-              <MaterialCommunityIcons
-                name="scissors-cutting"
-                size={22}
-                color="#fff"
-              />
-            ),
-            backgroundColor: "#e67e22",
-            label: "Tỉa cây",
-          };
-        case "PEST_CONTROL":
-          return {
-            icon: (
-              <MaterialCommunityIcons
-                name="bug-outline"
-                size={22}
-                color="#fff"
-              />
-            ),
-            backgroundColor: "#e74c3c",
-            label: "Diệt côn trùng",
-          };
-        default:
-          return {
-            icon: <Ionicons name="leaf-outline" size={22} color="#fff" />,
-            backgroundColor: theme.primary,
-            label: "Chăm sóc",
-          };
+        }
+
+        // Default weather icons based on condition
+        switch (item.weatherCondition) {
+          case "CLEAR":
+            return {
+              icon: <Ionicons name="sunny-outline" size={22} color="#fff" />,
+              backgroundColor: "#f39c12",
+              label: "Nắng",
+            };
+          case "RAIN":
+          case "DRIZZLE":
+            return {
+              icon: <Ionicons name="rainy-outline" size={22} color="#fff" />,
+              backgroundColor: "#3498db",
+              label: "Mưa",
+            };
+          case "CLOUDS":
+            return {
+              icon: <Ionicons name="cloud-outline" size={22} color="#fff" />,
+              backgroundColor: "#7f8c8d",
+              label: "Mây",
+            };
+          case "THUNDERSTORM":
+            return {
+              icon: (
+                <Ionicons name="thunderstorm-outline" size={22} color="#fff" />
+              ),
+              backgroundColor: "#8e44ad",
+              label: "Bão",
+            };
+          default:
+            return {
+              icon: (
+                <Ionicons name="thermometer-outline" size={22} color="#fff" />
+              ),
+              backgroundColor: theme.primary,
+              label: "Thời tiết",
+            };
+        }
+      } else {
+        // Fallback
+        return {
+          icon: <Ionicons name="leaf-outline" size={22} color="#fff" />,
+          backgroundColor: theme.primary,
+          label: "Chăm sóc",
+        };
       }
     },
     [theme]
@@ -146,70 +225,132 @@ const AdviceModal = ({
     [theme]
   );
 
-  // Render advice item
+  // Render advice item - handling both types
   const renderAdviceItem = useCallback(
-    ({ item }: { item: GardenAdvice }) => {
-      const categoryInfo = getIconForCategory(item.category);
-      return (
-        <View
-          style={[
-            styles.adviceItem,
-            {
-              backgroundColor: theme.card,
-              borderLeftColor: categoryInfo.backgroundColor,
-            },
-          ]}
-        >
-          <View style={styles.adviceHeader}>
-            <View
-              style={[
-                styles.iconContainer,
-                { backgroundColor: categoryInfo.backgroundColor },
-              ]}
-            >
-              {categoryInfo.icon}
-            </View>
-            <View style={styles.adviceTitle}>
-              <Text
+    ({ item }: { item: AdviceItem }) => {
+      if (isGardenAdvice(item)) {
+        // Render Garden Advice
+        const categoryInfo = getIconForAdvice(item);
+        return (
+          <View
+            style={[
+              styles.adviceItem,
+              {
+                backgroundColor: theme.card,
+                borderLeftColor: categoryInfo.backgroundColor,
+              },
+            ]}
+          >
+            <View style={styles.adviceHeader}>
+              <View
                 style={[
-                  styles.categoryLabel,
-                  { color: categoryInfo.backgroundColor },
+                  styles.iconContainer,
+                  { backgroundColor: categoryInfo.backgroundColor },
                 ]}
               >
-                {categoryInfo.label}
+                {categoryInfo.icon}
+              </View>
+              <View style={styles.adviceTitle}>
+                <Text
+                  style={[
+                    styles.categoryLabel,
+                    { color: categoryInfo.backgroundColor },
+                  ]}
+                >
+                  {categoryInfo.label}
+                </Text>
+                <Text style={[styles.actionText, { color: theme.text }]}>
+                  {item.action}
+                </Text>
+              </View>
+              {renderPriorityIndicator(item.priority)}
+            </View>
+
+            <Text style={[styles.descriptionText, { color: theme.text }]}>
+              {item.description}
+            </Text>
+
+            <View style={styles.reasonContainer}>
+              <Text
+                style={[styles.reasonLabel, { color: theme.textSecondary }]}
+              >
+                Lý do:
               </Text>
-              <Text style={[styles.actionText, { color: theme.text }]}>
-                {item.action}
+              <Text style={[styles.reasonText, { color: theme.textSecondary }]}>
+                {item.reason}
               </Text>
             </View>
-            {renderPriorityIndicator(item.priority)}
-          </View>
 
-          <Text style={[styles.descriptionText, { color: theme.text }]}>
-            {item.description}
-          </Text>
-
-          <View style={styles.reasonContainer}>
-            <Text style={[styles.reasonLabel, { color: theme.textSecondary }]}>
-              Lý do:
-            </Text>
-            <Text style={[styles.reasonText, { color: theme.textSecondary }]}>
-              {item.reason}
-            </Text>
-          </View>
-
-          <View style={styles.timeContainer}>
-            <View style={styles.timeIconContainer}>
-              <Ionicons name="time-outline" size={14} color="#fff" />
+            <View style={styles.timeContainer}>
+              <View style={styles.timeIconContainer}>
+                <Ionicons name="time-outline" size={14} color="#fff" />
+              </View>
+              <Text style={[styles.timeText, { color: theme.textSecondary }]}>
+                Đề xuất thực hiện: {formatDate(item.suggestedTime)}
+              </Text>
             </View>
-            <Text style={[styles.timeText, { color: theme.textSecondary }]}>
-              Đề xuất thực hiện: {formatDate(item.suggestedTime)}
-            </Text>
           </View>
-        </View>
-      );
+        );
+      } else if (isWeatherAdvice(item)) {
+        // Render Weather Advice
+        const iconInfo = getIconForAdvice(item);
+        return (
+          <View
+            style={[
+              styles.adviceItem,
+              {
+                backgroundColor: theme.card,
+                borderLeftColor: iconInfo.backgroundColor,
+              },
+            ]}
+          >
+            <View style={styles.adviceHeader}>
+              <View
+                style={[
+                  styles.iconContainer,
+                  { backgroundColor: iconInfo.backgroundColor },
+                ]}
+              >
+                {iconInfo.icon}
+              </View>
+              <View style={styles.adviceTitle}>
+                <Text
+                  style={[
+                    styles.categoryLabel,
+                    { color: iconInfo.backgroundColor },
+                  ]}
+                >
+                  {iconInfo.label}
+                </Text>
+                <Text style={[styles.actionText, { color: theme.text }]}>
+                  {item.title}
+                </Text>
+              </View>
+              {renderPriorityIndicator(item.priority)}
+            </View>
+
+            <Text style={[styles.descriptionText, { color: theme.text }]}>
+              {item.description}
+            </Text>
+
+            {item.bestTimeOfDay && (
+              <View style={styles.timeContainer}>
+                <View style={styles.timeIconContainer}>
+                  <Ionicons name="time-outline" size={14} color="#fff" />
+                </View>
+                <Text style={[styles.timeText, { color: theme.textSecondary }]}>
+                  Thời gian tốt nhất: {item.bestTimeOfDay}
+                </Text>
+              </View>
+            )}
+          </View>
+        );
+      } else {
+        // Fallback for unknown advice type
+        return null;
+      }
     },
-    [theme, getIconForCategory, formatDate, renderPriorityIndicator]
+    [theme, getIconForAdvice, formatDate, renderPriorityIndicator]
   );
 
   // Component for empty advice state

@@ -31,6 +31,7 @@ export const GARDEN_ENDPOINTS = {
   CREATE: "/gardens/me",
   UPDATE: (gardenId: string | number) => `/gardens/me/${gardenId}`,
   DELETE: (gardenId: string | number) => `/gardens/me/${gardenId}`,
+  ADVICE: (gardenId: string | number) => `/gardens/me/${gardenId}/advice`,
 };
 
 // Plant endpoints
@@ -65,6 +66,10 @@ export const SENSOR_ENDPOINTS = {
     `/sensors/gardens/${gardenId}/data`,
   LATEST_READINGS_BY_GARDEN: (gardenId: string | number) =>
     `/sensors/gardens/${gardenId}/latest`,
+  list: "/api/sensors",
+  gardenData: (gardenId: number) => `/api/gardens/${gardenId}/sensors/data`,
+  readings: (sensorId: number) => `/api/sensors/${sensorId}/readings`,
+  addReading: (sensorId: number) => `/api/sensors/${sensorId}/readings`,
 };
 
 // Task endpoints

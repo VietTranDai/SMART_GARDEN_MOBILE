@@ -2,7 +2,6 @@ import React, { memo, useMemo } from "react";
 import { View, StyleSheet } from "react-native";
 import GardenSection from "./GardenSection";
 import WeatherSection from "./WeatherSection";
-import AlertSection from "./AlertSection";
 import ActivitySection from "./ActivitySection";
 import { GardenDisplayDto } from "@/types/gardens/dtos";
 import {
@@ -14,7 +13,7 @@ import {
   WeatherObservation,
 } from "@/types/weather/weather.types";
 import { Alert } from "@/types/alerts/alert.types";
-import { SensorType } from "@/types/gardens/sensor.types";
+import { SensorData, SensorType } from "@/types/gardens/sensor.types";
 
 // Define Section Types
 export enum SectionType {
@@ -35,15 +34,12 @@ interface HomeSectionsProps {
   gardens: GardenDisplayDto[];
   selectedGardenId: number | null;
   onSelectGarden: (gardenId: number) => void;
-  onTogglePinGarden: (gardenId: number) => void;
 
   // Section visibility control
   sections: SectionConfig[];
 
   // Sensor data
-  sensorDataByGarden: Record<number, Record<string, any[]>>;
-  sensorDataLoading: Record<number, boolean>;
-  sensorDataError: Record<number, string | null>;
+  sensorDataByGarden: Record<number, Record<string, SensorData[]>>;
 
   // Weather data
   weatherData: WeatherObservation | null;
@@ -78,11 +74,8 @@ const HomeSections = memo(
     gardens,
     selectedGardenId,
     onSelectGarden,
-    onTogglePinGarden,
     sections,
     sensorDataByGarden,
-    sensorDataLoading,
-    sensorDataError,
     weatherData,
     gardenWeatherData,
     gardenAlerts,
@@ -115,14 +108,11 @@ const HomeSections = memo(
           gardens={gardens}
           selectedGardenId={selectedGardenId}
           onSelectGarden={onSelectGarden}
-          onTogglePinGarden={onTogglePinGarden}
           onShowAdvice={onShowAdvice}
           onShowWeatherDetail={onShowWeatherDetail}
           onScrollToWeatherSection={onScrollToWeatherSection}
           onShowAlertDetails={onShowAlertDetails}
           sensorDataByGarden={sensorDataByGarden}
-          sensorDataLoading={sensorDataLoading}
-          sensorDataError={sensorDataError}
           weatherDataByGarden={gardenWeatherData}
           adviceLoading={adviceLoading}
           weatherDetailLoading={weatherDetailLoading}
@@ -137,15 +127,6 @@ const HomeSections = memo(
             gardenWeatherData={gardenWeatherData}
             weatherData={weatherData}
             onShowDetail={onShowWeatherDetail}
-          />
-        )}
-
-        {/* Alert Section */}
-        {isSectionVisible(SectionType.ALERTS) && (
-          <AlertSection
-            gardenId={selectedGardenId}
-            gardenAlerts={gardenAlerts}
-            onShowAlertDetails={onShowAlertDetails}
           />
         )}
 

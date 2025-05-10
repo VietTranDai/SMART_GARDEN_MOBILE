@@ -16,7 +16,6 @@ type PreferencesContextType = {
   updateHomePreferences: (
     preferences: Partial<HomePreferences>
   ) => Promise<void>;
-  togglePinnedGarden: (gardenId: number) => Promise<void>;
   setLastVisitedGarden: (gardenId: number) => Promise<void>;
   resetPreferences: () => Promise<void>;
 };
@@ -106,27 +105,6 @@ export function PreferencesProvider({
     }
   };
 
-  // Function to toggle a garden's pinned status
-  const togglePinnedGarden = async (gardenId: number): Promise<void> => {
-    try {
-      const pinnedGardens = [...homePreferences.pinnedGardens];
-      const index = pinnedGardens.indexOf(gardenId);
-
-      if (index > -1) {
-        // Remove if already pinned
-        pinnedGardens.splice(index, 1);
-      } else {
-        // Add if not pinned
-        pinnedGardens.push(gardenId);
-      }
-
-      await updateHomePreferences({ pinnedGardens });
-    } catch (error) {
-      console.error("Failed to toggle pinned garden:", error);
-      throw error;
-    }
-  };
-
   // Function to set the last visited garden
   const setLastVisitedGarden = async (gardenId: number): Promise<void> => {
     try {
@@ -158,7 +136,6 @@ export function PreferencesProvider({
     isLoading,
     error,
     updateHomePreferences,
-    togglePinnedGarden,
     setLastVisitedGarden,
     resetPreferences,
   };

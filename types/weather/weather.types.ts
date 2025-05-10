@@ -142,14 +142,16 @@ export interface GardenWeatherData {
 export interface GardenAdvice {
   id: number;
   gardenId: number;
+  category: string;
+  priority: number;
   action: string;
   description: string;
   reason: string;
-  priority: number; // 1-5, 5 là cao nhất
   suggestedTime: string;
-  category: string; // WATERING, FERTILIZING, PRUNING, PEST_CONTROL, etc.
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
+  completed?: boolean;
+  thumbnail?: string;
 }
 
 /**
