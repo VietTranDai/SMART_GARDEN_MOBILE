@@ -13,7 +13,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { TaskStatus, WateringScheduleItem } from "@/types";
+import { TaskStatus, WateringSchedule } from "@/types";
 import { taskService, gardenService, wateringService } from "@/service/api";
 
 export default function GardenScheduleScreen() {
@@ -22,7 +22,7 @@ export default function GardenScheduleScreen() {
   const { id: gardenId } = useLocalSearchParams<{ id: string }>();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const [schedule, setSchedule] = useState<WateringScheduleItem[]>([]);
+  const [schedule, setSchedule] = useState<WateringSchedule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [garden, setGarden] = useState<any>(null);
@@ -68,7 +68,7 @@ export default function GardenScheduleScreen() {
       const scheduleData = await wateringService.getGardenWateringSchedules(
         gardenId
       );
-      setSchedule(scheduleData as WateringScheduleItem[]);
+      setSchedule(scheduleData as WateringSchedule[]);
     } catch (error) {
       console.error("Failed to load schedule:", error);
       setError("Không thể tải lịch tưới. Vui lòng thử lại sau.");
@@ -118,7 +118,7 @@ export default function GardenScheduleScreen() {
     }
   };
 
-  const renderScheduleItem = ({ item }: { item: WateringScheduleItem }) => {
+  const renderScheduleItem = ({ item }: { item: WateringSchedule }) => {
     const isPending = item.status === TaskStatus.PENDING;
     const isPast = new Date(item.scheduledAt) < new Date();
 

@@ -25,14 +25,9 @@ import sensorService from "@/service/api/sensor.service";
 import SensorStrip from "./SensorStrip";
 import env from "@/config/environment";
 
-// Extend GardenDisplayDto with optional properties needed
-interface ExtendedGardenDisplayDto extends GardenDisplayDto {
-  sensorCount?: number;
-}
-
 // Interface cho GardenCard props
 interface GardenCardProps {
-  garden: ExtendedGardenDisplayDto;
+  garden: GardenDisplayDto;
   index: number;
   isSelected: boolean;
   onSelect: (gardenId: number, index: number) => void;
@@ -56,7 +51,7 @@ interface GardenCardProps {
 }
 
 interface GardenDisplayProps {
-  gardens: ExtendedGardenDisplayDto[];
+  gardens: GardenDisplayDto[];
   selectedGardenId?: number | null;
   onSelectGarden: (gardenId: number) => void;
   showFullDetails?: boolean;
@@ -217,7 +212,7 @@ const GardenCard = memo(
 
             {/* Gradient overlay để làm nổi bật thông tin trên ảnh */}
             <LinearGradient
-              colors={["transparent", "rgba(0,0,0,0.6)"]}
+              colors={["transparent", "rgba(0,0,0,0.8)"]}
               style={styles.imageGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 0, y: 1 }}
@@ -242,7 +237,10 @@ const GardenCard = memo(
               </Text>
               {totalAlerts > 0 && (
                 <TouchableOpacity
-                  style={styles.alertBadge}
+                  style={[
+                    styles.alertBadge,
+                    { backgroundColor: `${theme.warning}CC` },
+                  ]}
                   onPress={() => {
                     // This would show alert details
                     if (isSelected && onShowAlertDetails) {
@@ -269,7 +267,12 @@ const GardenCard = memo(
           <View style={styles.gardenInfo}>
             {/* Garden Stats - Thông tin số liệu đặt ở đầu */}
             <View style={styles.statsContainer}>
-              <View style={styles.statItem}>
+              <View
+                style={[
+                  styles.statItem,
+                  { backgroundColor: `${theme.primary}10` },
+                ]}
+              >
                 <Ionicons
                   name="hardware-chip-outline"
                   size={16}
@@ -284,7 +287,12 @@ const GardenCard = memo(
                 </View>
               </View>
 
-              <View style={styles.statItem}>
+              <View
+                style={[
+                  styles.statItem,
+                  { backgroundColor: `${theme.primary}10` },
+                ]}
+              >
                 <Ionicons
                   name="alert-circle-outline"
                   size={16}
@@ -304,7 +312,12 @@ const GardenCard = memo(
                 </View>
               </View>
 
-              <View style={styles.statItem}>
+              <View
+                style={[
+                  styles.statItem,
+                  { backgroundColor: `${theme.primary}10` },
+                ]}
+              >
                 <Ionicons
                   name="calendar-outline"
                   size={16}
@@ -359,7 +372,8 @@ const GardenCard = memo(
                 <View style={styles.progressHeader}>
                   <Text style={styles.progressTitle}>Tiến độ thu hoạch</Text>
                   <Text style={styles.daysRemaining}>
-                    {garden.daysUntilHarvest} ngày
+                    {garden.growthProgress || 0}% - {garden.daysUntilHarvest}{" "}
+                    ngày
                   </Text>
                 </View>
                 <View
@@ -597,7 +611,7 @@ const GardenDisplay = memo(function GardenDisplay({
         style={[
           styles.gardenCard,
           styles.createGardenCard,
-          { backgroundColor: theme.background, borderColor: theme.border },
+          { backgroundColor: theme.background, borderColor: theme.primary },
         ]}
         onPress={() => router.push("/garden/create")}
         activeOpacity={0.7}
@@ -773,7 +787,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   gardenImageName: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: "Inter-SemiBold",
     color: "#fff",
     textShadowColor: "rgba(0,0,0,0.3)",
@@ -800,19 +814,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 4,
     backgroundColor: "rgba(255, 87, 51, 0.8)",
-    paddingVertical: 2,
-    paddingHorizontal: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
     borderRadius: 8,
     alignSelf: "flex-start",
     gap: 4,
   },
   alertBadgeText: {
     color: "#fff",
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Inter-Medium",
   },
   gardenInfo: {
-    padding: 12,
+    padding: 16,
     flex: 1,
   },
   statsContainer: {
@@ -826,7 +840,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: "31%",
     backgroundColor: "rgba(0,0,0,0.03)",
-    padding: 4,
+    padding: 8,
     borderRadius: 8,
   },
   statIcon: {
@@ -867,14 +881,14 @@ const styles = StyleSheet.create({
     color: "rgba(0,0,0,0.8)",
   },
   progressBar: {
-    height: 6,
-    borderRadius: 3,
+    height: 8,
+    borderRadius: 4,
     width: "100%",
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
-    borderRadius: 3,
+    borderRadius: 4,
   },
   metaInfoRow: {
     flexDirection: "row",
@@ -892,15 +906,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.02)",
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     borderRadius: 6,
     marginVertical: 6,
     gap: 4,
   },
   plantInfoText: {
-    fontSize: 12,
-    fontFamily: "Inter-Medium",
+    fontSize: 14,
+    fontFamily: "Inter-SemiBold",
     flex: 1,
   },
   descriptionContainer: {
@@ -909,29 +923,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   descriptionText: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: "Inter-Regular",
     fontStyle: "italic",
-    lineHeight: 14,
+    lineHeight: 16,
   },
   actionButtonsContainer: {
     position: "absolute",
     bottom: 10,
     right: 10,
     flexDirection: "row",
-    gap: 6,
+    gap: 8,
   },
   actionButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-    elevation: 1,
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 2,
   },
   pinButton: {
     width: 28,
@@ -965,21 +979,21 @@ const styles = StyleSheet.create({
   createGardenCard: {
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
+    borderWidth: 2,
     borderStyle: "dashed",
     height: 480,
     width: 280,
   },
   createIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 8,
+    marginBottom: 12,
   },
   createCardText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: "Inter-Medium",
   },
   emptyState: {

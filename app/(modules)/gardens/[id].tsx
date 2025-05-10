@@ -7,17 +7,36 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Animated,
+  Image as RNImage,
+  Modal,
+  ScrollView,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Feather, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  Feather,
+  FontAwesome5,
+  MaterialIcons,
+  Ionicons,
+} from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { LinearGradient } from "expo-linear-gradient";
+import { Image } from "expo-image";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Import custom components
 import WeatherDisplay from "@/components/common/WeatherDisplay";
 import SensorDetailView from "@/components/common/SensorDetailView";
 import GardenStatusCard from "@/components/common/GardenStatusCard";
 import AlertsList from "@/components/common/AlertsList";
+import AdviceModal from "@/components/common/AdviceModal";
 // Import API services
 import gardenService from "@/service/api/garden.service";
 import weatherService from "@/service/api/weather.service";
@@ -47,6 +66,7 @@ import {
 import { apiClient } from "@/service";
 import Toast from "react-native-toast-message";
 import ActivityList from "@/components/garden/ActivityList";
+import env from "@/config/environment";
 
 enum DetailSectionType {
   STATUS = "STATUS",
@@ -72,6 +92,14 @@ export default function GardenDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Animation values
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [0, 1],
+    extrapolate: "clamp",
+  });
+
   // State for garden data
   const [garden, setGarden] = useState<Garden | null>(null);
   const [currentWeather, setCurrentWeather] =
@@ -85,6 +113,12 @@ export default function GardenDetailScreen() {
   const [activities, setActivities] = useState<GardenActivity[]>([]);
   const [sensors, setSensors] = useState<Sensor[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  // Add state for advice modal
+  const [adviceModalVisible, setAdviceModalVisible] = useState(false);
+  const [gardenAdvice, setGardenAdvice] = useState<any[]>([]);
+  const [adviceLoading, setAdviceLoading] = useState(false);
+  const [adviceError, setAdviceError] = useState<string | null>(null);
 
   // Load garden data using API calls
   const loadGardenData = useCallback(async (gardenId: string) => {
@@ -419,6 +453,7 @@ export default function GardenDetailScreen() {
               onViewPlantDetails={() => {
                 console.log("Navigate to plant details for:", item.plantName);
               }}
+              onShowAdvice={handleShowGardenAdvice}
             />
           </View>
         );
@@ -459,11 +494,13 @@ export default function GardenDetailScreen() {
           <View style={styles.listSectionContainer}>
             {schedulesToRender.map((scheduleItem: any) => (
               <View key={scheduleItem.id} style={styles.scheduleItem}>
-                <MaterialIcons
-                  name="water-drop"
-                  size={20}
-                  color={theme.primary}
-                />
+                <View style={styles.scheduleIconContainer}>
+                  <MaterialIcons
+                    name="water-drop"
+                    size={20}
+                    color={theme.primary}
+                  />
+                </View>
                 <View style={styles.scheduleInfo}>
                   <Text style={styles.scheduleTime}>
                     {new Date(scheduleItem.scheduledAt).toLocaleTimeString([], {
@@ -530,7 +567,9 @@ export default function GardenDetailScreen() {
                 { backgroundColor: theme.primaryLight },
               ]}
               onPress={() =>
-                console.log("Go to add activity for garden:", item.gardenId)
+                router.push(
+                  `/(modules)/activities/create?gardenId=${item.gardenId}`
+                )
               }
             >
               <FontAwesome5 name="plus" size={16} color={theme.primary} />
@@ -591,7 +630,8 @@ export default function GardenDetailScreen() {
         buttonIcon = (
           <MaterialIcons name="history" size={18} color={theme.primary} />
         );
-        buttonOnPress = () => console.log("Navigate to full activity history");
+        buttonOnPress = () =>
+          router.push(`/(modules)/activities?gardenId=${id}`);
         break;
       default:
         return null;
@@ -628,35 +668,264 @@ export default function GardenDetailScreen() {
     );
   };
 
-  const ListHeader = () => (
-    <View style={styles.header}>
-      <TouchableOpacity
-        style={styles.headerButton}
-        onPress={() => router.back()}
-      >
-        <Feather name="arrow-left" size={24} color={theme.primary} />
-      </TouchableOpacity>
-      <View style={styles.headerTitleContainer}>
-        <Text
-          style={[styles.headerTitle, { color: theme.text }]}
-          numberOfLines={1}
-        >
-          {garden?.name}
-        </Text>
-        <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
-          {garden?.district
-            ? `${garden.district}, ${garden.city}`
-            : garden?.city}
-        </Text>
+  // Animation-enhanced header
+  const HeaderComponent = () => (
+    <>
+      {/* Animated header background that appears when scrolling */}
+      <Animated.View
+        style={[styles.animatedHeaderBackground, { opacity: headerOpacity }]}
+      />
+
+      {/* Main header content */}
+      <View style={styles.headerContentContainer}>
+        <Image
+          source={
+            garden?.profilePicture
+              ? { uri: `${env.apiUrl}${garden.profilePicture}` }
+              : garden?.type
+              ? { uri: gardenService.getDefaultGardenImage(garden.type).uri }
+              : require("@/assets/images/icon.png")
+          }
+          style={styles.headerImage}
+        />
+
+        <LinearGradient
+          colors={["transparent", "rgba(0,0,0,0.7)"]}
+          style={styles.headerGradient}
+        />
+
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => router.back()}
+          >
+            <Feather name="arrow-left" size={24} color={theme.card} />
+          </TouchableOpacity>
+
+          <View style={styles.headerTitleContainer}>
+            <Text
+              style={[styles.headerTitle, { color: theme.card }]}
+              numberOfLines={1}
+            >
+              {garden?.name}
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: theme.card }]}>
+              {garden?.district
+                ? `${garden.district}, ${garden.city}`
+                : garden?.city}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => router.push(`/(modules)/gardens/edit/${id}`)}
+          >
+            <Feather name="edit-2" size={20} color={theme.card} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Garden status pill */}
+        {garden && (
+          <View style={styles.statusPillContainer}>
+            <View
+              style={[
+                styles.statusPill,
+                { backgroundColor: getStatusColor(garden.status) },
+              ]}
+            >
+              <View style={styles.statusDotLarge} />
+              <Text style={styles.statusPillText}>
+                {getStatusText(garden.status)}
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
-      <TouchableOpacity
-        style={styles.headerButton}
-        onPress={() => router.push(`/(modules)/gardens/edit/${id}`)}
-      >
-        <Feather name="edit-2" size={20} color={theme.primary} />
-      </TouchableOpacity>
-    </View>
+    </>
   );
+
+  // Add handler for showing garden advice
+  const handleShowGardenAdvice = useCallback(async () => {
+    if (!id) return;
+
+    setAdviceLoading(true);
+    setAdviceError(null);
+
+    try {
+      // Trước tiên, thử kiểm tra dữ liệu từ cache
+      const cachedAdviceKey = `garden_advice_${id}`;
+      let adviceResponse;
+
+      try {
+        const cachedAdvice = await AsyncStorage.getItem(cachedAdviceKey);
+        if (cachedAdvice) {
+          adviceResponse = JSON.parse(cachedAdvice);
+        }
+      } catch (cacheErr) {
+        // Ignore cache errors
+      }
+
+      // Nếu không có trong cache, gọi API
+      if (!adviceResponse || adviceResponse.length === 0) {
+        adviceResponse = await gardenService.getGardenAdvice(id);
+
+        // Lưu vào cache nếu có dữ liệu
+        if (adviceResponse && adviceResponse.length > 0) {
+          try {
+            await AsyncStorage.setItem(
+              cachedAdviceKey,
+              JSON.stringify(adviceResponse)
+            );
+          } catch (cacheErr) {
+            // Ignore cache errors
+          }
+        }
+      }
+
+      // Đảm bảo dữ liệu là một mảng hợp lệ
+      const validAdvice = Array.isArray(adviceResponse) ? adviceResponse : [];
+
+      // Gán vào state
+      setGardenAdvice(validAdvice);
+
+      // Kiểm tra nếu không có dữ liệu
+      if (validAdvice.length === 0) {
+        setAdviceError("Không tìm thấy lời khuyên nào cho vườn này");
+      } else {
+        // Hiển thị modal
+        setAdviceModalVisible(true);
+      }
+    } catch (error) {
+      console.error("Failed to load garden advice:", error);
+      setAdviceError(
+        error instanceof Error
+          ? error.message
+          : "Không thể tải lời khuyên. Vui lòng thử lại sau."
+      );
+
+      // Show toast error message
+      Toast.show({
+        type: "error",
+        text1: "Lỗi tải lời khuyên",
+        text2: "Không thể tải lời khuyên, vui lòng thử lại",
+        position: "bottom",
+        visibilityTime: 3000,
+      });
+    } finally {
+      setAdviceLoading(false);
+    }
+  }, [id]);
+
+  // Add a debug modal component
+  const DebugAdviceModal = ({
+    isVisible,
+    onClose,
+    advice,
+    gardenName,
+    theme,
+  }: {
+    isVisible: boolean;
+    onClose: () => void;
+    advice: any[];
+    gardenName: string;
+    theme: any;
+  }) => {
+    if (!isVisible) return null;
+
+    // Đảm bảo theme luôn có giá trị mặc định nếu không được truyền vào
+    const safeTheme = theme || {
+      background: "#ffffff",
+      card: "#f5f5f5",
+      text: "#000000",
+      primary: "#3498db",
+      textSecondary: "#666666",
+    };
+
+    return (
+      <Modal
+        visible={isVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={onClose}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: "90%",
+              maxHeight: "80%",
+              backgroundColor: safeTheme.background,
+              borderRadius: 12,
+              padding: 16,
+            }}
+          >
+            <Text
+              style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}
+            >
+              Lời khuyên cho vườn: {gardenName}
+            </Text>
+            <ScrollView style={{ flex: 1 }}>
+              {advice && advice.length > 0 ? (
+                advice.map((item: any, index: number) => (
+                  <View
+                    key={`debug-advice-${index}`}
+                    style={{
+                      padding: 10,
+                      borderRadius: 8,
+                      backgroundColor: safeTheme.card,
+                      marginBottom: 10,
+                      borderLeftWidth: 4,
+                      borderLeftColor: safeTheme.primary,
+                    }}
+                  >
+                    <Text style={{ fontSize: 16, fontWeight: "600" }}>
+                      {item.action || "Không có hành động"}
+                    </Text>
+                    {item.description && (
+                      <Text style={{ fontSize: 14, marginTop: 5 }}>
+                        {item.description}
+                      </Text>
+                    )}
+                    {item.reason && (
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          marginTop: 5,
+                          fontStyle: "italic",
+                        }}
+                      >
+                        Lý do: {item.reason}
+                      </Text>
+                    )}
+                  </View>
+                ))
+              ) : (
+                <Text>Không có lời khuyên nào</Text>
+              )}
+            </ScrollView>
+            <TouchableOpacity
+              onPress={onClose}
+              style={{
+                backgroundColor: safeTheme.primary,
+                padding: 10,
+                borderRadius: 8,
+                alignItems: "center",
+                marginTop: 10,
+              }}
+            >
+              <Text style={{ color: "#fff", fontWeight: "600" }}>Đóng</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
 
   if (isLoading && !garden) {
     return (
@@ -712,7 +981,7 @@ export default function GardenDetailScreen() {
         }}
         renderItem={renderSectionItem}
         renderSectionHeader={renderSectionHeader}
-        ListHeaderComponent={ListHeader}
+        ListHeaderComponent={HeaderComponent}
         stickySectionHeadersEnabled={false}
         contentContainerStyle={styles.listContentContainer}
         style={styles.container}
@@ -729,6 +998,28 @@ export default function GardenDetailScreen() {
           <View style={styles.sectionSeparator} />
         )}
         ListFooterComponent={<View style={{ height: 20 }} />}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
+      />
+      <AdviceModal
+        isVisible={adviceModalVisible}
+        onClose={() => setAdviceModalVisible(false)}
+        advice={gardenAdvice}
+        isLoading={adviceLoading}
+        error={adviceError}
+        gardenName={garden?.name || ""}
+        theme={theme}
+        adviceType="garden"
+      />
+      <DebugAdviceModal
+        isVisible={false}
+        onClose={() => setAdviceModalVisible(false)}
+        advice={gardenAdvice}
+        gardenName={garden?.name || ""}
+        theme={theme}
       />
     </>
   );
@@ -775,6 +1066,32 @@ const createStyles = (theme: any) =>
       fontSize: 16,
       fontFamily: "Inter-Medium",
     },
+    headerContentContainer: {
+      position: "relative",
+      height: 220,
+    },
+    animatedHeaderBackground: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      height: Platform.OS === "ios" ? 90 : 70,
+      backgroundColor: theme.primary,
+      zIndex: 10,
+    },
+    headerImage: {
+      position: "absolute",
+      width: "100%",
+      height: "100%",
+      backgroundColor: theme.borderLight,
+    },
+    headerGradient: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 120,
+    },
     header: {
       flexDirection: "row",
       alignItems: "center",
@@ -782,24 +1099,63 @@ const createStyles = (theme: any) =>
       paddingHorizontal: 16,
       paddingVertical: 12,
       paddingTop: Platform.OS === "ios" ? 50 : 40,
-      backgroundColor: theme.background,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.borderLight,
+      zIndex: 5,
     },
     headerButton: {
-      padding: 5,
+      padding: 8,
+      backgroundColor: "rgba(0,0,0,0.3)",
+      borderRadius: 20,
     },
     headerTitleContainer: {
       flex: 1,
       marginHorizontal: 12,
       alignItems: "center",
     },
-    headerTitle: { fontSize: 18, fontFamily: "Inter-Bold", color: theme.text },
+    headerTitle: {
+      fontSize: 18,
+      fontFamily: "Inter-Bold",
+      textShadowColor: "rgba(0,0,0,0.5)",
+      textShadowOffset: { width: 1, height: 1 },
+      textShadowRadius: 3,
+    },
     headerSubtitle: {
       fontSize: 13,
       marginTop: 2,
-      color: theme.textSecondary,
       fontFamily: "Inter-Regular",
+      textShadowColor: "rgba(0,0,0,0.5)",
+      textShadowOffset: { width: 1, height: 1 },
+      textShadowRadius: 3,
+    },
+    statusPillContainer: {
+      position: "absolute",
+      bottom: -15,
+      alignSelf: "center",
+      zIndex: 5,
+    },
+    statusPill: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 3,
+      elevation: 4,
+    },
+    statusDotLarge: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: theme.card,
+      marginRight: 8,
+    },
+    statusPillText: {
+      color: theme.card,
+      fontSize: 14,
+      fontFamily: "Inter-SemiBold",
+      textTransform: "uppercase",
     },
     sectionContainerHeader: {
       flexDirection: "row",
@@ -837,9 +1193,9 @@ const createStyles = (theme: any) =>
     sectionHeaderButton: {
       flexDirection: "row",
       alignItems: "center",
-      paddingVertical: 4,
-      paddingHorizontal: 8,
-      borderRadius: 6,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      borderRadius: 8,
       backgroundColor: theme.cardAlt,
     },
     sectionHeaderButtonText: {
@@ -852,32 +1208,46 @@ const createStyles = (theme: any) =>
       flexDirection: "row",
       alignItems: "center",
       backgroundColor: theme.card,
-      padding: 12,
-      borderRadius: 8,
-      marginBottom: 8,
+      padding: 14,
+      borderRadius: 12,
+      marginBottom: 10,
       marginHorizontal: 16,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 3,
+      elevation: 2,
+    },
+    scheduleIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.primaryLight,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 12,
     },
     scheduleInfo: {
       flex: 1,
-      marginLeft: 12,
+      marginLeft: 4,
     },
     scheduleTime: {
-      fontSize: 14,
+      fontSize: 15,
       fontFamily: "Inter-SemiBold",
       color: theme.text,
-      marginBottom: 2,
+      marginBottom: 3,
     },
     scheduleAmount: {
-      fontSize: 13,
+      fontSize: 14,
       fontFamily: "Inter-Regular",
       color: theme.textSecondary,
     },
     scheduleStatusContainer: {
       flexDirection: "row",
       alignItems: "center",
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 12,
       backgroundColor: theme.backgroundAlt,
     },
     statusDot: {
@@ -890,12 +1260,14 @@ const createStyles = (theme: any) =>
       fontSize: 12,
       fontFamily: "Inter-Medium",
     },
-    listSectionContainer: {},
+    listSectionContainer: {
+      paddingVertical: 5,
+    },
     bottomActionContainer: {
       flexDirection: "row",
       justifyContent: "space-around",
       paddingTop: 16,
-      paddingBottom: 10,
+      paddingBottom: 14,
       borderTopWidth: 1,
       borderTopColor: theme.borderLight,
       backgroundColor: theme.background,
@@ -904,9 +1276,9 @@ const createStyles = (theme: any) =>
     actionButton: {
       flexDirection: "row",
       alignItems: "center",
-      paddingVertical: 10,
-      paddingHorizontal: 16,
-      borderRadius: 20,
+      paddingVertical: 12,
+      paddingHorizontal: 18,
+      borderRadius: 25,
       backgroundColor: theme.primaryLight,
     },
     actionButtonText: {
@@ -919,7 +1291,7 @@ const createStyles = (theme: any) =>
       height: 8,
     },
     sectionSeparator: {
-      height: 10,
+      height: 15,
       backgroundColor: theme.backgroundAlt,
     },
     noDataText: {

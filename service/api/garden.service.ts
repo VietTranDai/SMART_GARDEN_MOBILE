@@ -1,8 +1,12 @@
 import { CreateGardenDto, UpdateGardenDto, GardenDisplayDto } from "@/types";
 import apiClient from "../apiClient";
-import { GARDEN_ENDPOINTS } from "../endpoints";
-import { Garden, GardenType, GardenStatus } from "@/types/gardens/garden.types";
-import { GardenAdvice } from "@/types/weather/weather.types";
+import { GARDEN_ENDPOINTS, PLANT_ENDPOINTS } from "../endpoints";
+import {
+  Garden,
+  GardenType,
+  GardenStatus,
+  GardenAdvice,
+} from "@/types/gardens/garden.types";
 
 /**
  * Garden Service
@@ -22,7 +26,11 @@ class GardenService {
         console.warn("Unexpected API response format in getGardens");
         return [];
       }
-      return Array.isArray(response.data.data) ? response.data.data : [];
+
+      const gardens = Array.isArray(response.data.data)
+        ? response.data.data
+        : [];
+      return gardens;
     } catch (error) {
       console.error("Error fetching gardens:", error);
       return [];
@@ -37,7 +45,25 @@ class GardenService {
   async getGardenById(id: number | string): Promise<Garden | null> {
     try {
       const response = await apiClient.get(GARDEN_ENDPOINTS.DETAIL(id));
-      return response.data.data || null;
+      const garden = response.data.data || null;
+
+      if (garden) {
+        console.debug(`Fetched garden ${garden.id}: ${garden.name}`);
+
+        // Check if we need to fetch additional plant data
+        if (
+          garden.plantName &&
+          (!garden.plantStartDate || !garden.plantDuration)
+        ) {
+          console.debug(
+            `Garden has plant name but missing growing data. Enriching garden data...`
+          );
+          const enrichedGarden = await this.enrichGardenWithPlantData(garden);
+          return enrichedGarden;
+        }
+      }
+
+      return garden;
     } catch (error) {
       console.error(`Error fetching garden ${id}:`, error);
       return null;
@@ -215,122 +241,203 @@ class GardenService {
   async getGardenAdvice(gardenId: number | string): Promise<GardenAdvice[]> {
     try {
       const response = await apiClient.get(GARDEN_ENDPOINTS.ADVICE(gardenId));
-      return response.data.data || this.generateMockAdvice(gardenId);
+      if (!response || !response.data) {
+        console.warn(`No advice data returned for garden ${gardenId}`);
+        return [];
+      }
+
+      const adviceData = Array.isArray(response.data.data)
+        ? response.data.data
+        : [];
+
+      console.log("adviceData", adviceData);
+      return adviceData;
     } catch (error) {
-      console.error(`Error fetching garden advice ${gardenId}:`, error);
-      // Fallback to mock data if API fails
-      return this.generateMockAdvice(gardenId);
+      console.error(
+        `Error fetching garden advice for garden ${gardenId}:`,
+        error
+      );
+      return [];
     }
   }
 
   /**
-   * Generate mock garden advice (temporary until API is ready)
-   * @param gardenId Garden ID to generate advice for
-   * @private
-   */
-  private generateMockAdvice(gardenId: number | string): GardenAdvice[] {
-    const gardenIdNum =
-      typeof gardenId === "string" ? parseInt(gardenId, 10) : gardenId;
-
-    const adviceList: GardenAdvice[] = [
-      {
-        id: 1000 + gardenIdNum,
-        gardenId: gardenIdNum,
-        action: "Tưới nước buổi sáng",
-        description:
-          "Tưới cây vào buổi sáng sớm giúp giảm sự bốc hơi nước và cung cấp đủ nước cho cây suốt ngày nóng.",
-        reason: "Độ ẩm đất hiện đang ở mức thấp.",
-        priority: 5,
-        suggestedTime: new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(),
-        category: "WATERING",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      {
-        id: 2000 + gardenIdNum,
-        gardenId: gardenIdNum,
-        action: "Bón phân hữu cơ",
-        description:
-          "Thêm phân hữu cơ giúp cải thiện cấu trúc đất và cung cấp dinh dưỡng cho cây.",
-        reason:
-          "Cây đang trong giai đoạn phát triển nhanh và cần bổ sung dinh dưỡng.",
-        priority: 4,
-        suggestedTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        category: "FERTILIZING",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      {
-        id: 3000 + gardenIdNum,
-        gardenId: gardenIdNum,
-        action: "Kiểm tra và loại bỏ sâu bệnh",
-        description: "Kiểm tra lá cây để phát hiện và xử lý sâu bệnh kịp thời.",
-        reason:
-          "Thời tiết ẩm ướt hiện tại thuận lợi cho sự phát triển của nấm và sâu bệnh.",
-        priority: 3,
-        suggestedTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-        category: "PEST_CONTROL",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-    ];
-
-    return adviceList;
-  }
-
-  /**
    * Format date for display
+   * @param dateString ISO date string
+   * @returns Formatted date string
    */
   formatDate(dateString?: string): string {
-    if (!dateString) return "";
+    if (!dateString) return "--/--/----";
 
     try {
       const date = new Date(dateString);
+
+      // Format: DD/MM/YYYYs
       return date.toLocaleDateString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
         year: "numeric",
-        month: "long",
-        day: "numeric",
       });
     } catch (error) {
       console.error("Error formatting date:", error);
-      return dateString;
+      return "--/--/----";
     }
   }
 
   /**
    * Calculate garden statistics
+   * @param garden Garden object
+   * @returns Object containing days until harvest and growth progress
    */
   calculateGardenStatistics(garden: Garden): {
     daysUntilHarvest: number;
     growthProgress: number;
   } {
-    const plantedDate = garden.createdAt
-      ? new Date(garden.createdAt)
-      : new Date();
-    const currentDate = new Date();
+    let daysUntilHarvest = 0;
+    let growthProgress = 0;
 
-    // Calculate days since planting
-    const daysSincePlanting = Math.floor(
-      (currentDate.getTime() - plantedDate.getTime()) / (1000 * 60 * 60 * 24)
-    );
+    try {
+      if (garden.plantStartDate && garden.plantDuration) {
+        const startDate = new Date(garden.plantStartDate).getTime();
+        const currentDate = new Date().getTime();
+        const endDate = startDate + garden.plantDuration * 24 * 60 * 60 * 1000;
 
-    // Assume average harvest time is 40-60 days (based on common vegetables)
-    const estimatedHarvestDays = 50;
-    const daysUntilHarvest = Math.max(
-      0,
-      estimatedHarvestDays - daysSincePlanting
-    );
+        daysUntilHarvest = Math.max(
+          0,
+          Math.ceil((endDate - currentDate) / (24 * 60 * 60 * 1000))
+        );
 
-    // Calculate growth progress as a percentage
-    const growthProgress = Math.min(
-      100,
-      Math.floor((daysSincePlanting / estimatedHarvestDays) * 100)
-    );
+        const totalGrowthDays = garden.plantDuration;
+        const daysGrown = totalGrowthDays - daysUntilHarvest;
+        growthProgress = Math.min(
+          100,
+          Math.max(0, Math.round((daysGrown / totalGrowthDays) * 100))
+        );
+      } else {
+        console.debug(
+          `Cannot calculate growth progress for garden ${garden.id}: missing required data`
+        );
+        console.debug(
+          `Plant name: ${garden.plantName || "Missing"}, Start date: ${
+            garden.plantStartDate || "Missing"
+          }, Duration: ${garden.plantDuration || "Missing"}`
+        );
+      }
+    } catch (error) {
+      console.error(
+        `Error calculating garden statistics for garden ${garden.id}:`,
+        error
+      );
+    }
 
     return {
       daysUntilHarvest,
       growthProgress,
     };
+  }
+
+  /**
+   * Get garden summary for quick display
+   * @param garden Garden object
+   * @returns Object with summary information
+   */
+  getGardenSummary(garden: Garden): {
+    name: string;
+    type: string;
+    location: string;
+    plantInfo: string | null;
+    createdAt: string;
+    growthProgress: number;
+    daysUntilHarvest: number;
+  } {
+    const { growthProgress, daysUntilHarvest } =
+      this.calculateGardenStatistics(garden);
+
+    return {
+      name: garden.name,
+      type: this.getGardenTypeText(garden.type),
+      location: this.getLocationString(garden),
+      plantInfo: garden.plantName
+        ? `${garden.plantName}${
+            garden.plantGrowStage ? ` (${garden.plantGrowStage})` : ""
+          }`
+        : null,
+      createdAt: this.formatDate(garden.createdAt),
+      growthProgress,
+      daysUntilHarvest,
+    };
+  }
+
+  /**
+   * Get garden plants information
+   * @param gardenId Garden ID
+   * @returns List of plants in the garden
+   */
+  async getGardenPlants(gardenId: number | string): Promise<any[]> {
+    try {
+      const response = await apiClient.get(PLANT_ENDPOINTS.BY_GARDEN(gardenId));
+      const plants = response?.data?.data || [];
+      console.debug(`Fetched ${plants.length} plants for garden ${gardenId}`);
+      return plants;
+    } catch (error) {
+      console.error(`Error fetching plants for garden ${gardenId}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Enrich garden with plant growth data
+   * Used when garden object is missing plantStartDate or plantDuration
+   * @param garden Garden object to enrich
+   * @returns Enriched garden object with plant data
+   */
+  async enrichGardenWithPlantData(garden: Garden): Promise<Garden> {
+    // If we have all the data already, just return the garden
+    if (garden.plantName && garden.plantStartDate && garden.plantDuration) {
+      return garden;
+    }
+
+    try {
+      const plants = await this.getGardenPlants(garden.id);
+
+      // If no plants found, return original garden
+      if (!plants || plants.length === 0) {
+        console.debug(`No plants found for garden ${garden.id}`);
+        return garden;
+      }
+
+      // Use the first plant for now (could be enhanced to handle multiple plants)
+      const mainPlant = plants[0];
+      console.debug(`Found main plant: ${mainPlant.name}`);
+
+      // Create enriched copy of the garden
+      const enrichedGarden = { ...garden };
+
+      // Fill in missing data
+      if (!enrichedGarden.plantName && mainPlant.name) {
+        enrichedGarden.plantName = mainPlant.name;
+      }
+
+      if (!enrichedGarden.plantStartDate && mainPlant.plantedAt) {
+        enrichedGarden.plantStartDate = mainPlant.plantedAt;
+        console.debug(`Added plantStartDate: ${mainPlant.plantedAt}`);
+      }
+
+      if (!enrichedGarden.plantDuration && mainPlant.growthDuration) {
+        enrichedGarden.plantDuration = mainPlant.growthDuration;
+        console.debug(`Added plantDuration: ${mainPlant.growthDuration}`);
+      }
+
+      if (!enrichedGarden.plantGrowStage && mainPlant.currentGrowthStage) {
+        enrichedGarden.plantGrowStage = mainPlant.currentGrowthStage;
+      }
+
+      console.debug(`Garden data enriched with plant information`);
+      return enrichedGarden;
+    } catch (error) {
+      console.error(`Error enriching garden with plant data:`, error);
+      return garden; // Return original garden if enrichment fails
+    }
   }
 }
 

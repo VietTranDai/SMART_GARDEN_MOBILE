@@ -215,19 +215,9 @@ const WeatherDisplay = memo(
 
           {tip && (
             <View style={styles.tipContainer}>
-              <Ionicons name="bulb-outline" size={18} color="#fff" />
+              <Ionicons name="bulb-outline" size={20} color="#fff" />
               <Text style={styles.tipText}>{tip}</Text>
             </View>
-          )}
-
-          {showFullDetails && onShowDetail && (
-            <TouchableOpacity
-              style={styles.showDetailButton}
-              onPress={onShowDetail}
-            >
-              <Text style={styles.showDetailText}>Xem chi tiết</Text>
-              <Ionicons name="chevron-forward" size={16} color="#fff" />
-            </TouchableOpacity>
           )}
         </LinearGradient>
       </View>
@@ -242,11 +232,8 @@ const makeStyles = (theme: any) =>
       margin: 8,
       borderRadius: 20,
       overflow: "hidden",
-      elevation: 4,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 6,
+      borderWidth: 1,
+      borderColor: "#1a7a30", // Dark green border
     },
     cardContent: {
       padding: 16,
@@ -282,7 +269,7 @@ const makeStyles = (theme: any) =>
     },
     temperature: {
       color: "#fff",
-      fontSize: 32,
+      fontSize: 48,
       fontFamily: "Inter-Bold",
     },
     weatherDesc: {
@@ -340,9 +327,9 @@ const makeStyles = (theme: any) =>
       alignItems: "center",
       backgroundColor: "rgba(255,255,255,0.15)",
       borderRadius: 10,
-      padding: 8,
+      padding: 12,
       marginHorizontal: 4,
-      width: 80,
+      width: 100,
     },
     hourText: {
       color: "#fff",
@@ -351,12 +338,14 @@ const makeStyles = (theme: any) =>
     },
     hourTemp: {
       color: "#fff",
-      fontSize: 14,
+      fontSize: 16,
       fontFamily: "Inter-Bold",
+      marginTop: 4,
     },
     smallIcon: {
       width: 32,
       height: 32,
+      marginVertical: 4,
     },
     precipContainer: {
       flexDirection: "row",
@@ -373,13 +362,13 @@ const makeStyles = (theme: any) =>
       flexDirection: "row",
       alignItems: "center",
       marginTop: 12,
-      backgroundColor: "rgba(255,255,255,0.15)",
-      padding: 10,
+      backgroundColor: "rgba(255,255,255,0.1)",
+      padding: 12,
       borderRadius: 10,
     },
     tipText: {
       color: "#fff",
-      fontSize: 12,
+      fontSize: 13,
       fontFamily: "Inter-Regular",
       marginLeft: 6,
       flex: 1,
@@ -389,14 +378,19 @@ const makeStyles = (theme: any) =>
       alignItems: "center",
       justifyContent: "center",
       marginTop: 16,
-      padding: 8,
-      backgroundColor: "rgba(255,255,255,0.2)",
+      padding: 10,
+      backgroundColor: "rgba(255,255,255,0.25)",
       borderRadius: 8,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+      elevation: 5,
     },
     showDetailText: {
       color: "#fff",
       fontSize: 14,
-      fontFamily: "Inter-Medium",
+      fontFamily: "Inter-SemiBold",
       marginRight: 4,
     },
     // Compact mode styles
@@ -412,7 +406,7 @@ const makeStyles = (theme: any) =>
       flex: 1,
     },
     compactTemp: {
-      fontSize: 32,
+      fontSize: 36,
       fontFamily: "Inter-Bold",
     },
     compactLocation: {

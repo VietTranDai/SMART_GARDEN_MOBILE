@@ -99,7 +99,7 @@ export default function useHomeData() {
       try {
         // Fetch sensor data
         await sensorData.fetchSensorData(gardenId);
-        
+
 
         const weatherResult = await weatherData.fetchCompleteWeatherData(
           gardenId

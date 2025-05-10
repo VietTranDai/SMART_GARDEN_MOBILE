@@ -140,7 +140,7 @@ export default function WeatherDetailModal({
   const formatHour = (timestamp: string) => {
     try {
       return new Date(timestamp).toLocaleTimeString("vi-VN", {
-        hour: "2-digit",
+        hour: "numeric",
         hour12: false,
       });
     } catch (error) {
@@ -149,22 +149,34 @@ export default function WeatherDetailModal({
     }
   };
 
+  const getFilteredHourLabels = (timestamps: string[]) => {
+    return timestamps.map((time, index) => {
+      const hour = new Date(time).getHours();
+      if (hour % 6 === 0) {
+        return hour.toString();
+      }
+      return "";
+    });
+  };
+
   const temperatureChartData = useMemo(() => {
     if (!Array.isArray(safeHourlyForecast) || safeHourlyForecast.length === 0)
       return null;
 
     try {
       const next24Hours = safeHourlyForecast.slice(0, 24);
+      const hourlyTemps = next24Hours.map((h) => Math.round(h.temp));
+      const timestamps = next24Hours.map((h) => h.forecastFor);
+
       return {
-        labels: next24Hours.map((h) => formatHour(h.forecastFor)),
+        labels: getFilteredHourLabels(timestamps),
         datasets: [
           {
-            data: next24Hours.map((h) => Math.round(h.temp)),
+            data: hourlyTemps,
             color: () => theme.primary,
             strokeWidth: 2,
           },
         ],
-        legend: ["Nhiệt độ (°C)"],
       };
     } catch (error) {
       console.error("Error creating temperature chart data:", error);
@@ -178,16 +190,18 @@ export default function WeatherDetailModal({
 
     try {
       const next24Hours = safeHourlyForecast.slice(0, 24);
+      const hourlyRain = next24Hours.map((h) => Math.round((h.pop || 0) * 100));
+      const timestamps = next24Hours.map((h) => h.forecastFor);
+
       return {
-        labels: next24Hours.map((h) => formatHour(h.forecastFor)),
+        labels: getFilteredHourLabels(timestamps),
         datasets: [
           {
-            data: next24Hours.map((h) => Math.round((h.pop || 0) * 100)),
+            data: hourlyRain,
             color: () => "#4da6ff",
             strokeWidth: 2,
           },
         ],
-        legend: ["Khả năng mưa (%)"],
       };
     } catch (error) {
       console.error("Error creating rain chart data:", error);
@@ -245,7 +259,7 @@ export default function WeatherDetailModal({
                 styles.hourlyItem,
                 {
                   backgroundColor:
-                    index === 0 ? `${theme.primary}15` : theme.card,
+                    index === 0 ? `${theme.primary}20` : `${theme.card}E6`,
                 },
               ]}
             >
@@ -262,7 +276,7 @@ export default function WeatherDetailModal({
               <View style={styles.precipContainer}>
                 <Ionicons
                   name="water-outline"
-                  size={12}
+                  size={14}
                   color={theme.textSecondary}
                 />
                 <Text
@@ -373,67 +387,134 @@ export default function WeatherDetailModal({
   const renderCharts = () => {
     if (!temperatureChartData || !rainChartData) return null;
 
+    const chartConfig = {
+      backgroundColor: theme.card,
+      backgroundGradientFrom: theme.card,
+      backgroundGradientTo: theme.card,
+      decimalPlaces: 0,
+      color: (opacity = 1) => `rgba(78, 153, 224, ${opacity})`,
+      labelColor: (opacity = 1) => theme.textSecondary,
+      style: {
+        borderRadius: 16,
+      },
+      propsForDots: {
+        r: "4",
+        strokeWidth: "2",
+        stroke: theme.primary,
+      },
+      propsForLabels: {
+        fontSize: 12,
+        fontWeight: "500",
+        fontFamily: "Inter-Medium",
+      },
+      propsForBackgroundLines: {
+        strokeDasharray: "5,5",
+        stroke: `${theme.border}50`,
+      },
+      formatYLabel: (value) => `${value}°C`,
+      formatXLabel: (value) => value || "",
+    };
+
+    const rainChartConfig = {
+      ...chartConfig,
+      color: (opacity = 1) => `rgba(77, 166, 255, ${opacity})`,
+      propsForDots: {
+        r: "4",
+        strokeWidth: "2",
+        stroke: "#4da6ff",
+      },
+      formatYLabel: (value) => `${value}%`,
+    };
+
     return (
       <View style={styles.chartsContainer}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>
-          Biểu đồ nhiệt độ (24 giờ tới)
-        </Text>
+        <View style={styles.chartTitleContainer}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            Biểu đồ nhiệt độ (24 giờ tới)
+          </Text>
+          <Text style={[styles.chartLegend, { color: theme.textSecondary }]}>
+            Nhiệt độ (°C)
+          </Text>
+        </View>
+
         <LineChart
           data={temperatureChartData}
-          width={width - 40}
+          width={width - 32}
           height={180}
-          chartConfig={{
-            backgroundColor: theme.card,
-            backgroundGradientFrom: theme.card,
-            backgroundGradientTo: theme.card,
-            decimalPlaces: 0,
-            color: (opacity = 1) => `rgba(78, 153, 224, ${opacity})`,
-            labelColor: (opacity = 1) => theme.textSecondary,
-            style: {
-              borderRadius: 16,
-            },
-            propsForDots: {
-              r: "5",
-              strokeWidth: "2",
-              stroke: theme.primary,
-            },
-          }}
+          chartConfig={chartConfig}
           bezier
           style={{
             marginVertical: 8,
             borderRadius: 16,
+            paddingRight: 0,
+            backgroundColor: `${theme.card}E6`,
+            alignSelf: "center",
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 3,
+            elevation: 2,
           }}
+          withDots={true}
+          withShadow={false}
+          withInnerLines={true}
+          withOuterLines={true}
+          yAxisInterval={5}
+          withVerticalLabels={true}
+          withHorizontalLabels={true}
+          fromZero={false}
+          segments={4}
         />
 
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>
-          Xác suất mưa (24 giờ tới)
-        </Text>
+        <View style={styles.timeUnitContainer}>
+          <Text style={[styles.timeUnitText, { color: theme.textSecondary }]}>
+            Giờ
+          </Text>
+        </View>
+
+        <View style={styles.chartTitleContainer}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            Xác suất mưa (24 giờ tới)
+          </Text>
+          <Text style={[styles.chartLegend, { color: theme.textSecondary }]}>
+            Khả năng mưa (%)
+          </Text>
+        </View>
+
         <LineChart
           data={rainChartData}
-          width={width - 40}
+          width={width - 32}
           height={180}
-          chartConfig={{
-            backgroundColor: theme.card,
-            backgroundGradientFrom: theme.card,
-            backgroundGradientTo: theme.card,
-            decimalPlaces: 0,
-            color: (opacity = 1) => `rgba(77, 166, 255, ${opacity})`,
-            labelColor: (opacity = 1) => theme.textSecondary,
-            style: {
-              borderRadius: 16,
-            },
-            propsForDots: {
-              r: "5",
-              strokeWidth: "2",
-              stroke: "#4da6ff",
-            },
-          }}
+          chartConfig={rainChartConfig}
           bezier
           style={{
             marginVertical: 8,
             borderRadius: 16,
+            paddingRight: 0,
+            backgroundColor: `${theme.card}E6`,
+            alignSelf: "center",
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 3,
+            elevation: 2,
           }}
+          withDots={true}
+          withShadow={false}
+          withInnerLines={true}
+          withOuterLines={true}
+          yAxisInterval={10}
+          withVerticalLabels={true}
+          withHorizontalLabels={true}
+          fromZero={false}
+          segments={4}
         />
+
+        <View style={styles.timeUnitContainer}>
+          <Text style={[styles.timeUnitText, { color: theme.textSecondary }]}>
+            Giờ
+          </Text>
+        </View>
       </View>
     );
   };
@@ -464,7 +545,9 @@ export default function WeatherDetailModal({
             <View
               style={[
                 styles.adviceItem,
-                { backgroundColor: `${theme.primary}10` },
+                {
+                  backgroundColor: theme.card,
+                },
               ]}
             >
               <View style={styles.adviceHeader}>
@@ -527,7 +610,10 @@ export default function WeatherDetailModal({
               </Text>
             </View>
           )}
-          contentContainerStyle={styles.adviceContainer}
+          contentContainerStyle={[
+            styles.adviceContainer,
+            styles.contentContainer,
+          ]}
           showsVerticalScrollIndicator={false}
         />
       );
@@ -564,12 +650,14 @@ export default function WeatherDetailModal({
               style={[
                 styles.optimalItem,
                 {
-                  backgroundColor:
+                  backgroundColor: theme.card,
+                  borderLeftWidth: 4,
+                  borderLeftColor:
                     item.score >= 70
-                      ? `${theme.success}15`
+                      ? theme.success
                       : item.score >= 50
-                      ? `${theme.primary}15`
-                      : `${theme.textSecondary}15`,
+                      ? theme.primary
+                      : theme.textSecondary,
                 },
               ]}
             >
@@ -661,7 +749,10 @@ export default function WeatherDetailModal({
               </Text>
             </View>
           )}
-          contentContainerStyle={styles.optimalContainer}
+          contentContainerStyle={[
+            styles.optimalContainer,
+            styles.contentContainer,
+          ]}
           showsVerticalScrollIndicator={false}
         />
       );
@@ -734,11 +825,15 @@ export default function WeatherDetailModal({
       switch (activeTab) {
         case "forecast":
           return (
-            <>
+            <ScrollView
+              style={styles.contentScrollView}
+              contentContainerStyle={styles.contentContainer}
+              showsVerticalScrollIndicator={false}
+            >
               {renderHourlyForecast()}
               {renderCharts()}
               {renderDailyForecast()}
-            </>
+            </ScrollView>
           );
         case "advice":
           return renderAdvice();
@@ -770,7 +865,7 @@ export default function WeatherDetailModal({
             <TouchableOpacity
               style={styles.closeButton}
               onPress={onClose}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
             >
               <Ionicons name="close" size={24} color={theme.text} />
             </TouchableOpacity>
@@ -804,6 +899,16 @@ export default function WeatherDetailModal({
                   ]}
                   onPress={() => setActiveTab("forecast")}
                 >
+                  <Ionicons
+                    name="partly-sunny-outline"
+                    size={18}
+                    color={
+                      activeTab === "forecast"
+                        ? theme.primary
+                        : theme.textSecondary
+                    }
+                    style={styles.tabIcon}
+                  />
                   <Text
                     style={[
                       styles.tabButtonText,
@@ -828,6 +933,16 @@ export default function WeatherDetailModal({
                   ]}
                   onPress={() => setActiveTab("advice")}
                 >
+                  <Ionicons
+                    name="bulb-outline"
+                    size={18}
+                    color={
+                      activeTab === "advice"
+                        ? theme.primary
+                        : theme.textSecondary
+                    }
+                    style={styles.tabIcon}
+                  />
                   <Text
                     style={[
                       styles.tabButtonText,
@@ -852,6 +967,16 @@ export default function WeatherDetailModal({
                   ]}
                   onPress={() => setActiveTab("optimal")}
                 >
+                  <Ionicons
+                    name="time-outline"
+                    size={18}
+                    color={
+                      activeTab === "optimal"
+                        ? theme.primary
+                        : theme.textSecondary
+                    }
+                    style={styles.tabIcon}
+                  />
                   <Text
                     style={[
                       styles.tabButtonText,
@@ -868,13 +993,9 @@ export default function WeatherDetailModal({
                 </TouchableOpacity>
               </View>
 
-              <ScrollView
-                style={styles.contentScrollView}
-                contentContainerStyle={styles.contentContainer}
-                showsVerticalScrollIndicator={false}
-              >
+              <View style={styles.tabContentContainer}>
                 {renderTabContent()}
-              </ScrollView>
+              </View>
             </>
           )}
         </View>
@@ -908,8 +1029,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: "Inter-SemiBold",
+    fontWeight: "bold",
   },
   loadingContainer: {
     flex: 1,
@@ -950,8 +1072,8 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.8)",
   },
   currentIcon: {
-    width: 80,
-    height: 80,
+    width: 100,
+    height: 100,
   },
   currentStatsContainer: {
     marginTop: 8,
@@ -974,16 +1096,21 @@ const styles = StyleSheet.create({
     borderBottomColor: "rgba(0,0,0,0.1)",
   },
   tabButton: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 16,
     marginRight: 8,
   },
   activeTabButton: {
-    borderBottomWidth: 2,
+    borderBottomWidth: 3,
+  },
+  tabIcon: {
+    marginRight: 6,
   },
   tabButtonText: {
     fontSize: 14,
-    fontFamily: "Inter-Medium",
+    fontFamily: "Inter-SemiBold",
   },
   contentScrollView: {
     flex: 1,
@@ -994,13 +1121,19 @@ const styles = StyleSheet.create({
   },
   hourlyContainer: {
     paddingVertical: 16,
+    paddingHorizontal: 4,
   },
   hourlyItem: {
     padding: 12,
     borderRadius: 12,
     alignItems: "center",
     marginRight: 12,
-    width: 80,
+    width: 85,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
   },
   hourTime: {
     fontSize: 12,
@@ -1008,8 +1141,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   hourlyIcon: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    marginVertical: 4,
   },
   hourTemp: {
     fontSize: 16,
@@ -1019,11 +1153,12 @@ const styles = StyleSheet.create({
   precipContainer: {
     flexDirection: "row",
     alignItems: "center",
+    marginTop: 4,
   },
   precipText: {
     fontSize: 12,
     fontFamily: "Inter-Regular",
-    marginLeft: 2,
+    marginLeft: 4,
   },
   sectionTitle: {
     fontSize: 16,
@@ -1033,6 +1168,15 @@ const styles = StyleSheet.create({
   },
   chartsContainer: {
     marginVertical: 8,
+  },
+  chartTitleContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  chartLegend: {
+    fontSize: 12,
+    fontFamily: "Inter-Medium",
   },
   dailyContainer: {
     marginTop: 8,
@@ -1091,7 +1235,12 @@ const styles = StyleSheet.create({
   adviceItem: {
     borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2.5,
+    elevation: 3,
   },
   adviceHeader: {
     flexDirection: "row",
@@ -1099,9 +1248,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   adviceIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
@@ -1140,7 +1289,13 @@ const styles = StyleSheet.create({
   optimalItem: {
     borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2.5,
+    elevation: 3,
+    borderLeftWidth: 4,
   },
   optimalHeader: {
     flexDirection: "row",
@@ -1148,16 +1303,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   optimalScoreBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
   },
   optimalScoreText: {
     color: "#fff",
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: "Inter-Bold",
   },
   optimalTitleContainer: {
@@ -1203,5 +1358,17 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 14,
     fontFamily: "Inter-Regular",
+  },
+  timeUnitContainer: {
+    alignItems: "center",
+    marginTop: -4,
+    marginBottom: 20,
+  },
+  timeUnitText: {
+    fontSize: 12,
+    fontFamily: "Inter-Medium",
+  },
+  tabContentContainer: {
+    flex: 1,
   },
 });

@@ -23,11 +23,13 @@ interface GardenStatusCardProps {
     city?: string;
   };
   onViewPlantDetails?: () => void;
+  onShowAdvice?: () => void;
 }
 
 export default function GardenStatusCard({
   garden,
   onViewPlantDetails,
+  onShowAdvice,
 }: GardenStatusCardProps) {
   const theme = useAppTheme();
 
@@ -173,28 +175,54 @@ export default function GardenStatusCard({
             <Text style={[styles.plantTitle, { color: theme.text }]}>
               Thông tin cây trồng
             </Text>
-            <Pressable
-              style={({ pressed }) => [
-                styles.detailsButton,
-                {
-                  backgroundColor: pressed
-                    ? theme.backgroundSecondary
-                    : "transparent",
-                },
-              ]}
-              onPress={onViewPlantDetails}
-            >
-              <Text
-                style={[styles.detailsButtonText, { color: theme.primary }]}
+            <View style={styles.buttonsContainer}>
+              {onShowAdvice && (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.actionButton,
+                    {
+                      backgroundColor: pressed
+                        ? theme.backgroundSecondary
+                        : theme.primaryLight,
+                    },
+                  ]}
+                  onPress={onShowAdvice}
+                >
+                  <FontAwesome5
+                    name="lightbulb"
+                    size={12}
+                    color={theme.primary}
+                  />
+                  <Text
+                    style={[styles.actionButtonText, { color: theme.primary }]}
+                  >
+                    Lời khuyên
+                  </Text>
+                </Pressable>
+              )}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.detailsButton,
+                  {
+                    backgroundColor: pressed
+                      ? theme.backgroundSecondary
+                      : "transparent",
+                  },
+                ]}
+                onPress={onViewPlantDetails}
               >
-                Chi tiết
-              </Text>
-              <FontAwesome5
-                name="chevron-right"
-                size={12}
-                color={theme.primary}
-              />
-            </Pressable>
+                <Text
+                  style={[styles.detailsButtonText, { color: theme.primary }]}
+                >
+                  Chi tiết
+                </Text>
+                <FontAwesome5
+                  name="chevron-right"
+                  size={12}
+                  color={theme.primary}
+                />
+              </Pressable>
+            </View>
           </View>
 
           <View style={styles.plantInfoContainer}>
@@ -352,6 +380,22 @@ const styles = StyleSheet.create({
   plantTitle: {
     fontSize: 16,
     fontFamily: "Inter-Bold",
+  },
+  buttonsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    padding: 6,
+    borderRadius: 6,
+  },
+  actionButtonText: {
+    fontSize: 12,
+    fontFamily: "Inter-Medium",
   },
   detailsButton: {
     flexDirection: "row",

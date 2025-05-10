@@ -52,7 +52,6 @@ import {
   HourlyForecast,
   DailyForecast,
   GardenWeatherData,
-  GardenAdvice,
 } from "@/types/weather/weather.types";
 import { Alert } from "@/types/alerts/alert.types";
 import {
@@ -62,6 +61,7 @@ import {
 
 // Import getSensorStatus from the useSensorData hook
 import { getSensorStatus } from "@/hooks/useSensorData";
+import { GardenAdvice } from "@/types";
 
 // Structure for the main FlatList data
 interface Section {

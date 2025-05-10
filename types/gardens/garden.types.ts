@@ -42,6 +42,8 @@ export interface Garden {
   type: GardenType;
   status: GardenStatus;
 
+  sensorCount?: number;
+
   // Plant information
   plantName?: string;
   plantGrowStage?: string;
@@ -51,4 +53,22 @@ export interface Garden {
   // Timestamps
   createdAt?: string;
   updatedAt?: string;
+}
+
+/**
+ * Interface for garden advice data
+ */
+export interface GardenAdvice {
+  id: number;
+  gardenId: number;
+  category: string;
+  priority: number;
+  action: string;
+  description: string;
+  reason: string;
+  suggestedTime: string;
+  createdAt: string;
+  updatedAt?: string;
+  completed?: boolean;
+  thumbnail?: string;
 }

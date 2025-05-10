@@ -49,7 +49,7 @@ export interface WateringSchedule {
   // Schedule details
   scheduledAt: string;
   amount?: number;
-  status: "PENDING" | "COMPLETED" | "SKIPPED";
+  status: TaskStatus;
 
   notes?: string;
 

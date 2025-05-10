@@ -11,9 +11,14 @@ import {
   Image,
   Dimensions,
 } from "react-native";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { GardenAdvice, WeatherAdvice } from "@/types/weather/weather.types";
+import {
+  Ionicons,
+  MaterialCommunityIcons,
+  FontAwesome5,
+} from "@expo/vector-icons";
+import { WeatherAdvice } from "@/types/weather/weather.types";
 import { LinearGradient } from "expo-linear-gradient";
+import { GardenAdvice } from "@/types/gardens/garden.types";
 
 const { width } = Dimensions.get("window");
 
@@ -31,6 +36,39 @@ interface AdviceModalProps {
   theme: any;
 }
 
+// Định nghĩa các kiểu icon Ionicons được chấp nhận
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+
+// Map category của advice sang icon và label
+const CATEGORY_ICON_MAP: Record<
+  string,
+  { icon: IoniconName; color: string; label: string }
+> = {
+  WATERING: { icon: "water-outline", color: "#3498db", label: "Tưới nước" },
+  FERTILIZING: { icon: "leaf", color: "#27ae60", label: "Bón phân" },
+  PRUNING: { icon: "cut-outline", color: "#e67e22", label: "Tỉa cây" },
+  PEST_CONTROL: {
+    icon: "bug-outline",
+    color: "#e74c3c",
+    label: "Diệt côn trùng",
+  },
+  WEATHER_FORECAST: {
+    icon: "cloudy-outline",
+    color: "#3498db",
+    label: "Dự báo",
+  },
+  TEMPERATURE: {
+    icon: "thermometer-outline",
+    color: "#e67e22",
+    label: "Nhiệt độ",
+  },
+  LIGHT: { icon: "sunny-outline", color: "#f1c40f", label: "Ánh sáng" },
+  HUMIDITY: { icon: "water-outline", color: "#3498db", label: "Độ ẩm" },
+  SOIL_MOISTURE: { icon: "leaf-outline", color: "#2ecc71", label: "Ẩm đất" },
+  NUTRIENT: { icon: "flask-outline", color: "#9b59b6", label: "Dinh dưỡng" },
+  WEEDING: { icon: "trash-outline", color: "#e74c3c", label: "Làm cỏ" },
+};
+
 const AdviceModal = ({
   isVisible,
   onClose,
@@ -43,12 +81,15 @@ const AdviceModal = ({
 }: AdviceModalProps) => {
   // Helper function to check if item is GardenAdvice or WeatherAdvice
   const isGardenAdvice = (item: AdviceItem): item is GardenAdvice => {
-    return (
-      "category" in item &&
-      "action" in item &&
-      "reason" in item &&
-      "suggestedTime" in item
-    );
+    // Debug why items aren't being recognized
+    const hasCategory = "category" in item;
+    const hasAction = "action" in item;
+    const hasReason = "reason" in item;
+    const hasSuggestedTime = "suggestedTime" in item;
+
+    const isValid = hasCategory && hasAction && hasReason && hasSuggestedTime;
+
+    return isValid || adviceType === "garden"; // If adviceType is explicitly set to garden, accept it anyway
   };
 
   const isWeatherAdvice = (item: AdviceItem): item is WeatherAdvice => {
@@ -57,71 +98,46 @@ const AdviceModal = ({
     );
   };
 
+  // Convert string priority to number if needed
+  const getPriorityValue = useCallback((priority: string | number): number => {
+    if (typeof priority === "number") return priority;
+
+    switch (priority.toUpperCase()) {
+      case "CRITICAL":
+        return 5;
+      case "HIGH":
+        return 4;
+      case "MEDIUM":
+        return 3;
+      case "LOW":
+        return 2;
+      default:
+        return 1;
+    }
+  }, []);
+
   // Helper function to get icon based on category or advice type
   const getIconForAdvice = useCallback(
     (item: AdviceItem) => {
-      if (isGardenAdvice(item)) {
-        // Handle GardenAdvice
-        switch (item.category) {
-          case "WATERING":
-            return {
-              icon: <Ionicons name="water-outline" size={22} color="#fff" />,
-              backgroundColor: "#3498db",
-              label: "Tưới nước",
-            };
-          case "FERTILIZING":
-            return {
-              icon: (
-                <MaterialCommunityIcons
-                  name="leaf-circle"
-                  size={22}
-                  color="#fff"
-                />
-              ),
-              backgroundColor: "#27ae60",
-              label: "Bón phân",
-            };
-          case "PRUNING":
-            return {
-              icon: (
-                <MaterialCommunityIcons
-                  name="scissors-cutting"
-                  size={22}
-                  color="#fff"
-                />
-              ),
-              backgroundColor: "#e67e22",
-              label: "Tỉa cây",
-            };
-          case "PEST_CONTROL":
-            return {
-              icon: (
-                <MaterialCommunityIcons
-                  name="bug-outline"
-                  size={22}
-                  color="#fff"
-                />
-              ),
-              backgroundColor: "#e74c3c",
-              label: "Diệt côn trùng",
-            };
-          default:
-            return {
-              icon: <Ionicons name="leaf-outline" size={22} color="#fff" />,
-              backgroundColor: theme.primary,
-              label: "Chăm sóc",
-            };
-        }
+      if (isGardenAdvice(item) || adviceType === "garden") {
+        // Cast to access category property safely
+        const gardenItem = item as any;
+        // Use the category map if available, otherwise use defaults
+        const category = gardenItem.category?.toUpperCase() || "DEFAULT";
+
+        const categoryInfo = CATEGORY_ICON_MAP[category] || {
+          icon: "leaf-outline",
+          color: theme.primary,
+          label: "Chăm sóc",
+        };
+
+        return {
+          icon: <Ionicons name={categoryInfo.icon} size={22} color="#fff" />,
+          backgroundColor: categoryInfo.color,
+          label: categoryInfo.label,
+        };
       } else if (isWeatherAdvice(item)) {
         // Handle WeatherAdvice
-        if (item.icon) {
-          return {
-            icon: <Ionicons name={item.icon} size={22} color="#fff" />,
-            backgroundColor: "#3498db",
-            label: "Thời tiết",
-          };
-        }
-
         // Default weather icons based on condition
         switch (item.weatherCondition) {
           case "CLEAR":
@@ -169,28 +185,55 @@ const AdviceModal = ({
         };
       }
     },
-    [theme]
+    [theme, adviceType]
   );
 
-  // Helper function to format date
-  const formatDate = useCallback((dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleTimeString("vi-VN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-        day: "2-digit",
-        month: "2-digit",
-      });
-    } catch (err) {
-      return "Không xác định";
+  // Helper function to format date & time or time of day
+  const formatTimeOrDate = useCallback((timeValue: string) => {
+    // Check if it's likely a date string
+    if (
+      timeValue?.includes("-") ||
+      timeValue?.includes(":") ||
+      /^\d{4}/.test(timeValue)
+    ) {
+      try {
+        const date = new Date(timeValue);
+        if (!isNaN(date.getTime())) {
+          return date.toLocaleTimeString("vi-VN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+            day: "2-digit",
+            month: "2-digit",
+          });
+        }
+      } catch {
+        // Not a valid date
+      }
+    }
+
+    // Handle time of day
+    switch (timeValue?.toLowerCase()) {
+      case "morning":
+        return "Buổi sáng";
+      case "noon":
+        return "Buổi trưa";
+      case "afternoon":
+        return "Buổi chiều";
+      case "evening":
+        return "Buổi tối";
+      case "night":
+        return "Ban đêm";
+      default:
+        return timeValue || "Không xác định";
     }
   }, []);
 
   // Helper function to render priority indicator
   const renderPriorityIndicator = useCallback(
-    (priority: number) => {
+    (priority: string | number) => {
+      const priorityValue = getPriorityValue(priority);
+
       const getPriorityLabel = (p: number) => {
         if (p >= 4) return "Quan trọng";
         if (p >= 3) return "Cần thiết";
@@ -198,9 +241,9 @@ const AdviceModal = ({
       };
 
       const priorityColor =
-        priority >= 4
+        priorityValue >= 4
           ? theme.error
-          : priority >= 3
+          : priorityValue >= 3
           ? theme.warning
           : theme.success;
 
@@ -216,60 +259,70 @@ const AdviceModal = ({
             ]}
           >
             <Text style={[styles.priorityText, { color: priorityColor }]}>
-              {getPriorityLabel(priority)}
+              {getPriorityLabel(priorityValue)}
             </Text>
           </View>
         </View>
       );
     },
-    [theme]
+    [theme, getPriorityValue]
   );
 
   // Render advice item - handling both types
   const renderAdviceItem = useCallback(
-    ({ item }: { item: AdviceItem }) => {
-      if (isGardenAdvice(item)) {
-        // Render Garden Advice
-        const categoryInfo = getIconForAdvice(item);
-        return (
-          <View
-            style={[
-              styles.adviceItem,
-              {
-                backgroundColor: theme.card,
-                borderLeftColor: categoryInfo.backgroundColor,
-              },
-            ]}
-          >
-            <View style={styles.adviceHeader}>
-              <View
-                style={[
-                  styles.iconContainer,
-                  { backgroundColor: categoryInfo.backgroundColor },
-                ]}
-              >
-                {categoryInfo.icon}
-              </View>
-              <View style={styles.adviceTitle}>
-                <Text
-                  style={[
-                    styles.categoryLabel,
-                    { color: categoryInfo.backgroundColor },
-                  ]}
-                >
-                  {categoryInfo.label}
-                </Text>
-                <Text style={[styles.actionText, { color: theme.text }]}>
-                  {item.action}
-                </Text>
-              </View>
-              {renderPriorityIndicator(item.priority)}
+    ({ item, index }: { item: AdviceItem; index: number }) => {
+      // Xử lý đơn giản hóa, lấy dữ liệu trực tiếp
+      const anyItem = item as any;
+
+      // Chọn phân loại dựa trên dữ liệu có sẵn
+      const category = anyItem.category?.toUpperCase() || "DEFAULT";
+      const categoryInfo = CATEGORY_ICON_MAP[category] || {
+        icon: "leaf-outline",
+        color: theme.primary,
+        label: "Chăm sóc",
+      };
+
+      // Hiển thị theo định dạng đơn giản nhất
+      return (
+        <View
+          style={[
+            styles.adviceItem,
+            {
+              backgroundColor: theme.card,
+              borderLeftColor: categoryInfo.color,
+              marginBottom: index === advice.length - 1 ? 0 : 16,
+            },
+          ]}
+        >
+          <View style={styles.adviceHeader}>
+            <View
+              style={[
+                styles.iconContainer,
+                { backgroundColor: categoryInfo.color },
+              ]}
+            >
+              <Ionicons name={categoryInfo.icon} size={22} color="#fff" />
             </View>
+            <View style={styles.adviceTitle}>
+              <Text
+                style={[styles.categoryLabel, { color: categoryInfo.color }]}
+              >
+                {categoryInfo.label}
+              </Text>
+              <Text style={[styles.actionText, { color: theme.text }]}>
+                {anyItem.action || anyItem.title || "Lời khuyên chăm sóc"}
+              </Text>
+            </View>
+            {anyItem.priority && renderPriorityIndicator(anyItem.priority)}
+          </View>
 
+          {anyItem.description && (
             <Text style={[styles.descriptionText, { color: theme.text }]}>
-              {item.description}
+              {anyItem.description}
             </Text>
+          )}
 
+          {anyItem.reason && (
             <View style={styles.reasonContainer}>
               <Text
                 style={[styles.reasonLabel, { color: theme.textSecondary }]}
@@ -277,80 +330,34 @@ const AdviceModal = ({
                 Lý do:
               </Text>
               <Text style={[styles.reasonText, { color: theme.textSecondary }]}>
-                {item.reason}
+                {anyItem.reason}
               </Text>
             </View>
+          )}
 
+          {anyItem.suggestedTime && (
             <View style={styles.timeContainer}>
-              <View style={styles.timeIconContainer}>
-                <Ionicons name="time-outline" size={14} color="#fff" />
-              </View>
-              <Text style={[styles.timeText, { color: theme.textSecondary }]}>
-                Đề xuất thực hiện: {formatDate(item.suggestedTime)}
-              </Text>
-            </View>
-          </View>
-        );
-      } else if (isWeatherAdvice(item)) {
-        // Render Weather Advice
-        const iconInfo = getIconForAdvice(item);
-        return (
-          <View
-            style={[
-              styles.adviceItem,
-              {
-                backgroundColor: theme.card,
-                borderLeftColor: iconInfo.backgroundColor,
-              },
-            ]}
-          >
-            <View style={styles.adviceHeader}>
               <View
                 style={[
-                  styles.iconContainer,
-                  { backgroundColor: iconInfo.backgroundColor },
+                  styles.timeIconContainer,
+                  { backgroundColor: categoryInfo.color + "50" },
                 ]}
               >
-                {iconInfo.icon}
+                <Ionicons
+                  name="time-outline"
+                  size={14}
+                  color={categoryInfo.color}
+                />
               </View>
-              <View style={styles.adviceTitle}>
-                <Text
-                  style={[
-                    styles.categoryLabel,
-                    { color: iconInfo.backgroundColor },
-                  ]}
-                >
-                  {iconInfo.label}
-                </Text>
-                <Text style={[styles.actionText, { color: theme.text }]}>
-                  {item.title}
-                </Text>
-              </View>
-              {renderPriorityIndicator(item.priority)}
+              <Text style={[styles.timeText, { color: theme.textSecondary }]}>
+                Đề xuất thực hiện: {formatTimeOrDate(anyItem.suggestedTime)}
+              </Text>
             </View>
-
-            <Text style={[styles.descriptionText, { color: theme.text }]}>
-              {item.description}
-            </Text>
-
-            {item.bestTimeOfDay && (
-              <View style={styles.timeContainer}>
-                <View style={styles.timeIconContainer}>
-                  <Ionicons name="time-outline" size={14} color="#fff" />
-                </View>
-                <Text style={[styles.timeText, { color: theme.textSecondary }]}>
-                  Thời gian tốt nhất: {item.bestTimeOfDay}
-                </Text>
-              </View>
-            )}
-          </View>
-        );
-      } else {
-        // Fallback for unknown advice type
-        return null;
-      }
+          )}
+        </View>
+      );
     },
-    [theme, getIconForAdvice, formatDate, renderPriorityIndicator]
+    [theme, formatTimeOrDate, renderPriorityIndicator]
   );
 
   // Component for empty advice state
@@ -372,6 +379,16 @@ const AdviceModal = ({
     </View>
   );
 
+  // Xắp xếp lời khuyên theo mức độ ưu tiên
+  const sortedAdvice = React.useMemo(() => {
+    if (!advice || !advice.length) {
+      return [];
+    }
+
+    // Không sort để giữ nguyên thứ tự từ API
+    return [...advice];
+  }, [advice]);
+
   return (
     <Modal
       visible={isVisible}
@@ -392,11 +409,20 @@ const AdviceModal = ({
             end={{ x: 1, y: 0 }}
             style={styles.modalHeader}
           >
-            <View>
-              <Text style={styles.modalTitle}>Lời khuyên chăm sóc</Text>
-              <Text style={styles.gardenName}>{gardenName}</Text>
+            <View style={styles.headerContent}>
+              <View style={styles.headerIconContainer}>
+                <FontAwesome5 name="lightbulb" size={20} color="#fff" />
+              </View>
+              <View>
+                <Text style={styles.modalTitle}>Lời khuyên chăm sóc</Text>
+                <Text style={styles.gardenName}>{gardenName}</Text>
+              </View>
             </View>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={onClose}
+              activeOpacity={0.7}
+            >
               <Ionicons name="close" size={24} color="#fff" />
             </TouchableOpacity>
           </LinearGradient>
@@ -434,13 +460,15 @@ const AdviceModal = ({
                   </Text>
                 </TouchableOpacity>
               </View>
-            ) : advice.length === 0 ? (
+            ) : sortedAdvice.length === 0 ? (
               <EmptyAdviceComponent />
             ) : (
               <FlatList
-                data={advice}
+                data={sortedAdvice}
                 renderItem={renderAdviceItem}
-                keyExtractor={(item) => `${item.id}`}
+                keyExtractor={(item, index) =>
+                  `advice-${index}-${(item as any).id || index}`
+                }
                 contentContainerStyle={styles.adviceList}
                 showsVerticalScrollIndicator={false}
               />
@@ -477,6 +505,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
   modalTitle: {
     fontSize: 20,
     fontFamily: "Inter-Bold",
@@ -489,16 +530,21 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   closeButton: {
-    padding: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(0,0,0,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalContent: {
     flex: 1,
   },
   adviceList: {
     padding: 16,
+    paddingTop: 20,
   },
   adviceItem: {
-    marginBottom: 16,
     borderRadius: 12,
     borderLeftWidth: 4,
     padding: 16,
@@ -514,9 +560,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   iconContainer: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
@@ -528,6 +574,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter-Medium",
     marginBottom: 2,
+    textTransform: "uppercase",
   },
   actionText: {
     fontSize: 16,
@@ -541,13 +588,13 @@ const styles = StyleSheet.create({
   },
   reasonContainer: {
     marginBottom: 12,
-    backgroundColor: "rgba(0,0,0,0.02)",
-    padding: 10,
+    backgroundColor: "rgba(0,0,0,0.03)",
+    padding: 12,
     borderRadius: 8,
   },
   reasonLabel: {
     fontSize: 12,
-    fontFamily: "Inter-Medium",
+    fontFamily: "Inter-SemiBold",
     marginBottom: 4,
   },
   reasonText: {
@@ -560,10 +607,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   timeIconContainer: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.2)",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 8,
@@ -577,14 +623,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   priorityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
     borderWidth: 1,
   },
   priorityText: {
     fontSize: 11,
-    fontFamily: "Inter-Medium",
+    fontFamily: "Inter-SemiBold",
+    textTransform: "uppercase",
   },
   centerContainer: {
     flex: 1,

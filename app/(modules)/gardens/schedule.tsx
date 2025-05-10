@@ -111,7 +111,9 @@ export default function WateringScheduleScreen() {
         }
       );
 
-      setSchedules((prev) => [newSchedule, ...prev]);
+      if (newSchedule) {
+        setSchedules((prev) => [newSchedule, ...prev]);
+      }
       setShowScheduleForm(false);
       setScheduleDate(new Date());
       setScheduleTime(new Date());
@@ -144,7 +146,9 @@ export default function WateringScheduleScreen() {
         gardenId
       );
 
-      setSchedules((prev) => [newSchedule, ...prev]);
+      if (newSchedule) {
+        setSchedules((prev) => [newSchedule, ...prev]);
+      }
 
       Alert.alert(
         "Schedule Created",

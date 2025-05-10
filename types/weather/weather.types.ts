@@ -137,24 +137,6 @@ export interface GardenWeatherData {
 }
 
 /**
- * Interface for garden advice data
- */
-export interface GardenAdvice {
-  id: number;
-  gardenId: number;
-  category: string;
-  priority: number;
-  action: string;
-  description: string;
-  reason: string;
-  suggestedTime: string;
-  createdAt: string;
-  updatedAt?: string;
-  completed?: boolean;
-  thumbnail?: string;
-}
-
-/**
  * Interface for UI display components
  */
 export interface WeatherDisplayProps {

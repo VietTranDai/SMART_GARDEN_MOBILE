@@ -69,6 +69,8 @@ export interface GardenDisplayDto {
   type: GardenType;
   status: GardenStatus;
 
+  sensorCount?: number;
+
   // UI related properties
   alertCount: number;
   sensorData: {
