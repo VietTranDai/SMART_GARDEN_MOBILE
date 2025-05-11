@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -6,16 +6,45 @@ import {
   TouchableOpacity,
   Animated,
 } from "react-native";
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useTheme } from "@/contexts/ThemeContext";
 import { StatusBar } from "expo-status-bar";
 
+// Mock NetInfo for environments where the native module isn't available
+const NetInfoMock = {
+  configure: () => {},
+  addEventListener: (callback: any) => {
+    // Always return connected in mock mode
+    setTimeout(() => {
+      callback({
+        isConnected: true,
+        isInternetReachable: true,
+      });
+    }, 0);
+    return () => {}; // Unsubscribe function
+  },
+  fetch: () =>
+    Promise.resolve({ isConnected: true, isInternetReachable: true }),
+};
+
+// Use real NetInfo when available, otherwise use mock
+let NetInfo: any;
+try {
+  NetInfo = require("@react-native-community/netinfo").default;
+} catch (error) {
+  console.warn(
+    "NetInfo not available in unmatched route, using mock implementation"
+  );
+  NetInfo = NetInfoMock;
+}
+
 export default function FeatureNotImplementedScreen() {
   const theme = useAppTheme();
   const { isDarkMode } = useTheme();
+  const [isOffline, setIsOffline] = useState(false);
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -23,6 +52,13 @@ export default function FeatureNotImplementedScreen() {
   const iconAnim = useRef(new Animated.Value(0.8)).current;
 
   useEffect(() => {
+    // Check network status
+    const unsubscribe = NetInfo.addEventListener((state: any) => {
+      const isConnected =
+        state?.isConnected !== false && state?.isInternetReachable !== false;
+      setIsOffline(!isConnected);
+    });
+
     // Run animations sequentially
     Animated.sequence([
       // First fade in and slide up the content
@@ -46,6 +82,13 @@ export default function FeatureNotImplementedScreen() {
         useNativeDriver: true,
       }),
     ]).start();
+
+    // Clean up the subscription
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
   }, []);
 
   const handleGoHome = () => {
@@ -66,49 +109,67 @@ export default function FeatureNotImplementedScreen() {
     });
   };
 
+  const checkNetworkAndRetry = () => {
+    NetInfo.fetch().then((state: any) => {
+      const isConnected =
+        state?.isConnected !== false && state?.isInternetReachable !== false;
+      setIsOffline(!isConnected);
+      if (isConnected) {
+        // If connected now, go back
+        handleGoHome();
+      }
+    });
+  };
+
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-    >
-      <StatusBar style={isDarkMode ? "light" : "dark"} />
-      <Animated.View
-        style={[
-          styles.content,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
       >
-        <Animated.View style={{ transform: [{ scale: iconAnim }] }}>
-          <Ionicons
-            name="construct-outline"
-            size={120}
-            color={theme.primary}
-            style={styles.icon}
-          />
-        </Animated.View>
-
-        <Text style={[styles.description, { color: theme.textSecondary }]}>
-          Tính năng này chưa được hiện thực trong phiên bản hiện tại. Chúng tôi
-          đang nỗ lực phát triển và sẽ ra mắt trong phiên bản tiếp theo.
-        </Text>
-
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: theme.primary }]}
-          onPress={handleGoHome}
-          activeOpacity={0.8}
+        <StatusBar style={isDarkMode ? "light" : "dark"} />
+        <Animated.View
+          style={[
+            styles.content,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
         >
-          <Ionicons
-            name="home-outline"
-            size={20}
-            color="#FFFFFF"
-            style={styles.buttonIcon}
-          />
-          <Text style={styles.buttonText}>Quay lại trang chủ</Text>
-        </TouchableOpacity>
-      </Animated.View>
-    </SafeAreaView>
+          <Animated.View style={{ transform: [{ scale: iconAnim }] }}>
+            <Ionicons
+              name={isOffline ? "cloud-offline-outline" : "construct-outline"}
+              size={120}
+              color={theme.primary}
+              style={styles.icon}
+            />
+          </Animated.View>
+
+          <Text style={[styles.description, { color: theme.textSecondary }]}>
+            {isOffline
+              ? "Không có kết nối mạng. Vui lòng kiểm tra lại kết nối internet của bạn và thử lại."
+              : "Tính năng này chưa được hiện thực trong phiên bản hiện tại. Chúng tôi đang nỗ lực phát triển và sẽ ra mắt trong phiên bản tiếp theo."}
+          </Text>
+
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: theme.primary }]}
+            onPress={isOffline ? checkNetworkAndRetry : handleGoHome}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={isOffline ? "refresh-outline" : "home-outline"}
+              size={20}
+              color="#FFFFFF"
+              style={styles.buttonIcon}
+            />
+            <Text style={styles.buttonText}>
+              {isOffline ? "Thử lại" : "Quay lại trang chủ"}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </SafeAreaView>
+    </>
   );
 }
 

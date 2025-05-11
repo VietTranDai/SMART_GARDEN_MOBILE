@@ -231,6 +231,7 @@ class SensorService {
       const response = await this.retryApiCall(() =>
         apiClient.get(SENSOR_ENDPOINTS.LATEST_READINGS_BY_GARDEN(gardenId))
       );
+
       return response.data.data || [];
     } catch (error) {
       console.error(

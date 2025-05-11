@@ -12,6 +12,9 @@ import * as Notifications from "expo-notifications";
 import { Text, View, StyleSheet, TouchableOpacity } from "react-native";
 import { ONBOARDING_COMPLETED_KEY } from "@/constants/strings"; // Import the constant
 import Toast from "react-native-toast-message";
+import { NetworkProvider } from "@/contexts/NetworkContext";
+import OfflineBanner from "@/components/OfflineBanner";
+import NetworkErrorBoundary from "@/components/NetworkErrorBoundary";
 
 // Configure notifications with a simple try-catch pattern
 try {
@@ -150,32 +153,37 @@ export default function RootLayout() {
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ThemeProvider>
-          <UserProvider>
-            <PreferencesProvider>
-              <SafeAreaProvider>
-                <Stack>
-                  <Stack.Screen
-                    name="(modules)"
-                    options={{ headerShown: false }}
-                  />
-                  <Stack.Screen name="+not-found" />
-                  <Stack.Screen
-                    name="auth/index"
-                    options={{ headerShown: false }}
-                  />
-                  <Stack.Screen
-                    name="onboarding/index"
-                    options={{ headerShown: false }}
-                  />
-                  <Stack.Screen
-                    name="sensors/[id]"
-                    options={{ headerShown: false }}
-                  />
-                </Stack>
-                <AppNavigator />
-              </SafeAreaProvider>
-            </PreferencesProvider>
-          </UserProvider>
+          <NetworkProvider>
+            <UserProvider>
+              <PreferencesProvider>
+                <SafeAreaProvider>
+                  <NetworkErrorBoundary>
+                    <Stack>
+                      <Stack.Screen
+                        name="(modules)"
+                        options={{ headerShown: false }}
+                      />
+                      <Stack.Screen name="+not-found" />
+                      <Stack.Screen
+                        name="auth/index"
+                        options={{ headerShown: false }}
+                      />
+                      <Stack.Screen
+                        name="onboarding/index"
+                        options={{ headerShown: false }}
+                      />
+                      <Stack.Screen
+                        name="sensors/[id]"
+                        options={{ headerShown: false }}
+                      />
+                    </Stack>
+                    <AppNavigator />
+                  </NetworkErrorBoundary>
+                  <OfflineBanner />
+                </SafeAreaProvider>
+              </PreferencesProvider>
+            </UserProvider>
+          </NetworkProvider>
         </ThemeProvider>
         <Toast />
       </GestureHandlerRootView>

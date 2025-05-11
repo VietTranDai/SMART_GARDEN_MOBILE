@@ -48,9 +48,6 @@ class GardenService {
       const garden = response.data.data || null;
 
       if (garden) {
-        console.debug(`Fetched garden ${garden.id}: ${garden.name}`);
-
-        // Check if we need to fetch additional plant data
         if (
           garden.plantName &&
           (!garden.plantStartDate || !garden.plantDuration)

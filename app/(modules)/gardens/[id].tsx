@@ -1,3 +1,4 @@
+import React, { useCallback, useMemo, useRef } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -13,13 +14,6 @@ import {
   ScrollView,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
 import {
   Feather,
   FontAwesome5,
@@ -33,26 +27,30 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Import custom components
 import WeatherDisplay from "@/components/common/WeatherDisplay";
-import SensorDetailView from "@/components/common/SensorDetailView";
+import SensorDetailView, {
+  Sensor as SensorViewData,
+} from "@/components/common/SensorDetailView";
 import GardenStatusCard from "@/components/common/GardenStatusCard";
 import AlertsList from "@/components/common/AlertsList";
 import AdviceModal from "@/components/common/AdviceModal";
+import GardenSensorSection from "@/components/garden/GardenSensorSection";
+import ActivityList from "@/components/garden/ActivityList";
+import env from "@/config/environment";
+
+// Import custom hooks
+import { useGardenDetail } from "@/hooks/useGardenDetail";
+
 // Import API services
 import gardenService from "@/service/api/garden.service";
-import weatherService from "@/service/api/weather.service";
-import sensorService from "@/service/api/sensor.service";
-import taskService from "@/service/api/task.service";
-import activityService from "@/service/api/activity.service";
 import alertService from "@/service/api/alert.service";
-import wateringScheduleService from "@/service/api/watering.service";
-// Import weather types directly from the weather types file
+import { apiClient } from "@/service";
+
+// Import types
 import {
   DailyForecast,
   HourlyForecast,
   WeatherObservation,
 } from "@/types/weather/weather.types";
-
-// Import enums and potentially types from the central database constants/types file
 import {
   Alert,
   AlertStatus,
@@ -63,10 +61,8 @@ import {
   TaskStatus,
   WateringSchedule,
 } from "@/types";
-import { apiClient } from "@/service";
 import Toast from "react-native-toast-message";
-import ActivityList from "@/components/garden/ActivityList";
-import env from "@/config/environment";
+import { getSensorStatus } from "@/hooks/useSensorData";
 
 enum DetailSectionType {
   STATUS = "STATUS",
@@ -106,9 +102,6 @@ export default function GardenDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const theme = useAppTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
   // Animation values
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -118,161 +111,51 @@ export default function GardenDetailScreen() {
     extrapolate: "clamp",
   });
 
-  // State for garden data
-  const [garden, setGarden] = useState<Garden | null>(null);
-  const [currentWeather, setCurrentWeather] =
-    useState<WeatherObservation | null>(null);
-  const [hourlyForecast, setHourlyForecast] = useState<HourlyForecast[]>([]);
-  const [dailyForecast, setDailyForecast] = useState<DailyForecast[]>([]);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [wateringSchedule, setWateringSchedule] = useState<WateringSchedule[]>(
-    []
-  );
-  const [activities, setActivities] = useState<GardenActivity[]>([]);
-  const [sensors, setSensors] = useState<Sensor[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  // Use the custom hook for all garden data and operations
+  const {
+    garden,
+    currentWeather,
+    hourlyForecast,
+    dailyForecast,
+    alerts,
+    wateringSchedule,
+    activities,
+    sensors,
+    isLoading,
+    isRefreshing,
+    isSensorDataLoading,
+    error,
+    sensorDataError,
+    lastSensorUpdate,
+    adviceModalVisible,
+    gardenAdvice,
+    adviceLoading,
+    adviceError,
+    weatherModalVisible,
+    loadGardenData,
+    handleRefresh,
+    refreshSensorData,
+    fetchGardenAdvice,
+    showAdviceModal,
+    closeAdviceModal,
+    showWeatherModal,
+    closeWeatherModal,
+    getSensorTrend,
+    getTimeSinceUpdate,
+  } = useGardenDetail({ gardenId: id || null });
 
-  // Add state for advice modal
-  const [adviceModalVisible, setAdviceModalVisible] = useState(false);
-  const [gardenAdvice, setGardenAdvice] = useState<any[]>([]);
-  const [adviceLoading, setAdviceLoading] = useState(false);
-  const [adviceError, setAdviceError] = useState<string | null>(null);
+  // Create memoized styles
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
-  // Add state for weather modal
-  const [weatherModalVisible, setWeatherModalVisible] = useState(false);
-
-  // Load garden data using API calls
-  const loadGardenData = useCallback(async (gardenId: string) => {
-    if (!gardenId) return;
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Load garden details
-      const gardenData = await gardenService.getGardenById(gardenId);
-      if (!gardenData) {
-        throw new Error("Không thể tải dữ liệu vườn.");
-      }
-      setGarden(gardenData);
-
-      // Load weather data with better error handling
-      try {
-        const weatherData = await weatherService.getCurrentWeather(gardenId);
-        setCurrentWeather(weatherData);
-      } catch (error) {
-        console.error("Failed to load weather data:", error);
-        setCurrentWeather(null);
-      }
-
-      // Load hourly forecast
-      try {
-        const hourlyData = await weatherService.getHourlyForecast(gardenId);
-        setHourlyForecast(hourlyData || []);
-      } catch (error) {
-        console.error("Failed to load hourly forecast:", error);
-        setHourlyForecast([]);
-      }
-
-      // Load daily forecast
-      try {
-        const dailyData = await weatherService.getDailyForecast(gardenId);
-        setDailyForecast(dailyData || []);
-      } catch (error) {
-        console.error("Failed to load daily forecast:", error);
-        setDailyForecast([]);
-      }
-
-      // Load sensors
-      try {
-        const sensorData = await sensorService.getSensorsByGarden(gardenId);
-        setSensors(sensorData || []);
-      } catch (error) {
-        console.error("Failed to load sensor data:", error);
-        setSensors([]);
-      }
-
-      // Load alerts
-      try {
-        const alertData = await alertService.getAlertsByGarden(gardenId);
-        setAlerts(alertData || []);
-      } catch (error) {
-        console.error("Failed to load alerts:", error);
-        setAlerts([]);
-      }
-
-      // Load watering schedule
-      try {
-        const response =
-          await wateringScheduleService.getGardenWateringSchedules(gardenId);
-        setWateringSchedule(response || []);
-      } catch (error) {
-        console.error("Failed to load watering schedule:", error);
-        setWateringSchedule([]);
-      }
-
-      // Load activities
-      try {
-        const response = await activityService.getActivitiesByGarden(gardenId);
-        setActivities(response || []);
-      } catch (error) {
-        console.error("Failed to load activities:", error);
-        setActivities([]);
-      }
-    } catch (error) {
-      console.error("Failed to load garden data:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Không thể tải dữ liệu vườn. Vui lòng thử lại sau."
-      );
-      setGarden(null);
-
-      // Show toast error message
-      Toast.show({
-        type: "error",
-        text1: "Lỗi tải dữ liệu",
-        text2:
-          error instanceof Error
-            ? error.message
-            : "Không thể tải dữ liệu vườn, vui lòng thử lại",
-        position: "bottom",
-        visibilityTime: 4000,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (id) {
-      loadGardenData(id).catch((err) =>
-        console.error("Error loading garden data:", err)
-      );
-    }
-  }, [id, loadGardenData]);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    if (id) {
-      loadGardenData(id)
-        .catch((err) => console.error("Error refreshing garden data:", err))
-        .finally(() => setRefreshing(false));
-    } else {
-      setRefreshing(false);
-    }
-  }, [id, loadGardenData]);
-
+  // Handle alert functionality
   const handleResolveAlert = async (alertId: number) => {
     try {
       await alertService.updateAlertStatus(alertId, AlertStatus.RESOLVED);
 
-      setAlerts((prevAlerts) =>
-        prevAlerts.map((alert) =>
-          alert.id === alertId
-            ? { ...alert, status: AlertStatus.RESOLVED }
-            : alert
-        )
-      );
+      // Refresh data to reflect changes
+      if (id) {
+        refreshSensorData(id);
+      }
 
       Toast.show({
         type: "success",
@@ -298,9 +181,10 @@ export default function GardenDetailScreen() {
       // Assuming there's an API endpoint to ignore alerts
       await apiClient.post(`/alerts/${alertId}/ignore`);
 
-      setAlerts((prevAlerts) =>
-        prevAlerts.filter((alert) => alert.id !== alertId)
-      );
+      // Refresh data to reflect changes
+      if (id) {
+        refreshSensorData(id);
+      }
 
       Toast.show({
         type: "success",
@@ -319,6 +203,45 @@ export default function GardenDetailScreen() {
         visibilityTime: 3000,
       });
     }
+  };
+
+  // Weather button component
+  const renderStatusWithWeatherButton = (garden: Garden) => {
+    return (
+      <View style={styles.weatherButtonContainer}>
+        <TouchableOpacity
+          style={styles.weatherButton}
+          onPress={showWeatherModal}
+          accessible={true}
+          accessibilityLabel="Xem thông tin thời tiết"
+          accessibilityHint="Nhấn để xem dự báo thời tiết chi tiết"
+          accessibilityRole="button"
+        >
+          <Ionicons
+            name={getValidIconName(
+              currentWeather?.iconCode
+                ? `${currentWeather.iconCode}-outline`
+                : "cloudy-outline"
+            )}
+            size={22}
+            color={theme.primary}
+          />
+          {currentWeather ? (
+            <Text style={styles.weatherButtonTemp}>
+              {Math.round(currentWeather.temp)}°C
+            </Text>
+          ) : (
+            <Text style={styles.weatherButtonText}>Thời tiết</Text>
+          )}
+          <Ionicons
+            name="chevron-down-outline"
+            size={14}
+            color={theme.primary}
+            style={{ marginLeft: 3 }}
+          />
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   const getStatusColor = (
@@ -343,6 +266,7 @@ export default function GardenDetailScreen() {
         return theme.textSecondary;
     }
   };
+
   const getStatusText = (
     status: TaskStatus | AlertStatus | GardenStatus | string
   ): string => {
@@ -382,6 +306,7 @@ export default function GardenDetailScreen() {
             a.status !== AlertStatus.IGNORED
         )
       : [];
+
     const upcomingSchedules = Array.isArray(wateringSchedule)
       ? wateringSchedule.filter(
           (ws) =>
@@ -400,6 +325,7 @@ export default function GardenDetailScreen() {
         data: [activeAlerts],
       });
     }
+
     if (upcomingSchedules.length > 0) {
       dataSections.push({
         type: DetailSectionType.SCHEDULE,
@@ -441,17 +367,7 @@ export default function GardenDetailScreen() {
     });
 
     return dataSections;
-  }, [
-    garden,
-    currentWeather,
-    hourlyForecast,
-    dailyForecast,
-    alerts,
-    wateringSchedule,
-    sensors,
-    activities,
-    id,
-  ]);
+  }, [garden, alerts, wateringSchedule, sensors, activities, id]);
 
   const renderSectionItem = ({
     section,
@@ -469,7 +385,7 @@ export default function GardenDetailScreen() {
               onViewPlantDetails={() => {
                 console.log("Navigate to plant details for:", item.plantName);
               }}
-              onShowAdvice={handleShowGardenAdvice}
+              onShowAdvice={() => id && showAdviceModal(id)}
               topRightComponent={renderStatusWithWeatherButton(item)}
             />
           </View>
@@ -557,10 +473,15 @@ export default function GardenDetailScreen() {
         );
       case DetailSectionType.SENSORS:
         return (
-          <SensorDetailView
-            sensors={item}
-            data={item}
+          <GardenSensorSection
+            sensors={sensors}
+            isSensorDataLoading={isSensorDataLoading}
+            sensorDataError={sensorDataError}
+            lastSensorUpdate={lastSensorUpdate}
+            getTimeSinceUpdate={getTimeSinceUpdate}
             onSelectSensor={(sensor) => router.push(`/sensors/${sensor.id}`)}
+            onRefreshSensors={() => id && refreshSensorData(id)}
+            title="Thông tin cảm biến vườn"
           />
         );
       case DetailSectionType.ACTIVITY:
@@ -615,350 +536,95 @@ export default function GardenDetailScreen() {
 
   const renderSectionHeader = ({ section }: { section: DetailSection }) => {
     let title = "";
-    let showButton = false;
-    let buttonText = "Xem tất cả";
-    let buttonIcon: any = null;
-    let buttonOnPress = () => {};
-    let hasData = section.data[0]?.length > 0;
 
+    // Determine section title based on section type
     switch (section.type) {
+      case DetailSectionType.STATUS:
+        return null; // No header for the status section
+      case DetailSectionType.WEATHER:
+        title = "Thời tiết";
+        break;
       case DetailSectionType.ALERTS:
-        title = "Cảnh báo Đang hoạt động";
-        if (!hasData) return null;
+        title = "Cảnh báo";
         break;
       case DetailSectionType.SCHEDULE:
         title = "Lịch tưới sắp tới";
-        showButton = true;
-        buttonText = "Quản lý lịch";
-        buttonIcon = (
-          <MaterialIcons name="schedule" size={18} color={theme.primary} />
-        );
-        buttonOnPress = () =>
-          router.push(`/(modules)/gardens/schedule?id=${id}`);
         break;
       case DetailSectionType.SENSORS:
-        title = "Số liệu Cảm biến";
-        if (!hasData) return null;
-        break;
+        return null; // Handled within the SensorDetailView component
       case DetailSectionType.ACTIVITY:
-        title = "Hoạt động Gần đây";
-        showButton = true;
-        buttonText = "Xem tất cả";
-        buttonIcon = (
-          <MaterialIcons name="history" size={18} color={theme.primary} />
-        );
-        buttonOnPress = () =>
-          router.push(`/(modules)/activities?gardenId=${id}`);
+        title = "Hoạt động gần đây";
+        break;
+      case DetailSectionType.ACTIONS:
+        title = "Hoạt động khác";
         break;
       default:
         return null;
     }
 
     return (
-      <View
-        style={[styles.sectionContainerHeader, styles.sectionContentPadding]}
-      >
-        <Text style={styles.sectionTitle}>{title}</Text>
-        {section.type === DetailSectionType.ALERTS &&
-          section.data[0]?.length > 0 && (
-            <View
-              style={[
-                styles.headerAlertCountBadge,
-                { backgroundColor: theme.error },
-              ]}
-            >
-              <Text style={styles.headerAlertCountText}>
-                {section.data[0].length}
-              </Text>
-            </View>
-          )}
-        {showButton && (
-          <TouchableOpacity
-            onPress={buttonOnPress}
-            style={styles.sectionHeaderButton}
-          >
-            {buttonIcon}
-            <Text style={styles.sectionHeaderButtonText}>{buttonText}</Text>
-          </TouchableOpacity>
-        )}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionHeaderText}>{title}</Text>
       </View>
     );
   };
 
-  // Animation-enhanced header
-  const HeaderComponent = () => (
-    <>
-      {/* Animated header background that appears when scrolling */}
-      <Animated.View
-        style={[styles.animatedHeaderBackground, { opacity: headerOpacity }]}
-      />
-
-      {/* Main header content */}
-      <View style={styles.headerContentContainer}>
-        <Image
-          source={
-            garden?.profilePicture
-              ? { uri: `${env.apiUrl}${garden.profilePicture}` }
-              : garden?.type
-              ? { uri: gardenService.getDefaultGardenImage(garden.type).uri }
-              : require("@/assets/images/icon.png")
-          }
-          style={styles.headerImage}
-        />
-
-        <Gradient
-          colors={["transparent", "rgba(0,0,0,0.7)"]}
-          style={styles.headerGradient}
-        />
-
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => router.back()}
-          >
-            <Feather name="arrow-left" size={24} color={theme.card} />
-          </TouchableOpacity>
-
-          <View style={styles.headerTitleContainer}>
-            <Text
-              style={[styles.headerTitle, { color: theme.card }]}
-              numberOfLines={1}
-            >
-              {garden?.name}
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: theme.card }]}>
-              {garden?.district
-                ? `${garden.district}, ${garden.city}`
-                : garden?.city}
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => router.push(`/(modules)/gardens/edit/${id}`)}
-          >
-            <Feather name="edit-2" size={20} color={theme.card} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Garden status pill */}
-        {garden && (
-          <View style={styles.statusPillContainer}>
-            <View
-              style={[
-                styles.statusPill,
-                { backgroundColor: getStatusColor(garden.status) },
-              ]}
-            >
-              <View style={styles.statusDotLarge} />
-              <Text style={styles.statusPillText}>
-                {getStatusText(garden.status)}
-              </Text>
-            </View>
-          </View>
-        )}
-      </View>
-    </>
-  );
-
-  // Add handler for showing garden advice
-  const handleShowGardenAdvice = useCallback(async () => {
-    if (!id) return;
-
-    setAdviceLoading(true);
-    setAdviceError(null);
-
-    try {
-      // Trước tiên, thử kiểm tra dữ liệu từ cache
-      const cachedAdviceKey = `garden_advice_${id}`;
-      let adviceResponse;
-
-      try {
-        const cachedAdvice = await AsyncStorage.getItem(cachedAdviceKey);
-        if (cachedAdvice) {
-          adviceResponse = JSON.parse(cachedAdvice);
-        }
-      } catch (cacheErr) {
-        // Ignore cache errors
-      }
-
-      // Nếu không có trong cache, gọi API
-      if (!adviceResponse || adviceResponse.length === 0) {
-        adviceResponse = await gardenService.getGardenAdvice(id);
-
-        // Lưu vào cache nếu có dữ liệu
-        if (adviceResponse && adviceResponse.length > 0) {
-          try {
-            await AsyncStorage.setItem(
-              cachedAdviceKey,
-              JSON.stringify(adviceResponse)
-            );
-          } catch (cacheErr) {
-            // Ignore cache errors
-          }
-        }
-      }
-
-      // Đảm bảo dữ liệu là một mảng hợp lệ
-      const validAdvice = Array.isArray(adviceResponse) ? adviceResponse : [];
-
-      // Gán vào state
-      setGardenAdvice(validAdvice);
-
-      // Kiểm tra nếu không có dữ liệu
-      if (validAdvice.length === 0) {
-        setAdviceError("Không tìm thấy lời khuyên nào cho vườn này");
-      } else {
-        // Hiển thị modal
-        setAdviceModalVisible(true);
-      }
-    } catch (error) {
-      console.error("Failed to load garden advice:", error);
-      setAdviceError(
-        error instanceof Error
-          ? error.message
-          : "Không thể tải lời khuyên. Vui lòng thử lại sau."
-      );
-
-      // Show toast error message
-      Toast.show({
-        type: "error",
-        text1: "Lỗi tải lời khuyên",
-        text2: "Không thể tải lời khuyên, vui lòng thử lại",
-        position: "bottom",
-        visibilityTime: 3000,
-      });
-    } finally {
-      setAdviceLoading(false);
-    }
-  }, [id]);
-
-  // Add a debug modal component
-  const DebugAdviceModal = ({
-    isVisible,
-    onClose,
-    advice,
-    gardenName,
-    theme,
-  }: {
-    isVisible: boolean;
-    onClose: () => void;
-    advice: any[];
-    gardenName: string;
-    theme: any;
-  }) => {
-    if (!isVisible) return null;
-
-    // Đảm bảo theme luôn có giá trị mặc định nếu không được truyền vào
-    const safeTheme = theme || {
-      background: "#ffffff",
-      card: "#f5f5f5",
-      text: "#000000",
-      primary: "#3498db",
-      textSecondary: "#666666",
-    };
+  // Header component for the section list
+  const HeaderComponent = () => {
+    if (!garden) return null;
 
     return (
-      <Modal
-        visible={isVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={onClose}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <View
-            style={{
-              width: "90%",
-              maxHeight: "80%",
-              backgroundColor: safeTheme.background,
-              borderRadius: 12,
-              padding: 16,
-            }}
-          >
-            <Text
-              style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}
-            >
-              Lời khuyên cho vườn: {gardenName}
-            </Text>
-            <ScrollView style={{ flex: 1 }}>
-              {advice && advice.length > 0 ? (
-                advice.map((item: any, index: number) => (
-                  <View
-                    key={`debug-advice-${index}`}
-                    style={{
-                      padding: 10,
-                      borderRadius: 8,
-                      backgroundColor: safeTheme.card,
-                      marginBottom: 10,
-                      borderLeftWidth: 4,
-                      borderLeftColor: safeTheme.primary,
-                    }}
-                  >
-                    <Text style={{ fontSize: 16, fontWeight: "600" }}>
-                      {item.action || "Không có hành động"}
-                    </Text>
-                    {item.description && (
-                      <Text style={{ fontSize: 14, marginTop: 5 }}>
-                        {item.description}
-                      </Text>
-                    )}
-                    {item.reason && (
-                      <Text
-                        style={{
-                          fontSize: 13,
-                          marginTop: 5,
-                          fontStyle: "italic",
-                        }}
-                      >
-                        Lý do: {item.reason}
-                      </Text>
-                    )}
-                  </View>
-                ))
-              ) : (
-                <Text>Không có lời khuyên nào</Text>
-              )}
-            </ScrollView>
-            <TouchableOpacity
-              onPress={onClose}
-              style={{
-                backgroundColor: safeTheme.primary,
-                padding: 10,
-                borderRadius: 8,
-                alignItems: "center",
-                marginTop: 10,
-              }}
-            >
-              <Text style={{ color: "#fff", fontWeight: "600" }}>Đóng</Text>
-            </TouchableOpacity>
-          </View>
+      <View style={styles.headerContainer}>
+        <View style={styles.headerImageWrapper}>
+          {garden.profilePicture ? (
+            <Image
+              source={{ uri: `${env.apiUrl}${garden.profilePicture}` }}
+              style={styles.headerImage}
+              contentFit="cover"
+              transition={300}
+            />
+          ) : (
+            <RNImage
+              source={require("@/assets/images/garden-placeholder.png")}
+              style={styles.headerImage}
+            />
+          )}
+          <Gradient
+            style={styles.headerGradient}
+            colors={["rgba(0,0,0,0.5)", "transparent"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+          />
         </View>
-      </Modal>
+
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+          accessible={true}
+          accessibilityLabel="Quay lại"
+          accessibilityRole="button"
+        >
+          <Ionicons name="arrow-back" size={22} color="#fff" />
+        </TouchableOpacity>
+      </View>
     );
   };
 
-  // Weather Modal and Weather Button Component
-  const WeatherModal = () => {
+  // Weather Modal
+  const renderWeatherModal = () => {
     return (
       <Modal
         visible={weatherModalVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setWeatherModalVisible(false)}
+        onRequestClose={closeWeatherModal}
       >
         <View style={styles.modalOverlay}>
           <Animated.View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Thông tin thời tiết</Text>
               <TouchableOpacity
-                onPress={() => setWeatherModalVisible(false)}
+                onPress={closeWeatherModal}
                 accessible={true}
                 accessibilityLabel="Đóng thông tin thời tiết"
                 accessibilityRole="button"
@@ -1001,8 +667,9 @@ export default function GardenDetailScreen() {
                         </Text>
                         <Ionicons
                           name={getValidIconName(
-                            weatherService.getWeatherIcon(hour.iconCode) ||
-                              "cloudy-outline"
+                            hour.iconCode
+                              ? `${hour.iconCode}-outline`
+                              : "cloudy-outline"
                           )}
                           size={24}
                           color={theme.primary}
@@ -1033,8 +700,9 @@ export default function GardenDetailScreen() {
                       <View style={styles.dayIconContainer}>
                         <Ionicons
                           name={getValidIconName(
-                            weatherService.getWeatherIcon(day.iconCode) ||
-                              "cloudy-outline"
+                            day.iconCode
+                              ? `${day.iconCode}-outline`
+                              : "cloudy-outline"
                           )}
                           size={24}
                           color={theme.primary}
@@ -1057,7 +725,7 @@ export default function GardenDetailScreen() {
 
             <TouchableOpacity
               style={styles.modalCloseButton}
-              onPress={() => setWeatherModalVisible(false)}
+              onPress={closeWeatherModal}
               accessible={true}
               accessibilityLabel="Đóng"
               accessibilityRole="button"
@@ -1070,46 +738,7 @@ export default function GardenDetailScreen() {
     );
   };
 
-  // Weather button component
-  const renderStatusWithWeatherButton = (garden: Garden) => {
-    return (
-      <View style={styles.weatherButtonContainer}>
-        <TouchableOpacity
-          style={styles.weatherButton}
-          onPress={() => setWeatherModalVisible(true)}
-          accessible={true}
-          accessibilityLabel="Xem thông tin thời tiết"
-          accessibilityHint="Nhấn để xem dự báo thời tiết chi tiết"
-          accessibilityRole="button"
-        >
-          <Ionicons
-            name={getValidIconName(
-              currentWeather
-                ? weatherService.getWeatherIcon(currentWeather.iconCode) ||
-                    "cloudy-outline"
-                : "cloudy-outline"
-            )}
-            size={22}
-            color={theme.primary}
-          />
-          {currentWeather ? (
-            <Text style={styles.weatherButtonTemp}>
-              {Math.round(currentWeather.temp)}°C
-            </Text>
-          ) : (
-            <Text style={styles.weatherButtonText}>Thời tiết</Text>
-          )}
-          <Ionicons
-            name="chevron-down-outline"
-            size={14}
-            color={theme.primary}
-            style={{ marginLeft: 3 }}
-          />
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
+  // Loading state
   if (isLoading && !garden) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
@@ -1119,6 +748,7 @@ export default function GardenDetailScreen() {
     );
   }
 
+  // Error state
   if (!garden) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
@@ -1135,9 +765,7 @@ export default function GardenDetailScreen() {
         <TouchableOpacity
           onPress={() => {
             if (id) {
-              loadGardenData(id).catch((err) =>
-                console.error("Error retrying garden data:", err)
-              );
+              loadGardenData(id);
             }
           }}
           style={[
@@ -1153,7 +781,7 @@ export default function GardenDetailScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: garden.name, headerShown: false }} />
+      <Stack.Screen options={{ title: garden?.name, headerShown: false }} />
       <SectionList
         sections={sections}
         keyExtractor={(item, index) => {
@@ -1170,8 +798,8 @@ export default function GardenDetailScreen() {
         style={styles.container}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
             colors={[theme.primary]}
             tintColor={theme.primary}
           />
@@ -1187,23 +815,20 @@ export default function GardenDetailScreen() {
         )}
         scrollEventThrottle={16}
       />
-      <WeatherModal />
+
+      {/* Weather modal */}
+      {renderWeatherModal()}
+
+      {/* Advice modal */}
       <AdviceModal
         isVisible={adviceModalVisible}
-        onClose={() => setAdviceModalVisible(false)}
+        onClose={closeAdviceModal}
         advice={gardenAdvice}
         isLoading={adviceLoading}
         error={adviceError}
         gardenName={garden?.name || ""}
         theme={theme}
         adviceType="garden"
-      />
-      <DebugAdviceModal
-        isVisible={false}
-        onClose={() => setAdviceModalVisible(false)}
-        advice={gardenAdvice}
-        gardenName={garden?.name || ""}
-        theme={theme}
       />
     </>
   );
@@ -1250,18 +875,16 @@ const createStyles = (theme: any) =>
       fontSize: 16,
       fontFamily: "Inter-Medium",
     },
-    headerContentContainer: {
+    headerContainer: {
       position: "relative",
       height: 220,
     },
-    animatedHeaderBackground: {
+    headerImageWrapper: {
       position: "absolute",
       top: 0,
       left: 0,
       right: 0,
-      height: Platform.OS === "ios" ? 90 : 70,
-      backgroundColor: theme.primary,
-      zIndex: 10,
+      bottom: 0,
     },
     headerImage: {
       position: "absolute",
@@ -1276,117 +899,41 @@ const createStyles = (theme: any) =>
       right: 0,
       height: 120,
     },
-    header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      paddingTop: Platform.OS === "ios" ? 50 : 40,
-      zIndex: 5,
-    },
-    headerButton: {
+    backButton: {
       padding: 8,
       backgroundColor: "rgba(0,0,0,0.3)",
       borderRadius: 20,
+      position: "absolute",
+      top: 10,
+      left: 10,
     },
-    headerTitleContainer: {
-      flex: 1,
-      marginHorizontal: 12,
-      alignItems: "center",
+    sectionHeader: {
+      padding: 16,
     },
-    headerTitle: {
+    sectionHeaderText: {
       fontSize: 18,
       fontFamily: "Inter-Bold",
-      textShadowColor: "rgba(0,0,0,0.5)",
-      textShadowOffset: { width: 1, height: 1 },
-      textShadowRadius: 3,
-    },
-    headerSubtitle: {
-      fontSize: 13,
-      marginTop: 2,
-      fontFamily: "Inter-Regular",
-      textShadowColor: "rgba(0,0,0,0.5)",
-      textShadowOffset: { width: 1, height: 1 },
-      textShadowRadius: 3,
-    },
-    statusPillContainer: {
-      position: "absolute",
-      bottom: -15,
-      alignSelf: "center",
-      zIndex: 5,
-    },
-    statusPill: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      borderRadius: 20,
-      shadowColor: theme.shadow,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 3,
-      elevation: 4,
-    },
-    statusDotLarge: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: theme.card,
-      marginRight: 8,
-    },
-    statusPillText: {
-      color: theme.card,
-      fontSize: 14,
-      fontFamily: "Inter-SemiBold",
-      textTransform: "uppercase",
-    },
-    sectionContainerHeader: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      paddingBottom: 12,
-      paddingTop: 20,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.borderLight,
-      marginBottom: 10,
+      color: theme.text,
     },
     sectionContentPadding: {
       paddingHorizontal: 16,
     },
-    sectionTitle: {
-      fontSize: 18,
-      fontFamily: "Inter-Bold",
-      color: theme.text,
-      flexShrink: 1,
+    itemSeparator: {
+      height: 8,
     },
-    headerAlertCountBadge: {
-      minWidth: 20,
-      height: 20,
-      borderRadius: 10,
-      justifyContent: "center",
-      alignItems: "center",
-      marginLeft: 8,
-      paddingHorizontal: 5,
+    sectionSeparator: {
+      height: 15,
+      backgroundColor: theme.backgroundAlt,
     },
-    headerAlertCountText: {
-      color: theme.card,
-      fontSize: 12,
-      fontFamily: "Inter-Bold",
+    noDataText: {
+      fontSize: 14,
+      color: theme.textSecondary,
+      fontFamily: "Inter-Regular",
+      textAlign: "center",
+      paddingVertical: 20,
     },
-    sectionHeaderButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingVertical: 6,
-      paddingHorizontal: 10,
-      borderRadius: 8,
-      backgroundColor: theme.cardAlt,
-    },
-    sectionHeaderButtonText: {
-      fontSize: 13,
-      fontFamily: "Inter-Medium",
-      color: theme.primary,
-      marginLeft: 4,
+    listSectionContainer: {
+      paddingVertical: 5,
     },
     scheduleItem: {
       flexDirection: "row",
@@ -1444,9 +991,6 @@ const createStyles = (theme: any) =>
       fontSize: 12,
       fontFamily: "Inter-Medium",
     },
-    listSectionContainer: {
-      paddingVertical: 5,
-    },
     bottomActionContainer: {
       flexDirection: "row",
       justifyContent: "space-around",
@@ -1470,20 +1014,6 @@ const createStyles = (theme: any) =>
       fontSize: 14,
       fontFamily: "Inter-Medium",
       color: theme.primary,
-    },
-    itemSeparator: {
-      height: 8,
-    },
-    sectionSeparator: {
-      height: 15,
-      backgroundColor: theme.backgroundAlt,
-    },
-    noDataText: {
-      fontSize: 14,
-      color: theme.textSecondary,
-      fontFamily: "Inter-Regular",
-      textAlign: "center",
-      paddingVertical: 20,
     },
     weatherButtonContainer: {
       position: "absolute",
@@ -1518,6 +1048,7 @@ const createStyles = (theme: any) =>
       fontFamily: "Inter-Medium",
       color: theme.primary,
     },
+    // Weather modal styles
     modalOverlay: {
       flex: 1,
       backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -1553,6 +1084,26 @@ const createStyles = (theme: any) =>
     modalContent: {
       padding: 16,
     },
+    closeButton: {
+      padding: 8,
+      borderRadius: 20,
+    },
+    modalCloseButton: {
+      alignSelf: "center",
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      backgroundColor: theme.primary,
+      borderRadius: 8,
+      marginVertical: 16,
+      width: "80%",
+    },
+    modalCloseButtonText: {
+      color: theme.card,
+      fontSize: 16,
+      fontFamily: "Inter-SemiBold",
+      textAlign: "center",
+    },
+    // Weather forecast styles
     weatherLoadingContainer: {
       padding: 20,
       alignItems: "center",
@@ -1626,25 +1177,5 @@ const createStyles = (theme: any) =>
       fontFamily: "Inter-Medium",
       color: theme.primary,
       marginLeft: 8,
-    },
-    closeButton: {
-      padding: 8,
-      backgroundColor: "rgba(0,0,0,0.3)",
-      borderRadius: 20,
-    },
-    modalCloseButton: {
-      alignSelf: "center",
-      paddingVertical: 12,
-      paddingHorizontal: 24,
-      backgroundColor: theme.primary,
-      borderRadius: 8,
-      marginVertical: 16,
-      width: "80%",
-    },
-    modalCloseButtonText: {
-      color: theme.card,
-      fontSize: 16,
-      fontFamily: "Inter-SemiBold",
-      textAlign: "center",
     },
   });

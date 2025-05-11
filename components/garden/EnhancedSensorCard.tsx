@@ -27,6 +27,7 @@ interface EnhancedSensorCardProps {
   status: "normal" | "warning" | "critical";
   timestamp: string;
   trendData?: TrendPoint[];
+  iconName?: string; // Custom icon name
   onPress: () => void;
   onPressIn?: () => void;
   onPressOut?: () => void;
@@ -62,6 +63,7 @@ export default function EnhancedSensorCard({
   status,
   timestamp,
   trendData,
+  iconName,
   onPress,
   onPressIn,
   onPressOut,
@@ -160,6 +162,10 @@ export default function EnhancedSensorCard({
 
   // Get icon name for sensor type
   const getSensorIconName = (sensorType: SensorType): string => {
+    // Use custom iconName if provided
+    if (iconName) return iconName;
+    
+    // Otherwise use default icon mapping
     switch (sensorType) {
       case SensorType.TEMPERATURE:
         return "thermometer";
