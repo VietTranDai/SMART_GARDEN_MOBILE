@@ -7,13 +7,14 @@ import {
   TouchableOpacity,
   Animated,
   Platform,
+  RefreshControl,
 } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import EnhancedSensorCard from "@/components/garden/EnhancedSensorCard";
 import { SensorType, SensorUnit } from "@/types/gardens/sensor.types";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 
-// Tạo phiên bản ghi nhớ của EnhancedSensorCard để cải thiện hiệu suất
+// Memorized version of EnhancedSensorCard for performance
 const EnhancedSensorCardMemo = React.memo(EnhancedSensorCard);
 
 /**
@@ -27,16 +28,18 @@ export interface Sensor {
   unit: SensorUnit;
   lastUpdated?: string;
   lastReadingAt?: string;
-  recentValues?: { timestamp: string; value: number }[]; // Dữ liệu xu hướng
+  recentValues?: { timestamp: string; value: number }[]; // Trend data
 }
 
 interface SensorDetailViewProps {
   sensors: Sensor[];
   onSelectSensor: (sensor: Sensor) => void;
   title?: string;
+  isRefreshing?: boolean;
+  onRefresh?: () => void;
 }
 
-// Create a separate component for sensor items to properly use hooks
+// Separate component for sensor items to properly use hooks
 const SensorItem = React.memo(
   ({
     item,
@@ -79,6 +82,14 @@ const SensorItem = React.memo(
         ? theme.warning
         : theme.success;
 
+    // Gradient colors based on status
+    const gradientColors =
+      status === "critical"
+        ? [theme.errorLight || "rgba(255,59,48,0.05)", "transparent"]
+        : status === "warning"
+        ? [theme.warningLight || "rgba(255,204,0,0.05)", "transparent"]
+        : [theme.successLight || "rgba(52,199,89,0.05)", "transparent"];
+
     // Animation with a slight delay based on index for staggered effect
     const opacityAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.92)).current;
@@ -87,7 +98,7 @@ const SensorItem = React.memo(
     // Setup press animations
     const handlePressIn = () => {
       Animated.spring(pressedAnim, {
-        toValue: 0.96,
+        toValue: 0.97,
         friction: 8,
         tension: 40,
         useNativeDriver: true,
@@ -106,7 +117,7 @@ const SensorItem = React.memo(
     useEffect(() => {
       // Start animations with staggered delay
       Animated.sequence([
-        Animated.delay(index * 80),
+        Animated.delay(index * 50), // Faster delay for better UX
         Animated.parallel([
           Animated.timing(opacityAnim, {
             toValue: 1,
@@ -123,6 +134,36 @@ const SensorItem = React.memo(
       ]).start();
     }, [index, opacityAnim, scaleAnim]);
 
+    // Get a background color based on sensor type
+    const getSensorTypeColor = (type: SensorType): string => {
+      switch (type) {
+        case SensorType.TEMPERATURE:
+          return "rgba(255,59,48,0.08)";
+        case SensorType.HUMIDITY:
+          return "rgba(0,122,255,0.08)";
+        case SensorType.SOIL_MOISTURE:
+          return "rgba(52,199,89,0.08)";
+        case SensorType.LIGHT:
+          return "rgba(255,204,0,0.08)";
+        case SensorType.WATER_LEVEL:
+          return "rgba(0,122,255,0.08)";
+        case SensorType.RAINFALL:
+          return "rgba(0,122,255,0.08)";
+        case SensorType.SOIL_PH:
+          return "rgba(175,82,222,0.08)";
+        default:
+          return "rgba(142,142,147,0.08)";
+      }
+    };
+
+    // Get border color based on status
+    const statusBorderColor =
+      status === "critical"
+        ? `rgba(255,59,48,0.3)`
+        : status === "warning"
+        ? `rgba(255,204,0,0.3)`
+        : `rgba(52,199,89,0.2)`;
+
     return (
       <Animated.View
         style={[
@@ -137,32 +178,37 @@ const SensorItem = React.memo(
           onPress={() => onSelectSensor(item)}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
-          activeOpacity={0.85}
+          activeOpacity={0.9}
           accessible={true}
           accessibilityLabel={`Cảm biến ${displayName}`}
           accessibilityHint={`Hiển thị chi tiết về cảm biến ${displayName} với giá trị ${item.value} ${item.unit}`}
           accessibilityRole="button"
-          style={styles.cardWrapper}
+          style={[styles.cardWrapper, { borderColor: statusBorderColor }]}
         >
-          <EnhancedSensorCardMemo
-            id={String(item.id)}
-            type={item.type as SensorType}
-            name={displayName}
-            value={item.value}
-            unit={item.unit}
-            status={status}
-            timestamp={timestamp}
-            onPress={() => onSelectSensor(item)}
-            iconName={getSensorIcon(item.type)}
-          />
-
-          {/* Status and time indicator */}
-          <View style={styles.infoContainer}>
-            <View style={styles.statusContainer}>
-              <View
-                style={[styles.statusDot, { backgroundColor: statusColor }]}
-              />
-              <Text style={[styles.statusText, { color: statusColor }]}>
+          {/* Enhanced card header with icon and type-based color */}
+          <View
+            style={[
+              styles.cardHeader,
+              { backgroundColor: getSensorTypeColor(item.type) },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name={getSensorIcon(item.type) as any}
+              size={20}
+              color={theme.text}
+              style={styles.sensorIcon}
+            />
+            <Text
+              style={styles.sensorName}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {displayName}
+            </Text>
+            <View
+              style={[styles.statusBadge, { backgroundColor: statusColor }]}
+            >
+              <Text style={styles.statusBadgeText}>
                 {status === "critical"
                   ? "Nguy hiểm"
                   : status === "warning"
@@ -170,17 +216,43 @@ const SensorItem = React.memo(
                   : "Bình thường"}
               </Text>
             </View>
+          </View>
 
+          {/* Sensor value display with large text */}
+          <View style={styles.valueContainer}>
+            <Text style={styles.valueText}>
+              {typeof item.value === "number"
+                ? item.value % 1 === 0
+                  ? item.value.toString()
+                  : item.value.toFixed(1)
+                : "0"}
+            </Text>
+            <Text style={styles.unitText}>{item.unit}</Text>
+          </View>
+
+          {/* Status and time indicator */}
+          <View style={styles.infoContainer}>
             <View style={styles.timeContainer}>
               <MaterialCommunityIcons
                 name="clock-outline"
-                size={12}
+                size={14}
                 color={theme.textSecondary}
               />
-              <Text style={[styles.timeText, { color: theme.textSecondary }]}>
-                {timeAgo}
-              </Text>
+              <Text style={styles.timeText}>{timeAgo}</Text>
             </View>
+
+            <TouchableOpacity
+              style={styles.detailButton}
+              onPress={() => onSelectSensor(item)}
+              accessibilityLabel={`Xem chi tiết ${displayName}`}
+            >
+              <Text style={styles.detailButtonText}>Chi tiết</Text>
+              <Ionicons
+                name="chevron-forward"
+                size={14}
+                color={theme.primary}
+              />
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Animated.View>
@@ -192,6 +264,8 @@ export default function SensorDetailView({
   sensors,
   onSelectSensor,
   title = "Số liệu Cảm biến",
+  isRefreshing = false,
+  onRefresh,
 }: SensorDetailViewProps) {
   const theme = useAppTheme();
   const styles = createStyles(theme);
@@ -322,6 +396,12 @@ export default function SensorDetailView({
   if (!sensors || sensors.length === 0) {
     return (
       <View style={[styles.emptyContainer, { backgroundColor: theme.card }]}>
+        <MaterialCommunityIcons
+          name="devices"
+          size={40}
+          color={theme.textSecondary}
+          style={{ marginBottom: 12 }}
+        />
         <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
           Chưa có cảm biến nào được thêm vào vườn này.
         </Text>
@@ -332,7 +412,27 @@ export default function SensorDetailView({
   return (
     <View style={styles.container}>
       {title && (
-        <Text style={[styles.headerTitle, { color: theme.text }]}>{title}</Text>
+        <View style={styles.headerContainer}>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>
+            {title}
+          </Text>
+          {onRefresh && (
+            <TouchableOpacity
+              onPress={onRefresh}
+              style={styles.headerRefreshButton}
+              disabled={isRefreshing}
+              accessibilityLabel="Làm mới dữ liệu cảm biến"
+              accessibilityRole="button"
+            >
+              <MaterialCommunityIcons
+                name="refresh"
+                size={16}
+                color={theme.primary}
+                style={isRefreshing ? styles.refreshingIcon : null}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
       )}
       <FlatList
         data={sensors}
@@ -350,7 +450,7 @@ export default function SensorDetailView({
           />
         )}
         keyExtractor={(item, index) => {
-          // Đảm bảo luôn có key duy nhất ngay cả khi id là undefined
+          // Ensure unique key even if id is undefined
           return item.id !== undefined && item.id !== null
             ? String(item.id)
             : `sensor-${index}`;
@@ -361,16 +461,27 @@ export default function SensorDetailView({
         initialNumToRender={4}
         maxToRenderPerBatch={8}
         windowSize={5}
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              colors={[theme.primary]}
+              tintColor={theme.primary}
+            />
+          ) : undefined
+        }
         ListEmptyComponent={
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
             Không có dữ liệu cảm biến
           </Text>
         }
-        // Thêm điều khiển của thanh cuộn
+        // Scroll controls
         snapToAlignment="start"
         decelerationRate="fast"
-        snapToInterval={280} // Điều chỉnh theo chiều rộng thẻ + margin
-        ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+        snapToInterval={240} // Adjusted to card width + margin
+        ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
+        removeClippedSubviews={Platform.OS === "android"} // Performance optimization
       />
     </View>
   );
@@ -381,11 +492,24 @@ const createStyles = (theme: any) =>
     container: {
       marginVertical: 15,
     },
+    headerContainer: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+      marginHorizontal: 16,
+    },
     headerTitle: {
       fontSize: 16,
       fontFamily: "Inter-SemiBold",
-      marginBottom: 12,
-      marginHorizontal: 16,
+    },
+    headerRefreshButton: {
+      padding: 8,
+      borderRadius: 16,
+      backgroundColor: theme.backgroundSecondary || "rgba(0,0,0,0.05)",
+    },
+    refreshingIcon: {
+      transform: [{ rotate: "45deg" }],
     },
     listContent: {
       paddingHorizontal: 16,
@@ -393,68 +517,102 @@ const createStyles = (theme: any) =>
       paddingBottom: 16,
     },
     cardContainer: {
-      width: 260,
+      width: 220,
       margin: 2, // For shadow
     },
     cardWrapper: {
-      borderRadius: 12,
+      borderRadius: 16,
       backgroundColor: theme.card,
       overflow: "hidden",
-      borderWidth: 1,
-      borderColor: theme.borderLight || "rgba(0,0,0,0.05)",
+      borderWidth: 1.5,
       ...Platform.select({
         ios: {
           shadowColor: theme.shadow || "#000",
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.15,
-          shadowRadius: 3,
+          shadowRadius: 4,
         },
         android: {
-          elevation: 3,
+          elevation: 4,
         },
       }),
+    },
+    cardHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    sensorIcon: {
+      marginRight: 8,
+    },
+    sensorName: {
+      flex: 1,
+      fontSize: 14,
+      fontFamily: "Inter-Medium",
+      color: theme.text,
+    },
+    statusBadge: {
+      paddingHorizontal: 6,
+      paddingVertical: 3,
+      borderRadius: 10,
+      marginLeft: 6,
+    },
+    statusBadgeText: {
+      fontSize: 9,
+      fontFamily: "Inter-SemiBold",
+      color: "white",
+    },
+    valueContainer: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 16,
+      paddingHorizontal: 8,
+    },
+    valueText: {
+      fontSize: 36,
+      fontFamily: "Inter-Bold",
+      color: theme.text,
+    },
+    unitText: {
+      fontSize: 15,
+      fontFamily: "Inter-Medium",
+      color: theme.textSecondary,
+      marginTop: 4,
     },
     infoContainer: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
       paddingHorizontal: 12,
-      paddingVertical: 8,
+      paddingVertical: 10,
       borderTopWidth: 1,
       borderTopColor: theme.borderLight || "rgba(0,0,0,0.05)",
-    },
-    statusContainer: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingHorizontal: 6,
-      paddingVertical: 3,
-      borderRadius: 10,
-      backgroundColor: "rgba(0,0,0,0.03)",
-    },
-    statusDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      marginRight: 4,
-    },
-    statusText: {
-      fontSize: 10,
-      fontFamily: "Inter-Medium",
-      marginRight: 2,
     },
     timeContainer: {
       flexDirection: "row",
       alignItems: "center",
     },
     timeText: {
-      fontSize: 10,
+      fontSize: 12,
       fontFamily: "Inter-Regular",
+      color: theme.textSecondary,
       marginLeft: 4,
+    },
+    detailButton: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    detailButtonText: {
+      fontSize: 12,
+      fontFamily: "Inter-Medium",
+      color: theme.primary,
+      marginRight: 2,
     },
     emptyContainer: {
       margin: 16,
       padding: 20,
-      borderRadius: 12,
+      borderRadius: 16,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: theme.card,
@@ -468,7 +626,7 @@ const createStyles = (theme: any) =>
           shadowRadius: 2,
         },
         android: {
-          elevation: 1,
+          elevation: 2,
         },
       }),
     },

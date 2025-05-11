@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useInterval } from "./useInterval";
 import { Alert, Garden, GardenActivity, WateringSchedule } from "@/types";
-import { Sensor as SensorViewData } from "@/components/common/SensorDetailView";
+import { Sensor } from "@/components/common/SensorDetailView";
 import {
   HourlyForecast,
   WeatherObservation,
@@ -28,8 +28,8 @@ interface GardenDetailState {
   alerts: Alert[];
   wateringSchedule: WateringSchedule[];
   activities: GardenActivity[];
-  sensors: SensorViewData[];
-  previousSensorData: SensorViewData[];
+  sensors: Sensor[];
+  previousSensorData: Sensor[];
   isLoading: boolean;
   isRefreshing: boolean;
   isSensorDataLoading: boolean;
@@ -184,52 +184,26 @@ export function useGardenDetail({ gardenId }: UseGardenDetailProps) {
   /**
    * Validate and process sensor data to ensure it's safe for display
    */
-  const validateSensorData = useCallback(
-    (sensorData: any[]): SensorViewData[] => {
-      if (!Array.isArray(sensorData)) return [];
+  const validateSensorData = useCallback((sensorData: any[]): Sensor[] => {
+    if (!Array.isArray(sensorData)) return [];
 
-      // Filter out invalid sensors and ensure ID exists
-      const validSensors = sensorData
-        .filter(
-          (s) =>
-            s &&
-            typeof s === "object" &&
-            s.type &&
-            (typeof s.value === "number" ||
-              typeof s.lastReading?.value === "number") &&
-            s.unit
-        )
-        .map((sensor, index) => {
-          // Transform the data to match SensorViewData interface
-          const sensorValue =
-            typeof sensor.value === "number"
-              ? sensor.value
-              : typeof sensor.lastReading?.value === "number"
-              ? sensor.lastReading.value
-              : 0;
-
-          return {
-            id:
-              sensor.id !== undefined && sensor.id !== null
-                ? sensor.id
-                : -1000 - index,
-            type: sensor.type,
-            name: sensor.name,
-            value: sensorValue,
-            unit: sensor.unit,
-            lastUpdated:
-              sensor.lastUpdated || sensor.updatedAt || sensor.lastReadingAt,
-            lastReadingAt: sensor.lastReadingAt || sensor.updatedAt,
-            recentValues: Array.isArray(sensor.recentValues)
-              ? sensor.recentValues
-              : undefined,
-          } as SensorViewData;
-        });
-
-      return validSensors;
-    },
-    []
-  );
+    // Map API sensor data to the format required by the UI components
+    return sensorData
+      .filter(
+        (sensor) =>
+          sensor && typeof sensor === "object" && sensor.id && sensor.type
+      )
+      .map((sensor) => ({
+        id: sensor.id,
+        type: sensor.type,
+        name: sensor.name || "",
+        value: typeof sensor.lastReading === "number" ? sensor.lastReading : 0,
+        unit: sensor.unit,
+        lastUpdated: sensor.lastReadingAt || sensor.updatedAt,
+        lastReadingAt: sensor.lastReadingAt || sensor.updatedAt,
+        recentValues: sensor.recentValues || undefined,
+      }));
+  }, []);
 
   /**
    * Refresh sensor data with debouncing
@@ -361,7 +335,7 @@ export function useGardenDetail({ gardenId }: UseGardenDetailProps) {
    * Determine if a sensor value has increased or decreased
    */
   const getSensorTrend = useCallback(
-    (currentSensor: SensorViewData): "up" | "down" | "stable" | null => {
+    (currentSensor: Sensor): "up" | "down" | "stable" | null => {
       if (!state.previousSensorData || state.previousSensorData.length === 0)
         return null;
 

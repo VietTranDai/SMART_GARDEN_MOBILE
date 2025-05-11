@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useRef } from "react";
 import {
   ActivityIndicator,
-  Platform,
   RefreshControl,
   SectionList,
   StyleSheet,
@@ -23,13 +22,9 @@ import {
 import { useAppTheme } from "@/hooks/useAppTheme";
 import Gradient from "@/components/ui/Gradient";
 import { Image } from "expo-image";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Import custom components
 import WeatherDisplay from "@/components/common/WeatherDisplay";
-import SensorDetailView, {
-  Sensor as SensorViewData,
-} from "@/components/common/SensorDetailView";
 import GardenStatusCard from "@/components/common/GardenStatusCard";
 import AlertsList from "@/components/common/AlertsList";
 import AdviceModal from "@/components/common/AdviceModal";
@@ -41,23 +36,14 @@ import env from "@/config/environment";
 import { useGardenDetail } from "@/hooks/useGardenDetail";
 
 // Import API services
-import gardenService from "@/service/api/garden.service";
 import alertService from "@/service/api/alert.service";
 import { apiClient } from "@/service";
 
-// Import types
-import {
-  DailyForecast,
-  HourlyForecast,
-  WeatherObservation,
-} from "@/types/weather/weather.types";
 import {
   Alert,
   AlertStatus,
   Garden,
-  GardenActivity,
   GardenStatus,
-  Sensor,
   TaskStatus,
   WateringSchedule,
 } from "@/types";
