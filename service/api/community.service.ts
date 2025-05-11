@@ -7,235 +7,304 @@ import {
   VoteDto,
   Tag,
   FollowInfo,
+  Comment,
 } from "@/types";
+
+// Define the missing interface locally
+interface DeletePostResponseDto {
+  success: boolean;
+  message: string;
+  deletedId?: number | string;
+}
 
 /**
  * Community Service
  *
- * Handles all community-related API calls (posts, comments, votes, follows)
  */
 class CommunityService {
   /**
-   * Get all posts with optional filtering
-   * @param params Query parameters
-   * @returns List of posts
+   * Get all posts with optional pagination
    */
-  async getPosts(params?: {
-    tag?: string;
-    search?: string;
-    gardenerId?: number;
-    plantName?: string;
-    page?: number;
-    limit?: number;
-  }): Promise<Post[]> {
-    const response = await apiClient.get(COMMUNITY_ENDPOINTS.POSTS, { params });
-    return response.data?.data || [];
+  async getPosts(page: number = 1, limit: number = 10): Promise<Post[]> {
+    try {
+      const response = await apiClient.get(COMMUNITY_ENDPOINTS.POSTS, {
+        params: { page, limit },
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to fetch posts:", error);
+      throw error;
+    }
   }
 
   /**
-   * Get post details by ID
-   * @param postId Post ID
-   * @returns Post details
+   * Get posts with filtering and pagination
    */
-  async getPostById(postId: number | string): Promise<Post> {
-    const response = await apiClient.get(
-      COMMUNITY_ENDPOINTS.POST_DETAIL(postId)
-    );
-    return response.data?.data || null;
+  async getFilteredPosts(
+    tagIds?: number[],
+    searchQuery?: string,
+    gardenId?: number,
+    userId?: number,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<Post[]> {
+    try {
+      const response = await apiClient.get(COMMUNITY_ENDPOINTS.POSTS_FILTER, {
+        params: {
+          page,
+          limit,
+          tagIds: tagIds?.join(","),
+          searchQuery,
+          gardenId,
+          userId,
+        },
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to fetch filtered posts:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get a post by ID
+   */
+  async getPostById(postId: string): Promise<Post> {
+    try {
+      const response = await apiClient.get(
+        COMMUNITY_ENDPOINTS.POST_DETAIL(postId)
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to fetch post:", error);
+      throw error;
+    }
   }
 
   /**
    * Create a new post
-   * @param postData Post creation data
-   * @returns Created post
    */
-  async createPost(postData: CreatePostDto): Promise<Post> {
-    // If we have actual file objects, we need to use FormData
-    let formData: FormData | null = null;
-
-    if (
-      postData.images &&
-      Array.isArray(postData.images) &&
-      postData.images.length > 0
-    ) {
-      formData = new FormData();
-      formData.append("title", postData.title);
-      formData.append("content", postData.content);
-
-      if (postData.gardenId) {
-        formData.append("gardenId", postData.gardenId.toString());
-      }
-
-      if (postData.plantName) {
-        formData.append("plantName", postData.plantName);
-      }
-
-      if (postData.plantGrowStage) {
-        formData.append("plantGrowStage", postData.plantGrowStage);
-      }
-
-      // Append tag IDs
-      postData.tagIds.forEach((tagId) => {
-        formData?.append("tagIds", tagId.toString());
-      });
-
-      // Append images
-      postData.images.forEach((image, index) => {
-        if (image instanceof File) {
-          formData?.append(`images`, image);
-        }
-      });
-
+  async createPost(postData: CreatePostDto | FormData): Promise<Post> {
+    try {
       const response = await apiClient.post(
         COMMUNITY_ENDPOINTS.POSTS,
-        formData,
+        postData,
         {
           headers: {
             "Content-Type": "multipart/form-data",
           },
         }
       );
-
-      return response.data?.data || null;
-    } else {
-      // Regular JSON request if no images
-      const response = await apiClient.post(
-        COMMUNITY_ENDPOINTS.POSTS,
-        postData
-      );
-      return response.data?.data || null;
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to create post:", error);
+      throw error;
     }
   }
 
   /**
    * Update a post
-   * @param postId Post ID
-   * @param postData Post update data
-   * @returns Updated post
    */
   async updatePost(
-    postId: number | string,
+    postId: string,
     postData: Partial<CreatePostDto>
   ): Promise<Post> {
-    // Similar handling for FormData as in createPost if needed
-    const response = await apiClient.patch(
-      COMMUNITY_ENDPOINTS.POST_DETAIL(postId),
-      postData
-    );
-    return response.data?.data || null;
+    try {
+      const response = await apiClient.patch(
+        COMMUNITY_ENDPOINTS.POST_DETAIL(postId),
+        postData
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to update post:", error);
+      throw error;
+    }
   }
 
   /**
    * Delete a post
-   * @param postId Post ID
    */
-  async deletePost(postId: number | string): Promise<void> {
-    await apiClient.delete(COMMUNITY_ENDPOINTS.POST_DETAIL(postId));
+  async deletePost(postId: string): Promise<DeletePostResponseDto> {
+    try {
+      const response = await apiClient.delete(
+        COMMUNITY_ENDPOINTS.POST_DETAIL(postId)
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to delete post:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Vote on a post (upvote/downvote)
+   */
+  async votePost(postId: string, voteData: VoteDto): Promise<any> {
+    try {
+      const response = await apiClient.post(
+        COMMUNITY_ENDPOINTS.POST_VOTE(postId),
+        voteData
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to vote on post:", error);
+      throw error;
+    }
   }
 
   /**
    * Get comments for a post
-   * @param postId Post ID
-   * @returns List of comments
    */
-  async getPostComments(postId: number | string): Promise<Comment[]> {
-    const response = await apiClient.get(
-      COMMUNITY_ENDPOINTS.POST_COMMENTS(postId)
-    );
-    return response.data?.data || [];
-  }
-
-  /**
-   * Get replies to a comment
-   * @param commentId Comment ID
-   * @returns List of reply comments
-   */
-  async getCommentReplies(commentId: number | string): Promise<Comment[]> {
-    const response = await apiClient.get(
-      COMMUNITY_ENDPOINTS.COMMENT_REPLIES(commentId)
-    );
-    return response.data?.data || [];
+  async getPostComments(postId: string): Promise<Comment[]> {
+    try {
+      const response = await apiClient.get(
+        COMMUNITY_ENDPOINTS.POST_COMMENTS(postId)
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to fetch comments:", error);
+      throw error;
+    }
   }
 
   /**
    * Create a new comment
-   * @param commentData Comment creation data
-   * @returns Created comment
    */
   async createComment(commentData: CreateCommentDto): Promise<Comment> {
-    const response = await apiClient.post(
-      COMMUNITY_ENDPOINTS.POST_COMMENTS(commentData.postId),
-      commentData
-    );
-    return response.data?.data || null;
+    try {
+      const response = await apiClient.post(
+        COMMUNITY_ENDPOINTS.COMMENTS,
+        commentData
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to create comment:", error);
+      throw error;
+    }
   }
 
   /**
    * Update a comment
-   * @param commentId Comment ID
-   * @param content New comment content
-   * @returns Updated comment
    */
-  async updateComment(
-    commentId: number | string,
-    content: string
-  ): Promise<Comment> {
-    const response = await apiClient.patch(
-      COMMUNITY_ENDPOINTS.COMMENT_DETAIL(commentId),
-      { content }
-    );
-    return response.data?.data || null;
-  } 
+  async updateComment(commentId: string, content: string): Promise<Comment> {
+    try {
+      const response = await apiClient.patch(
+        COMMUNITY_ENDPOINTS.COMMENT_DETAIL(commentId),
+        {
+          content,
+        }
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to update comment:", error);
+      throw error;
+    }
+  }
 
   /**
    * Delete a comment
-   * @param commentId Comment ID
    */
-  async deleteComment(commentId: number | string): Promise<void> {
-    await apiClient.delete(COMMUNITY_ENDPOINTS.COMMENT_DETAIL(commentId));
+  async deleteComment(commentId: string): Promise<any> {
+    try {
+      const response = await apiClient.delete(
+        COMMUNITY_ENDPOINTS.COMMENT_DETAIL(commentId)
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to delete comment:", error);
+      throw error;
+    }
   }
 
   /**
-   * Vote on a post
-   * @param postId Post ID
-   * @param voteData Vote data
-   * @returns Updated post with new vote count
+   * Vote on a comment (upvote/downvote)
    */
-  async votePost(
-    postId: number | string,
-    voteData: VoteDto
-  ): Promise<{ total_vote: number; userVote: number }> {
-    const response = await apiClient.post(
-      COMMUNITY_ENDPOINTS.POST_VOTE(postId),
-      voteData
-    );
-    return response.data?.data || null;
-  }
-
-  /**
-   * Vote on a comment
-   * @param commentId Comment ID
-   * @param voteData Vote data
-   * @returns Updated comment with new score
-   */
-  async voteComment(
-    commentId: number | string,
-    voteData: VoteDto
-  ): Promise<{ score: number; userVote: number }> {
-    const response = await apiClient.post(
-      COMMUNITY_ENDPOINTS.COMMENT_VOTE(commentId),
-      voteData
-    );
-    return response.data?.data || null;
+  async voteComment(commentId: string, voteData: VoteDto): Promise<any> {
+    try {
+      const response = await apiClient.post(
+        COMMUNITY_ENDPOINTS.COMMENT_VOTE(commentId),
+        voteData
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to vote on comment:", error);
+      throw error;
+    }
   }
 
   /**
    * Get all tags
-   * @returns List of tags
    */
   async getTags(): Promise<Tag[]> {
-    const response = await apiClient.get(COMMUNITY_ENDPOINTS.TAGS);
-    return response.data?.data || [];
+    try {
+      const response = await apiClient.get(COMMUNITY_ENDPOINTS.TAGS);
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to fetch tags:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get popular tags based on post count
+   */
+  async getPopularTags(limit: number = 20): Promise<Tag[]> {
+    try {
+      const response = await apiClient.get(COMMUNITY_ENDPOINTS.TAGS_POPULAR, {
+        params: { limit },
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to fetch popular tags:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create new tag
+   */
+  async createTag(name: string): Promise<Tag> {
+    try {
+      const response = await apiClient.post(COMMUNITY_ENDPOINTS.TAGS, { name });
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to create tag:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Search tags by name
+   */
+  async searchTags(query: string, limit: number = 10): Promise<Tag[]> {
+    try {
+      const response = await apiClient.get(COMMUNITY_ENDPOINTS.TAGS_SEARCH, {
+        params: { query, limit },
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to search tags:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Search posts by query
+   */
+  async searchPosts(
+    query: string,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<Post[]> {
+    try {
+      const response = await apiClient.get(COMMUNITY_ENDPOINTS.POSTS_SEARCH, {
+        params: { query, page, limit },
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to search posts:", error);
+      throw error;
+    }
   }
 
   /**
@@ -247,7 +316,7 @@ class CommunityService {
     const response = await apiClient.get(
       COMMUNITY_ENDPOINTS.FOLLOWERS(gardenerId)
     );
-    return response.data?.data || [];
+    return response.data.data?.data || [];
   }
 
   /**
@@ -259,7 +328,7 @@ class CommunityService {
     const response = await apiClient.get(
       COMMUNITY_ENDPOINTS.FOLLOWING(gardenerId)
     );
-    return response.data?.data || [];
+    return response.data.data?.data || [];
   }
 
   /**
@@ -271,7 +340,7 @@ class CommunityService {
     const response = await apiClient.post(
       COMMUNITY_ENDPOINTS.FOLLOW_USER(gardenerId)
     );
-    return response.data?.data || null;
+    return response.data.data?.data || null;
   }
 
   /**
@@ -283,4 +352,5 @@ class CommunityService {
   }
 }
 
-export default new CommunityService();
+const communityService = new CommunityService();
+export default communityService;

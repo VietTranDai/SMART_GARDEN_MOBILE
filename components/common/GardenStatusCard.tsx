@@ -24,12 +24,14 @@ interface GardenStatusCardProps {
   };
   onViewPlantDetails?: () => void;
   onShowAdvice?: () => void;
+  topRightComponent?: React.ReactNode;
 }
 
 export default function GardenStatusCard({
   garden,
   onViewPlantDetails,
   onShowAdvice,
+  topRightComponent,
 }: GardenStatusCardProps) {
   const theme = useAppTheme();
 
@@ -120,6 +122,8 @@ export default function GardenStatusCard({
           </Text>
         </View>
       </View>
+
+      {topRightComponent}
 
       <View style={styles.infoContainer}>
         <View style={styles.infoRow}>

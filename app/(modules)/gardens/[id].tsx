@@ -27,7 +27,7 @@ import {
   Ionicons,
 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { LinearGradient } from "expo-linear-gradient";
+import Gradient from "@/components/ui/Gradient";
 import { Image } from "expo-image";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -84,6 +84,24 @@ interface DetailSection {
   data: any[];
 }
 
+const getValidIconName = (iconName: string): any => {
+  // Define a set of valid icon names we use
+  const validIcons = [
+    "cloudy-outline",
+    "sunny-outline",
+    "rainy-outline",
+    "thunderstorm-outline",
+    "snow-outline",
+    "partly-sunny-outline",
+    "cloud-outline",
+    "close",
+    // Add more as needed
+  ];
+
+  // Return the icon if it's valid, otherwise return a default icon
+  return validIcons.includes(iconName) ? iconName : "cloudy-outline"; // Default icon
+};
+
 export default function GardenDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -119,6 +137,9 @@ export default function GardenDetailScreen() {
   const [gardenAdvice, setGardenAdvice] = useState<any[]>([]);
   const [adviceLoading, setAdviceLoading] = useState(false);
   const [adviceError, setAdviceError] = useState<string | null>(null);
+
+  // Add state for weather modal
+  const [weatherModalVisible, setWeatherModalVisible] = useState(false);
 
   // Load garden data using API calls
   const loadGardenData = useCallback(async (gardenId: string) => {
@@ -370,11 +391,6 @@ export default function GardenDetailScreen() {
 
     let dataSections: DetailSection[] = [
       { type: DetailSectionType.STATUS, key: "status", data: [garden] },
-      {
-        type: DetailSectionType.WEATHER,
-        key: "weather",
-        data: [{ currentWeather, hourlyForecast, dailyForecast }],
-      },
     ];
 
     if (activeAlerts.length > 0) {
@@ -454,6 +470,7 @@ export default function GardenDetailScreen() {
                 console.log("Navigate to plant details for:", item.plantName);
               }}
               onShowAdvice={handleShowGardenAdvice}
+              topRightComponent={renderStatusWithWeatherButton(item)}
             />
           </View>
         );
@@ -689,7 +706,7 @@ export default function GardenDetailScreen() {
           style={styles.headerImage}
         />
 
-        <LinearGradient
+        <Gradient
           colors={["transparent", "rgba(0,0,0,0.7)"]}
           style={styles.headerGradient}
         />
@@ -927,6 +944,172 @@ export default function GardenDetailScreen() {
     );
   };
 
+  // Weather Modal and Weather Button Component
+  const WeatherModal = () => {
+    return (
+      <Modal
+        visible={weatherModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setWeatherModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Animated.View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Thông tin thời tiết</Text>
+              <TouchableOpacity
+                onPress={() => setWeatherModalVisible(false)}
+                accessible={true}
+                accessibilityLabel="Đóng thông tin thời tiết"
+                accessibilityRole="button"
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalContent}>
+              {currentWeather ? (
+                <WeatherDisplay currentWeather={currentWeather} />
+              ) : (
+                <View style={styles.weatherLoadingContainer}>
+                  <ActivityIndicator size="large" color={theme.primary} />
+                  <Text style={styles.noDataText}>
+                    Đang tải dữ liệu thời tiết...
+                  </Text>
+                </View>
+              )}
+
+              {/* Hourly forecast */}
+              {hourlyForecast && hourlyForecast.length > 0 && (
+                <View style={styles.forecastSection}>
+                  <Text style={styles.forecastSectionTitle}>
+                    Dự báo theo giờ
+                  </Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.hourlyForecastScroll}
+                  >
+                    {hourlyForecast.slice(0, 24).map((hour, index) => (
+                      <View
+                        key={`hourly-${index}`}
+                        style={styles.hourlyForecastItem}
+                      >
+                        <Text style={styles.hourTime}>
+                          {new Date(hour.forecastedAt).getHours()}:00
+                        </Text>
+                        <Ionicons
+                          name={getValidIconName(
+                            weatherService.getWeatherIcon(hour.iconCode) ||
+                              "cloudy-outline"
+                          )}
+                          size={24}
+                          color={theme.primary}
+                        />
+                        <Text style={styles.hourTemp}>
+                          {Math.round(hour.temp)}°C
+                        </Text>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Daily forecast */}
+              {dailyForecast && dailyForecast.length > 0 && (
+                <View style={styles.forecastSection}>
+                  <Text style={styles.forecastSectionTitle}>Dự báo 7 ngày</Text>
+                  {dailyForecast.map((day, index) => (
+                    <View
+                      key={`daily-${index}`}
+                      style={styles.dailyForecastItem}
+                    >
+                      <Text style={styles.dayName}>
+                        {new Date(day.forecastedAt).toLocaleDateString("vi", {
+                          weekday: "short",
+                        })}
+                      </Text>
+                      <View style={styles.dayIconContainer}>
+                        <Ionicons
+                          name={getValidIconName(
+                            weatherService.getWeatherIcon(day.iconCode) ||
+                              "cloudy-outline"
+                          )}
+                          size={24}
+                          color={theme.primary}
+                        />
+                      </View>
+                      <View style={styles.tempRangeContainer}>
+                        <Text style={styles.tempRange}>
+                          {Math.round(day.tempMin)}° - {Math.round(day.tempMax)}
+                          °C
+                        </Text>
+                      </View>
+                      <Text style={styles.rainChance}>
+                        {Math.round(day.pop * 100)}%
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setWeatherModalVisible(false)}
+              accessible={true}
+              accessibilityLabel="Đóng"
+              accessibilityRole="button"
+            >
+              <Text style={styles.modalCloseButtonText}>Đóng</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      </Modal>
+    );
+  };
+
+  // Weather button component
+  const renderStatusWithWeatherButton = (garden: Garden) => {
+    return (
+      <View style={styles.weatherButtonContainer}>
+        <TouchableOpacity
+          style={styles.weatherButton}
+          onPress={() => setWeatherModalVisible(true)}
+          accessible={true}
+          accessibilityLabel="Xem thông tin thời tiết"
+          accessibilityHint="Nhấn để xem dự báo thời tiết chi tiết"
+          accessibilityRole="button"
+        >
+          <Ionicons
+            name={getValidIconName(
+              currentWeather
+                ? weatherService.getWeatherIcon(currentWeather.iconCode) ||
+                    "cloudy-outline"
+                : "cloudy-outline"
+            )}
+            size={22}
+            color={theme.primary}
+          />
+          {currentWeather ? (
+            <Text style={styles.weatherButtonTemp}>
+              {Math.round(currentWeather.temp)}°C
+            </Text>
+          ) : (
+            <Text style={styles.weatherButtonText}>Thời tiết</Text>
+          )}
+          <Ionicons
+            name="chevron-down-outline"
+            size={14}
+            color={theme.primary}
+            style={{ marginLeft: 3 }}
+          />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   if (isLoading && !garden) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
@@ -1004,6 +1187,7 @@ export default function GardenDetailScreen() {
         )}
         scrollEventThrottle={16}
       />
+      <WeatherModal />
       <AdviceModal
         isVisible={adviceModalVisible}
         onClose={() => setAdviceModalVisible(false)}
@@ -1300,5 +1484,167 @@ const createStyles = (theme: any) =>
       fontFamily: "Inter-Regular",
       textAlign: "center",
       paddingVertical: 20,
+    },
+    weatherButtonContainer: {
+      position: "absolute",
+      top: 10,
+      right: 10,
+      zIndex: 5,
+    },
+    weatherButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.cardAlt,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      borderRadius: 16,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.15,
+      shadowRadius: 2,
+      elevation: 2,
+      borderWidth: 1,
+      borderColor: theme.borderLight,
+    },
+    weatherButtonTemp: {
+      marginLeft: 4,
+      fontSize: 14,
+      fontFamily: "Inter-SemiBold",
+      color: theme.primary,
+    },
+    weatherButtonText: {
+      marginLeft: 4,
+      fontSize: 14,
+      fontFamily: "Inter-Medium",
+      color: theme.primary,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    modalContainer: {
+      width: "90%",
+      maxHeight: "80%",
+      backgroundColor: theme.background,
+      borderRadius: 16,
+      overflow: "hidden",
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+    modalHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.borderLight,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontFamily: "Inter-Bold",
+      color: theme.text,
+    },
+    modalContent: {
+      padding: 16,
+    },
+    weatherLoadingContainer: {
+      padding: 20,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    forecastSection: {
+      marginTop: 20,
+      paddingTop: 16,
+      borderTopWidth: 1,
+      borderTopColor: theme.borderLight,
+    },
+    forecastSectionTitle: {
+      fontSize: 16,
+      fontFamily: "Inter-SemiBold",
+      color: theme.text,
+      marginBottom: 12,
+    },
+    hourlyForecastScroll: {
+      flexGrow: 0,
+      marginBottom: 8,
+    },
+    hourlyForecastItem: {
+      alignItems: "center",
+      marginRight: 16,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      backgroundColor: theme.cardAlt,
+      borderRadius: 12,
+      minWidth: 60,
+    },
+    hourTime: {
+      fontSize: 13,
+      fontFamily: "Inter-Medium",
+      color: theme.textSecondary,
+      marginBottom: 6,
+    },
+    hourTemp: {
+      fontSize: 14,
+      fontFamily: "Inter-SemiBold",
+      color: theme.text,
+      marginTop: 6,
+    },
+    dailyForecastItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.borderLight,
+    },
+    dayName: {
+      width: 50,
+      fontSize: 14,
+      fontFamily: "Inter-Medium",
+      color: theme.text,
+    },
+    dayIconContainer: {
+      width: 40,
+      alignItems: "center",
+    },
+    tempRangeContainer: {
+      flex: 1,
+      marginLeft: 8,
+    },
+    tempRange: {
+      fontSize: 14,
+      fontFamily: "Inter-SemiBold",
+      color: theme.text,
+    },
+    rainChance: {
+      fontSize: 13,
+      fontFamily: "Inter-Medium",
+      color: theme.primary,
+      marginLeft: 8,
+    },
+    closeButton: {
+      padding: 8,
+      backgroundColor: "rgba(0,0,0,0.3)",
+      borderRadius: 20,
+    },
+    modalCloseButton: {
+      alignSelf: "center",
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      backgroundColor: theme.primary,
+      borderRadius: 8,
+      marginVertical: 16,
+      width: "80%",
+    },
+    modalCloseButtonText: {
+      color: theme.card,
+      fontSize: 16,
+      fontFamily: "Inter-SemiBold",
+      textAlign: "center",
     },
   });

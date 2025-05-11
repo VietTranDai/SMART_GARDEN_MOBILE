@@ -1,15 +1,23 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+/**
+ * Enhanced GardensScreen with:
+ * - useHomeData hook for data fetching
+ * - FastImage for optimized image loading
+ * - Skeleton loading placeholders
+ * - Accessibility features
+ * - Optimized FlatList performance
+ * - Improved empty state
+ * - Progress bar with percentage
+ */
+import React, { useState, useMemo, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Image,
-  RefreshControl,
-  ActivityIndicator,
   Animated,
   Platform,
+  ViewStyle,
 } from "react-native";
 import { router, Stack } from "expo-router";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -21,43 +29,236 @@ import {
 } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GardenStatus, GardenType } from "@/types";
-import { gardenService } from "@/service/api";
 import { Garden } from "@/types/gardens/garden.types";
 import env from "@/config/environment";
-import { LinearGradient } from "expo-linear-gradient";
+import FastImage from "react-native-fast-image";
+import SkeletonPlaceholder from "@/components/ui/SkeletonPlaceholder";
+import useHomeData from "@/hooks/useHomeData";
+import { gardenService } from "@/service/api";
+
+// Gradient Replacement Component with proper TypeScript types
+const GradientOverlay = ({ style }: { style: ViewStyle }) => {
+  const theme = useAppTheme();
+  return (
+    <View
+      style={[
+        style,
+        {
+          backgroundColor: "transparent",
+          borderBottomWidth: 50,
+          borderBottomColor: "rgba(0,0,0,0.4)",
+        },
+      ]}
+    />
+  );
+};
+
+// Extract GardenItem component and wrap with React.memo for optimization
+const GardenItem = React.memo(
+  ({
+    item,
+    theme,
+    getStatusColor,
+    getStatusText,
+    getGardenTypeIcon,
+    getGardenTypeText,
+    getLocationText,
+  }: {
+    item: Garden;
+    theme: any;
+    getStatusColor: (status: GardenStatus) => string;
+    getStatusText: (status: GardenStatus) => string;
+    getGardenTypeIcon: (type: GardenType) => string;
+    getGardenTypeText: (type: GardenType) => string;
+    getLocationText: (garden: Garden) => string;
+  }) => {
+    // Added animated press effect for better feedback
+    const scale = new Animated.Value(1);
+
+    const onPressIn = () => {
+      Animated.spring(scale, {
+        toValue: 0.97,
+        friction: 5,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const onPressOut = () => {
+      Animated.spring(scale, {
+        toValue: 1,
+        friction: 5,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    // Get growth progress for the progress bar
+    const growthProgress = item.growthProgress;
+    const growthProgressText = `${Math.round(growthProgress)}%`;
+
+    const styles = useMemo(() => createStyles(theme), [theme]);
+
+    return (
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <TouchableOpacity
+          style={styles.gardenCard}
+          onPress={() => router.push(`/(modules)/gardens/${item.id}`)}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          activeOpacity={0.9}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel={`Khu vườn ${item.name}`}
+          accessibilityHint={`Nhấn để xem chi tiết về khu vườn ${item.name}`}
+        >
+          <View style={styles.imageThumbnailContainer}>
+            <FastImage
+              source={{
+                uri: item.profilePicture
+                  ? `${env.apiUrl}${item.profilePicture}`
+                  : gardenService.getDefaultGardenImage(item.type).uri,
+                priority: FastImage.priority.normal,
+              }}
+              style={styles.gardenThumbnail}
+              resizeMode={FastImage.resizeMode.cover}
+              onLoadStart={() => {}}
+              onError={() => {}}
+              accessibilityIgnoresInvertColors={true}
+            />
+            <GradientOverlay style={styles.imageGradient} />
+          </View>
+
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: getStatusColor(item.status) },
+            ]}
+            accessible={true}
+            accessibilityLabel={`Trạng thái: ${getStatusText(item.status)}`}
+          >
+            <Text style={styles.statusBadgeText}>
+              {getStatusText(item.status)}
+            </Text>
+          </View>
+
+          <View style={styles.gardenContent}>
+            <Text
+              style={styles.gardenTitle}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {item.name}
+            </Text>
+            <View style={styles.gardenMetaRow}>
+              <View
+                style={styles.gardenMetaItem}
+                accessible={true}
+                accessibilityLabel={`Loại: ${getGardenTypeText(item.type)}`}
+              >
+                <Ionicons
+                  name={getGardenTypeIcon(item.type) as any}
+                  size={14}
+                  color={theme.textSecondary}
+                />
+                <Text style={styles.gardenMetaText}>
+                  {getGardenTypeText(item.type)}
+                </Text>
+              </View>
+              <View
+                style={styles.gardenMetaItem}
+                accessible={true}
+                accessibilityLabel={`Vị trí: ${getLocationText(item)}`}
+              >
+                <Ionicons
+                  name="location-outline"
+                  size={14}
+                  color={theme.textSecondary}
+                />
+                <Text
+                  style={styles.gardenMetaText}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {getLocationText(item)}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.gardenMetaRow}>
+              {item.plantName && (
+                <View
+                  style={styles.gardenMetaItem}
+                  accessible={true}
+                  accessibilityLabel={`Loại cây: ${item.plantName}`}
+                >
+                  <Feather
+                    name="target"
+                    size={14}
+                    color={theme.textSecondary}
+                  />
+                  <Text
+                    style={styles.gardenMetaText}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {item.plantName}
+                  </Text>
+                </View>
+              )}
+              {item.plantGrowStage && (
+                <View
+                  style={styles.gardenMetaItem}
+                  accessible={true}
+                  accessibilityLabel={`Giai đoạn phát triển: ${item.plantGrowStage}`}
+                >
+                  <FontAwesome5
+                    name="seedling"
+                    size={13}
+                    color={theme.textSecondary}
+                  />
+                  <Text style={styles.gardenMetaText}>
+                    {item.plantGrowStage}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {item.plantStartDate && item.plantDuration && (
+              <View
+                style={styles.progressContainer}
+                accessible={true}
+                accessibilityLabel={`Tiến độ phát triển: ${growthProgressText}`}
+              >
+                <View style={styles.progressLabelRow}>
+                  <Text style={styles.progressLabel}>Tiến độ phát triển</Text>
+                  <Text style={styles.progressPercentage}>
+                    {growthProgressText}
+                  </Text>
+                </View>
+                <View style={styles.progressBarBackground}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      {
+                        width: `${growthProgress}%`,
+                        backgroundColor: theme.primary,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  }
+);
 
 export default function GardensScreen() {
   const theme = useAppTheme();
-  const [gardens, setGardens] = useState<Garden[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const fetchGardens = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const gardenData = await gardenService.getGardens();
-      setGardens(gardenData);
-    } catch (err) {
-      console.error("Failed to load gardens:", err);
-      setError("Không thể tải danh sách vườn. Vui lòng thử lại sau.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchGardens();
-  }, [fetchGardens]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchGardens();
-    setRefreshing(false);
-  }, [fetchGardens]);
+  // Use the useHomeData hook instead of direct API calls
+  const { gardens, loading, error, refreshing, handleRefresh } = useHomeData();
 
   // --- Helper Functions (Use new interface/enums) ---
   const getStatusColor = (status: GardenStatus) => {
@@ -128,136 +329,73 @@ export default function GardensScreen() {
 
   // --- Render Logic (Use fields from Garden) ---
   const renderGardenItem = ({ item }: { item: Garden }) => {
-    // Added animated press effect for better feedback
-    const scale = new Animated.Value(1);
-
-    const onPressIn = () => {
-      Animated.spring(scale, {
-        toValue: 0.97,
-        friction: 5,
-        useNativeDriver: true,
-      }).start();
-    };
-
-    const onPressOut = () => {
-      Animated.spring(scale, {
-        toValue: 1,
-        friction: 5,
-        useNativeDriver: true,
-      }).start();
-    };
-
     return (
-      <Animated.View style={{ transform: [{ scale }] }}>
-        <TouchableOpacity
-          style={styles.gardenCard}
-          onPress={() => router.push(`/(modules)/gardens/${item.id}`)}
-          onPressIn={onPressIn}
-          onPressOut={onPressOut}
-          activeOpacity={0.9}
-        >
-          <View style={styles.imageThumbnailContainer}>
-            <Image
-              source={{
-                uri: item.profilePicture
-                  ? `${env.apiUrl}${item.profilePicture}`
-                  : gardenService.getDefaultGardenImage(item.type).uri,
-              }}
-              style={styles.gardenThumbnail}
-              resizeMode="cover"
-            />
-            <LinearGradient
-              colors={["transparent", "rgba(0,0,0,0.4)"]}
-              style={styles.imageGradient}
-            />
-          </View>
-
-          <View
-            style={[
-              styles.statusBadge,
-              { backgroundColor: getStatusColor(item.status) },
-            ]}
-          >
-            <Text style={styles.statusBadgeText}>
-              {getStatusText(item.status)}
-            </Text>
-          </View>
-
-          <View style={styles.gardenContent}>
-            <Text style={styles.gardenTitle} numberOfLines={1}>
-              {item.name}
-            </Text>
-            <View style={styles.gardenMetaRow}>
-              <View style={styles.gardenMetaItem}>
-                <Ionicons
-                  name={getGardenTypeIcon(item.type) as any}
-                  size={14}
-                  color={theme.textSecondary}
-                />
-                <Text style={styles.gardenMetaText}>
-                  {getGardenTypeText(item.type)}
-                </Text>
-              </View>
-              <View style={styles.gardenMetaItem}>
-                <Ionicons
-                  name="location-outline"
-                  size={14}
-                  color={theme.textSecondary}
-                />
-                <Text style={styles.gardenMetaText} numberOfLines={1}>
-                  {getLocationText(item)}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.gardenMetaRow}>
-              {item.plantName && (
-                <View style={styles.gardenMetaItem}>
-                  <Feather
-                    name="target"
-                    size={14}
-                    color={theme.textSecondary}
-                  />
-                  <Text style={styles.gardenMetaText}>{item.plantName}</Text>
-                </View>
-              )}
-              {item.plantGrowStage && (
-                <View style={styles.gardenMetaItem}>
-                  <FontAwesome5
-                    name="seedling"
-                    size={13}
-                    color={theme.textSecondary}
-                  />
-                  <Text style={styles.gardenMetaText}>
-                    {item.plantGrowStage}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {item.plantStartDate && item.plantDuration && (
-              <View style={styles.progressContainer}>
-                <Text style={styles.progressLabel}>Tiến độ phát triển</Text>
-                <View style={styles.progressBarBackground}>
-                  <View
-                    style={[
-                      styles.progressBarFill,
-                      {
-                        width: `${
-                          gardenService.calculateGardenStatistics(item)
-                            .growthProgress
-                        }%`,
-                        backgroundColor: theme.primary,
-                      },
-                    ]}
-                  />
-                </View>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
-      </Animated.View>
+      <GardenItem
+        item={item}
+        theme={theme}
+        getStatusColor={getStatusColor}
+        getStatusText={getStatusText}
+        getGardenTypeIcon={getGardenTypeIcon}
+        getGardenTypeText={getGardenTypeText}
+        getLocationText={getLocationText}
+      />
     );
   };
+
+  // Render skeleton loading placeholders
+  const renderSkeletonPlaceholder = () => {
+    return Array(3)
+      .fill(0)
+      .map((_, index) => (
+        <View key={`skeleton-${index}`} style={styles.gardenCard}>
+          <SkeletonPlaceholder
+            backgroundColor={theme.border || "#e1e9ee"}
+            highlightColor={theme.borderLight || "#f2f8fc"}
+          >
+            <SkeletonPlaceholder.Item
+              height={150}
+              width="100%"
+              borderTopLeftRadius={16}
+              borderTopRightRadius={16}
+            />
+            <SkeletonPlaceholder.Item padding={16}>
+              <SkeletonPlaceholder.Item
+                width="70%"
+                height={20}
+                marginBottom={10}
+              />
+              <SkeletonPlaceholder.Item flexDirection="row" marginBottom={8}>
+                <SkeletonPlaceholder.Item
+                  width="40%"
+                  height={14}
+                  marginRight={20}
+                />
+                <SkeletonPlaceholder.Item width="30%" height={14} />
+              </SkeletonPlaceholder.Item>
+              <SkeletonPlaceholder.Item flexDirection="row" marginBottom={12}>
+                <SkeletonPlaceholder.Item
+                  width="35%"
+                  height={14}
+                  marginRight={20}
+                />
+                <SkeletonPlaceholder.Item width="25%" height={14} />
+              </SkeletonPlaceholder.Item>
+              <SkeletonPlaceholder.Item
+                width="100%"
+                height={6}
+                marginTop={10}
+              />
+            </SkeletonPlaceholder.Item>
+          </SkeletonPlaceholder>
+        </View>
+      ));
+  };
+
+  // Item separator for the FlatList
+  const ItemSeparator = () => <View style={styles.itemSeparator} />;
+
+  // Memoized keyExtractor to improve performance
+  const keyExtractor = useCallback((item: Garden) => item.id.toString(), []);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -268,6 +406,10 @@ export default function GardensScreen() {
             <TouchableOpacity
               style={styles.createButton}
               onPress={() => router.push("/(modules)/gardens/create")}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Tạo khu vườn mới"
+              accessibilityHint="Nhấn để tạo khu vườn mới"
             >
               <Ionicons name="add-outline" size={24} color="white" />
             </TouchableOpacity>
@@ -277,23 +419,38 @@ export default function GardensScreen() {
 
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.primary} />
-          <Text style={styles.loadingText}>Đang tải khu vườn...</Text>
+          {renderSkeletonPlaceholder()}
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color={theme.error} />
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchGardens}>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={handleRefresh}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Thử lại"
+            accessibilityHint="Nhấn để tải lại danh sách khu vườn"
+          >
             <Text style={styles.retryButtonText}>Thử lại</Text>
           </TouchableOpacity>
         </View>
       ) : gardens.length === 0 ? (
         <View style={styles.emptyContainer}>
+          <View style={styles.emptyImageContainer}>
+            <MaterialCommunityIcons
+              name="sprout"
+              size={84}
+              color={theme.primary}
+              style={styles.emptyIcon}
+            />
+          </View>
           <MaterialCommunityIcons
             name="sprout"
             size={64}
             color={theme.textTertiary}
+            style={styles.emptyIcon}
           />
           <Text style={styles.emptyTitle}>Chưa có khu vườn nào</Text>
           <Text style={styles.emptyText}>
@@ -302,6 +459,10 @@ export default function GardensScreen() {
           <TouchableOpacity
             style={styles.createGardenButton}
             onPress={() => router.push("/(modules)/gardens/create")}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Tạo khu vườn"
+            accessibilityHint="Nhấn để tạo khu vườn đầu tiên của bạn"
           >
             <Text style={styles.createGardenButtonText}>Tạo khu vườn</Text>
           </TouchableOpacity>
@@ -310,17 +471,21 @@ export default function GardensScreen() {
         <FlatList
           data={gardens}
           renderItem={renderGardenItem}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={keyExtractor}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[theme.primary]}
-              tintColor={theme.primary}
-            />
-          }
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          initialNumToRender={5}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS === "android"}
+          ItemSeparatorComponent={ItemSeparator}
+          getItemLayout={(data, index) => ({
+            length: 320, // approximate height of a garden card with all elements
+            offset: 320 * index,
+            index,
+          })}
         />
       )}
     </SafeAreaView>
@@ -335,8 +500,8 @@ const createStyles = (theme: any) =>
     },
     loadingContainer: {
       flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingTop: 16,
       backgroundColor: theme.background,
     },
     gardenList: {
@@ -425,6 +590,7 @@ const createStyles = (theme: any) =>
     gardenMetaItem: {
       flexDirection: "row",
       alignItems: "center",
+      maxWidth: "70%", // Ensure text doesn't overflow too much
     },
     gardenMetaText: {
       fontSize: 14,
@@ -441,11 +607,21 @@ const createStyles = (theme: any) =>
     progressContainer: {
       marginTop: 10,
     },
+    progressLabelRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 5,
+    },
     progressLabel: {
       fontSize: 13,
       color: theme.textSecondary,
-      marginBottom: 5,
       fontFamily: "Inter-Regular",
+    },
+    progressPercentage: {
+      fontSize: 13,
+      color: theme.primary,
+      fontFamily: "Inter-Medium",
     },
     progressBarBackground: {
       height: 6,
@@ -464,6 +640,18 @@ const createStyles = (theme: any) =>
       padding: 32,
       marginTop: 40,
       minHeight: 300,
+    },
+    emptyImageContainer: {
+      width: 150,
+      height: 150,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: theme.borderLight,
+      borderRadius: 75,
+      marginBottom: 20,
+    },
+    emptyIcon: {
+      marginBottom: 10,
     },
     emptyText: {
       fontSize: 16,
@@ -567,5 +755,8 @@ const createStyles = (theme: any) =>
       backgroundColor: theme.primary,
       borderRadius: 20,
       marginRight: 8,
+    },
+    itemSeparator: {
+      height: 16,
     },
   });

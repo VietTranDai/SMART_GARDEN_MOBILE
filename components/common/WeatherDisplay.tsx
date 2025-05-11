@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from "react-native";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
+import Gradient from "@/components/ui/Gradient";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import {
   WeatherObservation,
@@ -104,7 +104,7 @@ const WeatherDisplay = memo(
 
     return (
       <View style={styles.container}>
-        <LinearGradient
+        <Gradient
           colors={[gradientStart, gradientEnd]}
           style={styles.cardContent}
           start={{ x: 0, y: 0 }}
@@ -219,7 +219,7 @@ const WeatherDisplay = memo(
               <Text style={styles.tipText}>{tip}</Text>
             </View>
           )}
-        </LinearGradient>
+        </Gradient>
       </View>
     );
   }

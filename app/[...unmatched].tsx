@@ -13,7 +13,7 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { useTheme } from "@/contexts/ThemeContext";
 import { StatusBar } from "expo-status-bar";
 
-export default function NotFoundScreen() {
+export default function FeatureNotImplementedScreen() {
   const theme = useAppTheme();
   const { isDarkMode } = useTheme();
 
@@ -82,18 +82,16 @@ export default function NotFoundScreen() {
       >
         <Animated.View style={{ transform: [{ scale: iconAnim }] }}>
           <Ionicons
-            name="alert-circle-outline"
+            name="construct-outline"
             size={120}
             color={theme.primary}
             style={styles.icon}
           />
         </Animated.View>
 
-        <Text style={[styles.title, { color: theme.text }]}>
-          Page Not Found
-        </Text>
         <Text style={[styles.description, { color: theme.textSecondary }]}>
-          The page you're looking for doesn't exist or has been moved.
+          Tính năng này chưa được hiện thực trong phiên bản hiện tại. Chúng tôi
+          đang nỗ lực phát triển và sẽ ra mắt trong phiên bản tiếp theo.
         </Text>
 
         <TouchableOpacity
@@ -107,7 +105,7 @@ export default function NotFoundScreen() {
             color="#FFFFFF"
             style={styles.buttonIcon}
           />
-          <Text style={styles.buttonText}>Go to Home</Text>
+          <Text style={styles.buttonText}>Quay lại trang chủ</Text>
         </TouchableOpacity>
       </Animated.View>
     </SafeAreaView>
@@ -130,13 +128,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 16,
-    fontFamily: "Inter-Bold",
-    textAlign: "center",
   },
   description: {
     fontSize: 16,

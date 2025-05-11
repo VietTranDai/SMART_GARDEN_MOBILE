@@ -50,6 +50,9 @@ export interface Garden {
   plantStartDate?: string;
   plantDuration?: number;
 
+  daysUntilHarvest: number;
+  growthProgress: number;
+
   // Timestamps
   createdAt?: string;
   updatedAt?: string;

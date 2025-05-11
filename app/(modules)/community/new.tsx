@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,22 +11,80 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Dimensions,
+  FlatList,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { Ionicons, AntDesign, Entypo } from "@expo/vector-icons";
+import { Ionicons, AntDesign, Entypo, MaterialIcons } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import * as ImagePicker from "expo-image-picker";
 import { communityService, gardenService } from "@/service/api";
 import { Garden, Tag, CreatePostDto } from "@/types";
+import ContentLoader, { Rect, Circle } from "react-content-loader/native";
+import DraggableFlatList, {
+  RenderItemParams,
+} from "react-native-draggable-flatlist";
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
+
+interface PostImage {
+  uri: string;
+  type: string;
+  name: string;
+  id?: string;
+  width?: number;
+  height?: number;
+}
+
+// Skeleton loader for form
+const FormSkeleton = ({ theme }: { theme: any }) => (
+  <View style={{ padding: 16 }}>
+    <ContentLoader
+      speed={2}
+      width={SCREEN_WIDTH - 32}
+      height={500}
+      backgroundColor={theme.backgroundSecondary}
+      foregroundColor={theme.cardAlt}
+    >
+      {/* Garden selector */}
+      <Rect x={0} y={0} rx={8} ry={8} width={SCREEN_WIDTH - 32} height={50} />
+
+      {/* Title input */}
+      <Rect x={0} y={70} rx={4} ry={4} width={SCREEN_WIDTH - 32} height={60} />
+
+      {/* Content input */}
+      <Rect
+        x={0}
+        y={150}
+        rx={4}
+        ry={4}
+        width={SCREEN_WIDTH - 32}
+        height={120}
+      />
+
+      {/* Tags section */}
+      <Rect x={0} y={290} rx={4} ry={4} width={100} height={24} />
+      <Rect x={0} y={324} rx={20} ry={20} width={80} height={30} />
+      <Rect x={90} y={324} rx={20} ry={20} width={100} height={30} />
+
+      {/* Popular tags */}
+      <Rect x={0} y={374} rx={4} ry={4} width={150} height={20} />
+      <Rect x={0} y={404} rx={16} ry={16} width={70} height={32} />
+      <Rect x={80} y={404} rx={16} ry={16} width={90} height={32} />
+      <Rect x={180} y={404} rx={16} ry={16} width={60} height={32} />
+    </ContentLoader>
+  </View>
+);
 
 export default function NewPostScreen() {
   const theme = useAppTheme();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<PostImage[]>([]);
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [filteredTags, setFilteredTags] = useState<Tag[]>([]);
   const [selectedGarden, setSelectedGarden] = useState<Garden | null>(null);
   const [showGardenSelector, setShowGardenSelector] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -35,6 +93,7 @@ export default function NewPostScreen() {
   const [popularTags, setPopularTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Fetch gardens and tags
   useEffect(() => {
@@ -59,6 +118,21 @@ export default function NewPostScreen() {
     fetchData();
   }, []);
 
+  // Filter tags based on input
+  useEffect(() => {
+    if (!tagInput.trim()) {
+      setFilteredTags([]);
+      return;
+    }
+
+    const filtered = popularTags.filter(
+      (tag) =>
+        tag.name.toLowerCase().includes(tagInput.toLowerCase()) &&
+        !selectedTags.some((selected) => selected.id === tag.id)
+    );
+    setFilteredTags(filtered.slice(0, 5)); // Limit to 5 suggestions
+  }, [tagInput, popularTags, selectedTags]);
+
   // Add a tag to the post
   const handleAddTag = (tag: Tag) => {
     if (
@@ -70,8 +144,22 @@ export default function NewPostScreen() {
     setTagInput("");
   };
 
+  // Add a new custom tag
+  const handleAddCustomTag = () => {
+    if (!tagInput.trim() || selectedTags.length >= 5) return;
+
+    // Create a temporary tag (in a real app you might want to create this through API)
+    const newTag: Tag = {
+      id: Date.now(), // Use a number instead of string for id
+      name: tagInput.trim(),
+    };
+
+    setSelectedTags([...selectedTags, newTag]);
+    setTagInput("");
+  };
+
   // Remove a tag from the post
-  const handleRemoveTag = (tagId: number) => {
+  const handleRemoveTag = (tagId: string | number) => {
     setSelectedTags(selectedTags.filter((t) => t.id !== tagId));
   };
 
@@ -81,8 +169,8 @@ export default function NewPostScreen() {
 
     if (status !== "granted") {
       Alert.alert(
-        "Permission Required",
-        "Please allow access to your photo library to add images to your post."
+        "Cần quyền truy cập",
+        "Vui lòng cho phép truy cập thư viện ảnh để thêm hình ảnh vào bài viết."
       );
       return;
     }
@@ -91,19 +179,37 @@ export default function NewPostScreen() {
       setLoadingImage(true);
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
+        allowsEditing: false,
         aspect: [4, 3],
         quality: 0.8,
+        allowsMultipleSelection: true,
+        selectionLimit: 5 - images.length,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        // In a real app, this would upload the image to a server and get back a URL
-        // For now, we just use the local URI
-        setImages([...images, result.assets[0].uri]);
+        // Format images for display and upload
+        const newImages: PostImage[] = result.assets.map((asset) => ({
+          uri: asset.uri,
+          type: "image/jpeg",
+          name: asset.uri.split("/").pop() || `image_${Date.now()}.jpg`,
+          id: `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          width: asset.width,
+          height: asset.height,
+        }));
+
+        // Show success toast
+        Alert.alert(
+          "Thành công",
+          `Đã thêm ${newImages.length} hình ảnh.`,
+          [{ text: "OK" }],
+          { cancelable: true }
+        );
+
+        setImages([...images, ...newImages]);
       }
     } catch (error) {
       console.error("Error picking image:", error);
-      Alert.alert("Error", "Failed to load image. Please try again.");
+      Alert.alert("Lỗi", "Không thể tải hình ảnh. Vui lòng thử lại.");
     } finally {
       setLoadingImage(false);
     }
@@ -114,17 +220,40 @@ export default function NewPostScreen() {
     setImages(images.filter((_, i) => i !== index));
   };
 
-  // Submit the post
-  const handleSubmitPost = async () => {
+  // Reorder images with drag and drop
+  const handleDragEnd = ({ data }: { data: PostImage[] }) => {
+    setImages(data);
+  };
+
+  // Form validation
+  const validateForm = () => {
     if (!title.trim()) {
-      Alert.alert("Error", "Please add a title for your post");
-      return;
+      Alert.alert("Thiếu tiêu đề", "Vui lòng thêm tiêu đề cho bài viết");
+      return false;
     }
 
     if (!content.trim()) {
-      Alert.alert("Error", "Please add content for your post");
-      return;
+      Alert.alert("Thiếu nội dung", "Vui lòng thêm nội dung cho bài viết");
+      return false;
     }
+
+    return true;
+  };
+
+  // Toggle preview mode
+  const togglePreview = () => {
+    if (showPreview) {
+      setShowPreview(false);
+    } else {
+      if (validateForm()) {
+        setShowPreview(true);
+      }
+    }
+  };
+
+  // Submit the post
+  const handleSubmitPost = async () => {
+    if (!validateForm()) return;
 
     setSubmitting(true);
 
@@ -145,19 +274,9 @@ export default function NewPostScreen() {
       }
 
       // Add images
-      images.forEach((image, index) => {
-        // Extract filename from path
-        const filename = image.split("/").pop() || `image_${index}.jpg`;
-
-        // Create file object from URI
-        const file = {
-          uri: image,
-          type: "image/jpeg",
-          name: filename,
-        };
-
+      images.forEach((image) => {
         // @ts-ignore - We need to ignore type checking here as the FormData types don't match React Native's file object
-        formData.append("images", file);
+        formData.append("images", image);
       });
 
       // @ts-ignore - Ignore the type error since communityService.createPost expects CreatePostDto but we're sending FormData
@@ -167,18 +286,508 @@ export default function NewPostScreen() {
       router.back();
     } catch (err) {
       console.error("Failed to create post:", err);
-      Alert.alert("Error", "Failed to create your post. Please try again.");
+      Alert.alert("Lỗi", "Không thể tạo bài viết. Vui lòng thử lại.");
     } finally {
       setSubmitting(false);
     }
   };
+
+  // Preview component
+  const PreviewPost = () => (
+    <ScrollView style={styles.previewContainer}>
+      <View style={[styles.previewHeader, { backgroundColor: theme.card }]}>
+        <Text style={[styles.previewTitle, { color: theme.text }]}>
+          Xem trước
+        </Text>
+        <TouchableOpacity onPress={togglePreview}>
+          <Ionicons name="close" size={24} color={theme.textSecondary} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={[styles.postCard, { backgroundColor: theme.card }]}>
+        <View style={styles.postHeader}>
+          <View style={styles.userInfo}>
+            <Image
+              source={{ uri: "https://i.pravatar.cc/150?img=1" }}
+              style={styles.avatar}
+            />
+            <View>
+              <Text style={[styles.userName, { color: theme.text }]}>Bạn</Text>
+              <Text style={[styles.postDate, { color: theme.textSecondary }]}>
+                Bản nháp
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <Text style={[styles.postTitle, { color: theme.text }]}>{title}</Text>
+        <Text style={[styles.postContent, { color: theme.text }]}>
+          {content}
+        </Text>
+
+        {images.length > 0 && (
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+          >
+            {images.map((image, index) => (
+              <Image
+                key={index}
+                source={{ uri: image.uri }}
+                style={styles.previewImage}
+                resizeMode="cover"
+              />
+            ))}
+          </ScrollView>
+        )}
+
+        {selectedTags.length > 0 && (
+          <View style={styles.tagsContainer}>
+            {selectedTags.map((tag) => (
+              <View
+                key={tag.id}
+                style={[
+                  styles.tagChip,
+                  { backgroundColor: theme.primary + "20" },
+                ]}
+              >
+                <Text style={[styles.tagChipText, { color: theme.primary }]}>
+                  #{tag.name}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {selectedGarden && (
+          <View
+            style={[
+              styles.gardenInfoContainer,
+              { borderTopColor: theme.borderLight },
+            ]}
+          >
+            <Ionicons name="leaf" size={16} color={theme.primary} />
+            <Text
+              style={[styles.gardenInfoText, { color: theme.textSecondary }]}
+            >
+              {selectedGarden.name}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      <TouchableOpacity
+        style={[styles.publishButton, { backgroundColor: theme.primary }]}
+        onPress={handleSubmitPost}
+        disabled={submitting}
+      >
+        {submitting ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <Text style={styles.publishButtonText}>Đăng bài viết</Text>
+        )}
+      </TouchableOpacity>
+    </ScrollView>
+  );
+
+  // Main form component
+  const PostForm = () => (
+    <>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.editorContainer}>
+          {/* Garden Selector */}
+          <TouchableOpacity
+            style={[styles.gardenSelector, { backgroundColor: theme.cardAlt }]}
+            onPress={() => setShowGardenSelector(!showGardenSelector)}
+          >
+            <Ionicons
+              name="leaf"
+              size={18}
+              color={theme.primary}
+              style={styles.gardenIcon}
+            />
+            <Text style={[styles.gardenText, { color: theme.text }]}>
+              {selectedGarden
+                ? `Đăng trong: ${selectedGarden.name}`
+                : "Chọn một khu vườn (tùy chọn)"}
+            </Text>
+            <Ionicons
+              name={showGardenSelector ? "chevron-up" : "chevron-down"}
+              size={18}
+              color={theme.textSecondary}
+            />
+          </TouchableOpacity>
+
+          {showGardenSelector && (
+            <View
+              style={[styles.gardenOptions, { backgroundColor: theme.cardAlt }]}
+            >
+              {gardens.map((garden) => (
+                <TouchableOpacity
+                  key={garden.id}
+                  style={[
+                    styles.gardenOption,
+                    selectedGarden?.id === garden.id && {
+                      backgroundColor: theme.primary + "20",
+                    },
+                  ]}
+                  onPress={() => {
+                    setSelectedGarden(garden);
+                    setShowGardenSelector(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.gardenOptionText,
+                      {
+                        color:
+                          selectedGarden?.id === garden.id
+                            ? theme.primary
+                            : theme.text,
+                      },
+                    ]}
+                  >
+                    {garden.name}
+                  </Text>
+                  {selectedGarden?.id === garden.id && (
+                    <Ionicons
+                      name="checkmark"
+                      size={18}
+                      color={theme.primary}
+                    />
+                  )}
+                </TouchableOpacity>
+              ))}
+              {selectedGarden && (
+                <TouchableOpacity
+                  style={[
+                    styles.gardenOption,
+                    { borderTopWidth: 1, borderTopColor: theme.borderLight },
+                  ]}
+                  onPress={() => {
+                    setSelectedGarden(null);
+                    setShowGardenSelector(false);
+                  }}
+                >
+                  <Text
+                    style={[styles.gardenOptionText, { color: theme.error }]}
+                  >
+                    Bỏ chọn
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {/* Post Title */}
+          <TextInput
+            style={[
+              styles.titleInput,
+              { color: theme.text, borderBottomColor: theme.borderLight },
+            ]}
+            placeholder="Tiêu đề bài viết"
+            placeholderTextColor={theme.textTertiary}
+            value={title}
+            onChangeText={setTitle}
+            maxLength={100}
+          />
+
+          {/* Post Content */}
+          <TextInput
+            style={[styles.contentInput, { color: theme.text }]}
+            placeholder="Chia sẻ kinh nghiệm làm vườn của bạn hoặc đặt câu hỏi..."
+            placeholderTextColor={theme.textTertiary}
+            multiline
+            value={content}
+            onChangeText={setContent}
+          />
+
+          {/* Image Preview */}
+          {images.length > 0 && (
+            <View style={styles.imagePreviewContainer}>
+              <View style={styles.sectionTitleRow}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                  Hình ảnh ({images.length}/5)
+                </Text>
+                <Text
+                  style={[
+                    styles.sectionSubtitle,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  Giữ & kéo để sắp xếp
+                </Text>
+              </View>
+
+              <DraggableFlatList
+                data={images}
+                renderItem={({ item, drag, isActive }) => (
+                  <TouchableOpacity
+                    style={[
+                      styles.imagePreview,
+                      isActive && {
+                        opacity: 0.7,
+                        transform: [{ scale: 1.05 }],
+                      },
+                    ]}
+                    onLongPress={drag}
+                    disabled={isActive}
+                  >
+                    <Image
+                      source={{ uri: item.uri }}
+                      style={styles.previewImage}
+                    />
+                    <TouchableOpacity
+                      style={[
+                        styles.removeImageButton,
+                        { backgroundColor: theme.error },
+                      ]}
+                      onPress={() => {
+                        // Find the index based on id or uri
+                        const index = images.findIndex(
+                          (img) =>
+                            (item.id && img.id === item.id) ||
+                            img.uri === item.uri
+                        );
+                        if (index !== -1) handleRemoveImage(index);
+                      }}
+                    >
+                      <Ionicons name="close" size={16} color="#fff" />
+                    </TouchableOpacity>
+                    <View style={styles.dragHandle}>
+                      <MaterialIcons
+                        name="drag-handle"
+                        size={18}
+                        color={theme.textSecondary}
+                      />
+                    </View>
+
+                    {/* Image dimensions badge */}
+                    {item.width && item.height && (
+                      <View style={styles.dimensionsBadge}>
+                        <Text style={styles.dimensionsText}>
+                          {item.width}×{item.height}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                )}
+                keyExtractor={(item) => item.id || item.uri}
+                horizontal
+                onDragEnd={handleDragEnd}
+                autoscrollSpeed={5}
+                activationDistance={10}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.imagePreviewListContainer}
+              />
+            </View>
+          )}
+
+          {/* Tags Input */}
+          <View style={styles.tagsContainer}>
+            <View style={styles.tagsHeader}>
+              <Text style={[styles.tagsTitle, { color: theme.text }]}>
+                Tags
+              </Text>
+              <Text style={[styles.tagsCount, { color: theme.textSecondary }]}>
+                {selectedTags.length}/5
+              </Text>
+            </View>
+
+            <View style={styles.selectedTagsContainer}>
+              {selectedTags.map((tag) => (
+                <View
+                  key={tag.id}
+                  style={[
+                    styles.tagChip,
+                    { backgroundColor: theme.primary + "20" },
+                  ]}
+                >
+                  <Text style={[styles.tagChipText, { color: theme.primary }]}>
+                    #{tag.name}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => handleRemoveTag(tag.id)}
+                    style={styles.removeTagButton}
+                  >
+                    <Ionicons
+                      name="close-circle"
+                      size={16}
+                      color={theme.primary}
+                    />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+
+            {selectedTags.length < 5 && (
+              <View>
+                <View
+                  style={[
+                    styles.tagInputContainer,
+                    { backgroundColor: theme.backgroundSecondary },
+                  ]}
+                >
+                  <TextInput
+                    style={[styles.tagInput, { color: theme.text }]}
+                    placeholder="Thêm thẻ (ví dụ: Cà chua, Giúp đỡ)"
+                    placeholderTextColor={theme.textTertiary}
+                    value={tagInput}
+                    onChangeText={setTagInput}
+                    onSubmitEditing={handleAddCustomTag}
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.addTagButton,
+                      {
+                        backgroundColor: tagInput.trim()
+                          ? theme.primary
+                          : theme.backgroundSecondary,
+                      },
+                    ]}
+                    onPress={handleAddCustomTag}
+                    disabled={!tagInput.trim()}
+                  >
+                    <Ionicons
+                      name="add"
+                      size={20}
+                      color={tagInput.trim() ? "#fff" : theme.textTertiary}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {filteredTags.length > 0 && (
+                  <View
+                    style={[
+                      styles.tagSuggestions,
+                      { backgroundColor: theme.card },
+                    ]}
+                  >
+                    {filteredTags.map((tag) => (
+                      <TouchableOpacity
+                        key={tag.id}
+                        style={styles.tagSuggestion}
+                        onPress={() => handleAddTag(tag)}
+                      >
+                        <Text
+                          style={[
+                            styles.tagSuggestionText,
+                            { color: theme.text },
+                          ]}
+                        >
+                          #{tag.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Popular Tags */}
+            <Text style={[styles.popularTagsTitle, { color: theme.text }]}>
+              Thẻ phổ biến
+            </Text>
+            <View style={styles.popularTagsContainer}>
+              {popularTags.slice(0, 10).map((tag) => (
+                <TouchableOpacity
+                  key={tag.id}
+                  style={[
+                    styles.popularTag,
+                    {
+                      backgroundColor: selectedTags.some((t) => t.id === tag.id)
+                        ? theme.primary + "20"
+                        : theme.backgroundSecondary,
+                    },
+                  ]}
+                  onPress={() => handleAddTag(tag)}
+                  disabled={
+                    selectedTags.some((t) => t.id === tag.id) ||
+                    selectedTags.length >= 5
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.popularTagText,
+                      {
+                        color: selectedTags.some((t) => t.id === tag.id)
+                          ? theme.primary
+                          : theme.textSecondary,
+                      },
+                    ]}
+                  >
+                    #{tag.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Action Toolbar */}
+      <View
+        style={[
+          styles.toolbar,
+          {
+            backgroundColor: theme.card,
+            borderTopColor: theme.borderLight,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.toolbarButton}
+          onPress={handlePickImage}
+          disabled={loadingImage || images.length >= 5}
+        >
+          {loadingImage ? (
+            <ActivityIndicator size="small" color={theme.primary} />
+          ) : (
+            <Entypo
+              name="image"
+              size={22}
+              color={images.length >= 5 ? theme.textTertiary : theme.primary}
+            />
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.toolbarButton} onPress={togglePreview}>
+          <Ionicons name="eye-outline" size={22} color={theme.primary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.postButton,
+            {
+              backgroundColor:
+                !title.trim() || !content.trim() || submitting
+                  ? theme.primary + "50"
+                  : theme.primary,
+            },
+          ]}
+          onPress={handleSubmitPost}
+          disabled={!title.trim() || !content.trim() || submitting}
+        >
+          {submitting ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="send" size={18} color="#fff" />
+              <Text style={styles.postButtonText}>Đăng</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </>
+  );
 
   if (loading) {
     return (
       <View
         style={[styles.loadingContainer, { backgroundColor: theme.background }]}
       >
-        <ActivityIndicator size="large" color={theme.primary} />
+        <FormSkeleton theme={theme} />
       </View>
     );
   }
@@ -209,346 +818,18 @@ export default function NewPostScreen() {
             onPress={() => router.back()}
           >
             <Text style={[styles.headerButtonText, { color: theme.text }]}>
-              Cancel
+              Hủy
             </Text>
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.text }]}>
-            New Post
+            Tạo bài viết
           </Text>
-          <TouchableOpacity
-            style={[
-              styles.headerButton,
-              {
-                opacity:
-                  !title.trim() || !content.trim() || submitting ? 0.5 : 1,
-              },
-            ]}
-            onPress={handleSubmitPost}
-            disabled={!title.trim() || !content.trim() || submitting}
-          >
-            {submitting ? (
-              <ActivityIndicator size="small" color={theme.primary} />
-            ) : (
-              <Text style={[styles.headerButtonText, { color: theme.primary }]}>
-                Post
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView style={styles.scrollView}>
-          <View style={styles.editorContainer}>
-            {/* Garden Selector */}
-            <TouchableOpacity
-              style={[
-                styles.gardenSelector,
-                { backgroundColor: theme.cardAlt },
-              ]}
-              onPress={() => setShowGardenSelector(!showGardenSelector)}
-            >
-              <Ionicons
-                name="leaf"
-                size={18}
-                color={theme.primary}
-                style={styles.gardenIcon}
-              />
-              <Text style={[styles.gardenText, { color: theme.text }]}>
-                {selectedGarden
-                  ? `Posting in: ${selectedGarden.name}`
-                  : "Select a garden (optional)"}
-              </Text>
-              <Ionicons
-                name={showGardenSelector ? "chevron-up" : "chevron-down"}
-                size={18}
-                color={theme.textSecondary}
-              />
-            </TouchableOpacity>
-
-            {showGardenSelector && (
-              <View
-                style={[
-                  styles.gardenOptions,
-                  { backgroundColor: theme.cardAlt },
-                ]}
-              >
-                {gardens.map((garden) => (
-                  <TouchableOpacity
-                    key={garden.id}
-                    style={[
-                      styles.gardenOption,
-                      selectedGarden?.id === garden.id && {
-                        backgroundColor: theme.primary + "20",
-                      },
-                    ]}
-                    onPress={() => {
-                      setSelectedGarden(garden);
-                      setShowGardenSelector(false);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.gardenOptionText,
-                        {
-                          color:
-                            selectedGarden?.id === garden.id
-                              ? theme.primary
-                              : theme.text,
-                        },
-                      ]}
-                    >
-                      {garden.name}
-                    </Text>
-                    {selectedGarden?.id === garden.id && (
-                      <Ionicons
-                        name="checkmark"
-                        size={18}
-                        color={theme.primary}
-                      />
-                    )}
-                  </TouchableOpacity>
-                ))}
-                {selectedGarden && (
-                  <TouchableOpacity
-                    style={[
-                      styles.gardenOption,
-                      { borderTopWidth: 1, borderTopColor: theme.borderLight },
-                    ]}
-                    onPress={() => {
-                      setSelectedGarden(null);
-                      setShowGardenSelector(false);
-                    }}
-                  >
-                    <Text
-                      style={[styles.gardenOptionText, { color: theme.error }]}
-                    >
-                      Clear selection
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-
-            {/* Post Title */}
-            <TextInput
-              style={[
-                styles.titleInput,
-                { color: theme.text, borderBottomColor: theme.borderLight },
-              ]}
-              placeholder="Title"
-              placeholderTextColor={theme.textTertiary}
-              value={title}
-              onChangeText={setTitle}
-              maxLength={100}
-            />
-
-            {/* Post Content */}
-            <TextInput
-              style={[styles.contentInput, { color: theme.text }]}
-              placeholder="Share your gardening experience or ask a question..."
-              placeholderTextColor={theme.textTertiary}
-              multiline
-              value={content}
-              onChangeText={setContent}
-            />
-
-            {/* Image Preview */}
-            {images.length > 0 && (
-              <View style={styles.imagePreviewContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {images.map((image, index) => (
-                    <View key={index} style={styles.imagePreview}>
-                      <Image
-                        source={{ uri: image }}
-                        style={styles.previewImage}
-                      />
-                      <TouchableOpacity
-                        style={[
-                          styles.removeImageButton,
-                          { backgroundColor: theme.error },
-                        ]}
-                        onPress={() => handleRemoveImage(index)}
-                      >
-                        <Ionicons name="close" size={16} color="#fff" />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
-            {/* Tags Input */}
-            <View style={styles.tagsContainer}>
-              <View style={styles.tagsHeader}>
-                <Text style={[styles.tagsTitle, { color: theme.text }]}>
-                  Tags
-                </Text>
-                <Text
-                  style={[styles.tagsCount, { color: theme.textSecondary }]}
-                >
-                  {selectedTags.length}/5
-                </Text>
-              </View>
-
-              <View style={styles.selectedTagsContainer}>
-                {selectedTags.map((tag) => (
-                  <View
-                    key={tag.id}
-                    style={[
-                      styles.tagChip,
-                      { backgroundColor: theme.primary + "20" },
-                    ]}
-                  >
-                    <Text
-                      style={[styles.tagChipText, { color: theme.primary }]}
-                    >
-                      #{tag.name}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => handleRemoveTag(tag.id)}
-                      style={styles.removeTagButton}
-                    >
-                      <Ionicons
-                        name="close-circle"
-                        size={16}
-                        color={theme.primary}
-                      />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-
-              {selectedTags.length < 5 && (
-                <View
-                  style={[
-                    styles.tagInputContainer,
-                    { backgroundColor: theme.backgroundSecondary },
-                  ]}
-                >
-                  <TextInput
-                    style={[styles.tagInput, { color: theme.text }]}
-                    placeholder="Add a tag (e.g., Tomatoes, Help)"
-                    placeholderTextColor={theme.textTertiary}
-                    value={tagInput}
-                    onChangeText={setTagInput}
-                    onSubmitEditing={() => handleAddTag(selectedTags[0])}
-                  />
-                  <TouchableOpacity
-                    style={[
-                      styles.addTagButton,
-                      {
-                        backgroundColor: tagInput.trim()
-                          ? theme.primary
-                          : theme.backgroundSecondary,
-                      },
-                    ]}
-                    onPress={() => handleAddTag(selectedTags[0])}
-                    disabled={!tagInput.trim()}
-                  >
-                    <Ionicons
-                      name="add"
-                      size={20}
-                      color={tagInput.trim() ? "#fff" : theme.textTertiary}
-                    />
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* Popular Tags */}
-              <Text style={[styles.popularTagsTitle, { color: theme.text }]}>
-                Popular Tags
-              </Text>
-              <View style={styles.popularTagsContainer}>
-                {popularTags.map((tag) => (
-                  <TouchableOpacity
-                    key={tag.id}
-                    style={[
-                      styles.popularTag,
-                      {
-                        backgroundColor: selectedTags.some(
-                          (t) => t.id === tag.id
-                        )
-                          ? theme.primary + "20"
-                          : theme.backgroundSecondary,
-                      },
-                    ]}
-                    onPress={() => handleAddTag(tag)}
-                    disabled={
-                      selectedTags.some((t) => t.id === tag.id) ||
-                      selectedTags.length >= 5
-                    }
-                  >
-                    <Text
-                      style={[
-                        styles.popularTagText,
-                        {
-                          color: selectedTags.some((t) => t.id === tag.id)
-                            ? theme.primary
-                            : theme.textSecondary,
-                        },
-                      ]}
-                    >
-                      #{tag.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+          <View style={styles.headerButton}>
+            {/* Placeholder for balance */}
           </View>
-        </ScrollView>
-
-        {/* Action Toolbar */}
-        <View
-          style={[
-            styles.toolbar,
-            {
-              backgroundColor: theme.card,
-              borderTopColor: theme.borderLight,
-            },
-          ]}
-        >
-          <TouchableOpacity
-            style={styles.toolbarButton}
-            onPress={handlePickImage}
-            disabled={loadingImage || images.length >= 5}
-          >
-            {loadingImage ? (
-              <ActivityIndicator size="small" color={theme.primary} />
-            ) : (
-              <Entypo
-                name="image"
-                size={22}
-                color={images.length >= 5 ? theme.textTertiary : theme.primary}
-              />
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.toolbarButton}>
-            <AntDesign name="tagso" size={22} color={theme.primary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.postButton,
-              {
-                backgroundColor:
-                  !title.trim() || !content.trim() || submitting
-                    ? theme.primary + "50"
-                    : theme.primary,
-              },
-            ]}
-            onPress={handleSubmitPost}
-            disabled={!title.trim() || !content.trim() || submitting}
-          >
-            {submitting ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="send" size={18} color="#fff" />
-                <Text style={styles.postButtonText}>Post</Text>
-              </>
-            )}
-          </TouchableOpacity>
         </View>
+
+        {showPreview ? <PreviewPost /> : <PostForm />}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -630,8 +911,25 @@ const styles = StyleSheet.create({
     minHeight: 120,
     paddingVertical: 8,
   },
+  sectionTitleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  sectionSubtitle: {
+    fontSize: 12,
+    fontStyle: "italic",
+  },
   imagePreviewContainer: {
     marginVertical: 16,
+  },
+  imagePreviewListContainer: {
+    paddingRight: 16,
   },
   imagePreview: {
     width: 100,
@@ -639,6 +937,15 @@ const styles = StyleSheet.create({
     marginRight: 8,
     borderRadius: 8,
     position: "relative",
+    overflow: "hidden",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
   },
   previewImage: {
     width: "100%",
@@ -654,6 +961,14 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
+  },
+  dragHandle: {
+    position: "absolute",
+    bottom: 4,
+    right: 4,
+    padding: 2,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    borderRadius: 12,
   },
   tagsContainer: {
     marginTop: 24,
@@ -697,7 +1012,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 20,
     paddingHorizontal: 12,
-    marginBottom: 16,
+    marginBottom: 8,
   },
   tagInput: {
     flex: 1,
@@ -710,6 +1025,25 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
+  },
+  tagSuggestions: {
+    borderRadius: 8,
+    marginBottom: 12,
+    overflow: "hidden",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  tagSuggestion: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#EEEEEE",
+  },
+  tagSuggestionText: {
+    fontSize: 14,
   },
   popularTagsTitle: {
     fontSize: 14,
@@ -772,5 +1106,100 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
     marginTop: 16,
+  },
+  previewContainer: {
+    flex: 1,
+  },
+  previewHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 12,
+    margin: 16,
+    marginBottom: 0,
+  },
+  previewTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  postCard: {
+    borderRadius: 12,
+    margin: 16,
+    padding: 16,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  postHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  userInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  postDate: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  postTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  postContent: {
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 16,
+  },
+  gardenInfoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  gardenInfoText: {
+    marginLeft: 8,
+    fontSize: 14,
+  },
+  publishButton: {
+    margin: 16,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  publishButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  dimensionsBadge: {
+    position: "absolute",
+    bottom: 4,
+    left: 4,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+  },
+  dimensionsText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "500",
   },
 });

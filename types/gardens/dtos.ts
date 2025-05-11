@@ -83,8 +83,9 @@ export interface GardenDisplayDto {
   lastVisitedAt?: string;
   statusColor: string;
   isSelected?: boolean;
-  daysUntilHarvest?: number;
-  growthProgress?: number;
+
+  daysUntilHarvest: number;
+  growthProgress: number;
 
   // Plant information
   plantName?: string;

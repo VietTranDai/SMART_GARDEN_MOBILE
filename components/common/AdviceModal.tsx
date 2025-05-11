@@ -17,7 +17,7 @@ import {
   FontAwesome5,
 } from "@expo/vector-icons";
 import { WeatherAdvice } from "@/types/weather/weather.types";
-import { LinearGradient } from "expo-linear-gradient";
+import Gradient from "@/components/ui/Gradient";
 import { GardenAdvice } from "@/types/gardens/garden.types";
 
 const { width } = Dimensions.get("window");
@@ -403,7 +403,7 @@ const AdviceModal = ({
           style={[styles.modalContainer, { backgroundColor: theme.background }]}
         >
           {/* Header with gradient */}
-          <LinearGradient
+          <Gradient
             colors={[theme.primary, `${theme.primary}90`]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
@@ -425,7 +425,7 @@ const AdviceModal = ({
             >
               <Ionicons name="close" size={24} color="#fff" />
             </TouchableOpacity>
-          </LinearGradient>
+          </Gradient>
 
           {/* Content */}
           <View style={styles.modalContent}>

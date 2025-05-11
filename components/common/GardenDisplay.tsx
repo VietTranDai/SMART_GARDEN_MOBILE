@@ -747,7 +747,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   gardenCard: {
-    width: 300,
+    width: 325,
     height: 580,
     borderRadius: 16,
     overflow: "hidden",

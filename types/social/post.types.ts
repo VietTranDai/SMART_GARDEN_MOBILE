@@ -3,7 +3,6 @@
  */
 
 import { Garden } from "../gardens";
-import { User } from "../users";
 
 // Mục tiêu bình chọn (up/down) áp dụng cho cả bài viết và bình luận
 export enum VoteTargetType {
@@ -11,18 +10,26 @@ export enum VoteTargetType {
   COMMENT = "COMMENT",
 }
 
+// Thông tin người dùng trong cộng đồng
+export interface CommunityUser {
+  id: number;
+  fullName: string;
+  username: string;
+  profilePicture?: string;
+  bio?: string;
+  levelTitle?: string;
+  levelIcon?: string;
+}
+
 // Thẻ Tag gắn vào bài viết
 export interface Tag {
   id: number;
   name: string;
-  postCount: number;
 }
 
-// Quan hệ nhiều–nhiều giữa Post và Tag
-export interface PostTag {
-  postId: number;
-  tagId: number;
-  tag: Tag;
+// Tag với số lượng bài viết
+export interface TagWithPostCount extends Tag {
+  postCount: number;
 }
 
 // Ảnh kèm theo bài viết
@@ -37,8 +44,8 @@ export interface Post {
   id: number;
 
   // Tác giả
-  userDataId: number;
-  userData: User;
+  gardenerId: number;
+  userdata: CommunityUser;
 
   // Vườn (tuỳ chọn)
   gardenId?: number;
@@ -56,16 +63,16 @@ export interface Post {
   total_vote: number;
 
   // Quan hệ
-  tags: PostTag[];
-  images: PostImage[];
+  tags?: Tag[];
+  images?: PostImage[];
   comments?: Comment[];
 
   // Vote của user hiện tại (–1, 0, +1)
   userVote?: number;
 
   // Timestamps
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // Bình luận
@@ -75,8 +82,8 @@ export interface Comment {
   // Quan hệ
   postId: number;
   parentId?: number; // trả lời bình luận khác
-  userDataId: number;
-  userData: User;
+  gardenerId: number;
+  userdata: CommunityUser;
 
   // Nội dung & điểm số
   content: string;
@@ -89,8 +96,8 @@ export interface Comment {
   userVote?: number;
 
   // Timestamps
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // Vote record
@@ -136,7 +143,7 @@ export interface VoteDto {
 export interface FollowInfo {
   followerId: number;
   followedId: number;
-  follower: User;
-  followed: User;
+  follower: CommunityUser;
+  followed: CommunityUser;
   createdAt: string;
 }

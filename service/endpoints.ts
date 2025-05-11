@@ -115,20 +115,28 @@ export const WATERING_ENDPOINTS = {
 
 // Define the base API endpoints for community features
 export const COMMUNITY_ENDPOINTS = {
-  POSTS: "/posts",
-  POST_DETAIL: (postId: string | number) => `/posts/${postId}`,
-  POST_COMMENTS: (postId: string | number) => `/posts/${postId}/comments`,
+  // Posts endpoints
+  POSTS: "/community/posts",
+  POSTS_FILTER: "/community/posts/filter",
+  POST_DETAIL: (postId: string | number) => `/community/posts/${postId}`,
+  POST_COMMENTS: (postId: string | number) =>
+    `/community/posts/${postId}/comments`,
+  POST_VOTE: (postId: string | number) => `/community/posts/${postId}/vote`,
+  POSTS_SEARCH: "/community/posts/search",
 
-  POST_VOTE: (postId: string | number) => `/vote/posts/${postId}`,
-  COMMENT_VOTE: (commentId: string | number) => `/vote/comments/${commentId}`,
+  // Comments endpoints
+  COMMENTS: "/community/comments",
+  COMMENT_DETAIL: (commentId: string | number) =>
+    `/community/comments/${commentId}`,
+  COMMENT_VOTE: (commentId: string | number) =>
+    `/community/comments/${commentId}/vote`,
 
-  COMMENT_DETAIL: (commentId: string | number) => `/comments/${commentId}`,
-  COMMENT_REPLIES: (commentId: string | number) =>
-    `/comments/${commentId}/replies`,
+  // Tags endpoints
+  TAGS: "/community/tags",
+  TAGS_POPULAR: "/community/tags/popular",
+  TAGS_SEARCH: "/community/tags/search",
 
-  TAGS: "/tags",
-
-  FOLLOW: "/follow",
+  // Follow system endpoints
   FOLLOWERS: (gardenerId: string | number) => `/follow/followers/${gardenerId}`,
   FOLLOWING: (gardenerId: string | number) => `/follow/following/${gardenerId}`,
   FOLLOW_USER: (gardenerId: string | number) => `/follow/${gardenerId}`,

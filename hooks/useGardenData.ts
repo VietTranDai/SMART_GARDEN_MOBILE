@@ -10,8 +10,7 @@ import { gardenService } from "@/service/api";
  */
 export default function useGardenData() {
   const theme = useAppTheme();
-  const { homePreferences, togglePinnedGarden, setLastVisitedGarden } =
-    usePreferences();
+  const { homePreferences, setLastVisitedGarden } = usePreferences();
 
   // State for gardens
   const [gardens, setGardens] = useState<GardenDisplayDto[]>([]);
@@ -52,11 +51,6 @@ export default function useGardenData() {
           const statusColor =
             garden && garden.status === "ACTIVE" ? theme.success : theme.error;
 
-          // Calculate growth stats - add null check
-          const { daysUntilHarvest, growthProgress } = garden
-            ? gardenService.calculateGardenStatistics(garden)
-            : { daysUntilHarvest: 0, growthProgress: 0 };
-
           // Create display version with UI properties
           return {
             ...garden,
@@ -66,8 +60,6 @@ export default function useGardenData() {
             isPinned,
             lastVisitedAt,
             statusColor,
-            daysUntilHarvest,
-            growthProgress,
           };
         } catch (itemError) {
           console.error("Error processing garden item:", garden, itemError);
