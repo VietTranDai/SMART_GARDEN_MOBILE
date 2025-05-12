@@ -37,7 +37,7 @@ interface GardenSensorSectionProps {
 }
 
 /**
- * Enhanced Garden Sensor Section Component with loading states and refresh capability
+ * Garden Sensor Section Component with loading states and refresh capability
  */
 const GardenSensorSection: React.FC<GardenSensorSectionProps> = ({
   sensors,
@@ -52,7 +52,7 @@ const GardenSensorSection: React.FC<GardenSensorSectionProps> = ({
   const theme = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  // Loading state with ActivityIndicator instead of skeleton
+  // Loading state
   if (isSensorDataLoading && sensors.length === 0) {
     return (
       <View style={styles.container}>
@@ -74,7 +74,7 @@ const GardenSensorSection: React.FC<GardenSensorSectionProps> = ({
     );
   }
 
-  // Error state with retry option
+  // Error state
   if (sensorDataError && sensors.length === 0) {
     return (
       <View style={styles.container}>
@@ -115,9 +115,9 @@ const GardenSensorSection: React.FC<GardenSensorSectionProps> = ({
     );
   }
 
+  // Normal state with data
   return (
     <View style={styles.container}>
-      {/* Pass the refresh capabilities to SensorDetailView */}
       <SensorDetailView
         sensors={sensors}
         onSelectSensor={onSelectSensor}
@@ -126,7 +126,6 @@ const GardenSensorSection: React.FC<GardenSensorSectionProps> = ({
         onRefresh={onRefreshSensors}
       />
 
-      {/* Last update info */}
       {lastSensorUpdate && (
         <View style={styles.lastUpdateContainer}>
           <View style={styles.updateInfoContainer}>

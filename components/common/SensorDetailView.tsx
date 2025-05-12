@@ -11,18 +11,14 @@ import {
   Dimensions,
 } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import EnhancedSensorCard from "@/components/garden/EnhancedSensorCard";
-import { SensorType, SensorUnit } from "@/types/gardens/sensor.types";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { LineChart } from "react-native-chart-kit";
 import { LinearGradient } from "expo-linear-gradient";
+import { SensorType, SensorUnit } from "@/types/gardens/sensor.types";
 import { UISensor } from "@/components/garden/GardenSensorSection";
 
 // Get screen width for responsive grid
 const screenWidth = Dimensions.get("window").width;
-
-// Memorized version of EnhancedSensorCard for performance
-const EnhancedSensorCardMemo = React.memo(EnhancedSensorCard);
 
 interface SensorDetailViewProps {
   sensors: UISensor[];
@@ -32,7 +28,7 @@ interface SensorDetailViewProps {
   onRefresh?: () => void;
 }
 
-// Separate component for sensor items to properly use hooks
+// Separate component for sensor items
 const SensorItem = React.memo(
   ({
     item,
@@ -75,20 +71,12 @@ const SensorItem = React.memo(
           ? theme.warning
           : theme.success;
 
-    // Gradient colors based on status
-    const gradientColors =
-      status === "critical"
-        ? [theme.errorLight || "rgba(255,59,48,0.05)", "transparent"]
-        : status === "warning"
-          ? [theme.warningLight || "rgba(255,204,0,0.05)", "transparent"]
-          : [theme.successLight || "rgba(52,199,89,0.05)", "transparent"];
-
-    // Animation with a slight delay based on index for staggered effect
+    // Animation refs
     const opacityAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.92)).current;
     const pressedAnim = useRef(new Animated.Value(1)).current;
 
-    // Setup improved press animations
+    // Press animations
     const handlePressIn = () => {
       Animated.spring(pressedAnim, {
         toValue: 0.96,
@@ -108,9 +96,9 @@ const SensorItem = React.memo(
     };
 
     useEffect(() => {
-      // Start animations with staggered delay
+      // Staggered animation on mount
       Animated.sequence([
-        Animated.delay(index * 50), // Faster delay for better UX
+        Animated.delay(index * 50),
         Animated.parallel([
           Animated.timing(opacityAnim, {
             toValue: 1,
@@ -149,7 +137,7 @@ const SensorItem = React.memo(
       }
     };
 
-    // Get card background color based on sensor type (lighter than header but still themed)
+    // Get card background color
     const getCardBgColor = (type: SensorType): string => {
       switch (type) {
         case SensorType.TEMPERATURE:
@@ -179,7 +167,7 @@ const SensorItem = React.memo(
           ? `rgba(255,204,0,0.3)`
           : `rgba(52,199,89,0.2)`;
 
-    // Prepare data for sparkline chart
+    // Chart configuration
     const chartData = {
       labels: [],
       datasets: [
@@ -187,7 +175,7 @@ const SensorItem = React.memo(
           data:
             item.recentValues && item.recentValues.length > 1
               ? item.recentValues.map((rv) => rv.value)
-              : [0, 0], // Default dummy data if no values
+              : [0, 0],
           color: () => statusColor,
           strokeWidth: 2,
         },
@@ -208,26 +196,22 @@ const SensorItem = React.memo(
       },
     };
 
-    // Format value based on sensor type for better display
+    // Format value based on sensor type
     const formatSensorValue = (value: number, type: SensorType): string => {
       if (typeof value !== "number") return "0";
 
-      // Add specific formatting for different sensor types
       switch (type) {
         case SensorType.SOIL_PH:
-          // pH values usually have 1 decimal place
           return value.toFixed(1);
         case SensorType.HUMIDITY:
         case SensorType.SOIL_MOISTURE:
-          // Moisture/humidity as whole numbers
           return Math.round(value).toString();
         default:
-          // Default formatting: show decimals only if present
           return value % 1 === 0 ? value.toString() : value.toFixed(1);
       }
     };
 
-    // Format unit display for better visual
+    // Format unit display
     const formatUnitDisplay = (unit: SensorUnit): string => {
       switch (unit) {
         case SensorUnit.PERCENT:
@@ -269,7 +253,7 @@ const SensorItem = React.memo(
             styles.cardWrapper,
             {
               borderColor: statusBorderColor,
-              backgroundColor: theme.card, // Base card color
+              backgroundColor: theme.card,
             },
           ]}
         >
@@ -277,7 +261,6 @@ const SensorItem = React.memo(
             colors={[getCardBgColor(item.type), "transparent"]}
             style={styles.cardGradient}
           >
-            {/* Enhanced card header with icon and type-based color */}
             <View
               style={[
                 styles.cardHeader,
@@ -298,7 +281,6 @@ const SensorItem = React.memo(
                 {displayName}
               </Text>
 
-              {/* Improved status badge with icon */}
               <View
                 style={[
                   styles.statusBadge,
@@ -327,7 +309,6 @@ const SensorItem = React.memo(
               </View>
             </View>
 
-            {/* Sensor value display with large text */}
             <View style={styles.valueContainer}>
               <Text
                 style={styles.valueText}
@@ -341,7 +322,6 @@ const SensorItem = React.memo(
               </Text>
             </View>
 
-            {/* Sparkline chart for trend visualization */}
             {item.recentValues && item.recentValues.length > 1 && (
               <View style={styles.sparklineContainer}>
                 <LineChart
@@ -359,7 +339,6 @@ const SensorItem = React.memo(
               </View>
             )}
 
-            {/* Status and time indicator */}
             <View style={styles.infoContainer}>
               <View style={styles.timeContainer}>
                 <MaterialCommunityIcons
@@ -400,9 +379,7 @@ export default function SensorDetailView({
   const theme = useAppTheme();
   const styles = createStyles(theme);
 
-  /**
-   * Get display name for sensor type
-   */
+  // Get display name for sensor type
   const getSensorName = (type: string): string => {
     switch (type) {
       case SensorType.TEMPERATURE:
@@ -424,9 +401,7 @@ export default function SensorDetailView({
     }
   };
 
-  /**
-   * Get icon name for sensor type (compatible with MaterialCommunityIcons)
-   */
+  // Get icon name for sensor type
   const getSensorIcon = (type: SensorType): string => {
     switch (type) {
       case SensorType.TEMPERATURE:
@@ -448,9 +423,7 @@ export default function SensorDetailView({
     }
   };
 
-  /**
-   * Determine sensor status based on value and type
-   */
+  // Determine sensor status based on value and type
   const getSensorStatus = (
     value: number,
     type: string
@@ -469,7 +442,6 @@ export default function SensorDetailView({
         if (value < 30) return "warning";
         return "normal";
       case SensorType.LIGHT:
-        // Implement light threshold logic
         return "normal";
       case SensorType.SOIL_PH:
         if (value < 4.5 || value > 8.5) return "critical";
@@ -480,16 +452,13 @@ export default function SensorDetailView({
     }
   };
 
-  /**
-   * Format timestamp to display in a friendly way
-   */
+  // Format timestamp to display in a friendly way
   const formatTimeAgo = (timestamp?: string): string => {
     if (!timestamp) return "Chưa cập nhật";
 
     const date = new Date(timestamp);
     if (isNaN(date.getTime())) return "Định dạng không hợp lệ";
 
-    // Simple relative time formatting (can be replaced with date-fns if available)
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
@@ -504,25 +473,16 @@ export default function SensorDetailView({
     }
   };
 
-  /**
-   * Get display label for a sensor
-   * Combines name (if available) with location or identifier
-   */
+  // Get display label for a sensor
   const getSensorDisplayName = (sensor: UISensor): string => {
-    // Use custom name if available, otherwise use type name
     const baseName = sensor.name || getSensorName(sensor.type);
-
-    // Add identifier if sensor doesn't have a custom name
     if (!sensor.name) {
       return `${baseName} #${sensor.id}`;
     }
-
     return baseName;
   };
 
-  /**
-   * Render empty state when no sensors available
-   */
+  // Render empty state
   if (!sensors || sensors.length === 0) {
     return (
       <View style={[styles.emptyContainer, { backgroundColor: theme.card }]}>
@@ -580,7 +540,6 @@ export default function SensorDetailView({
           />
         )}
         keyExtractor={(item, index) => {
-          // Ensure unique key even if id is undefined
           return item.id !== undefined && item.id !== null
             ? String(item.id)
             : `sensor-${index}`;
@@ -617,7 +576,7 @@ export default function SensorDetailView({
 const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
-      marginVertical: 10, // Reduced vertical margin for more compact layout
+      marginVertical: 10,
     },
     headerContainer: {
       flexDirection: "row",
@@ -639,21 +598,21 @@ const createStyles = (theme: any) =>
       transform: [{ rotate: "45deg" }],
     },
     gridContent: {
-      paddingHorizontal: 12, // Reduced padding for better card fit
+      paddingHorizontal: 12,
       paddingBottom: 12,
       paddingTop: 4,
     },
     columnWrapper: {
       justifyContent: "space-between",
-      marginBottom: 8, // Consistent spacing between rows
+      marginBottom: 8,
     },
     cardContainer: {
-      width: (screenWidth - 36) / 2, // Adjusted for better spacing
-      height: 180, // Reduced height for more compact cards
-      marginBottom: 8, // Consistent margin between rows
+      width: (screenWidth - 36) / 2,
+      height: 180,
+      marginBottom: 8,
     },
     cardWrapper: {
-      borderRadius: 14, // Slightly reduced border radius
+      borderRadius: 14,
       backgroundColor: theme.card,
       overflow: "hidden",
       borderWidth: 1,
@@ -671,7 +630,7 @@ const createStyles = (theme: any) =>
       }),
     },
     cardGradient: {
-      borderRadius: 16,
+      borderRadius: 14,
       overflow: "hidden",
       height: "100%",
       display: "flex",
@@ -688,7 +647,7 @@ const createStyles = (theme: any) =>
     },
     sensorName: {
       flex: 1,
-      fontSize: 12, // Smaller font size for better fit
+      fontSize: 12,
       fontFamily: "Inter-Medium",
       color: theme.text,
     },
@@ -701,18 +660,18 @@ const createStyles = (theme: any) =>
       alignItems: "center",
     },
     statusBadgeText: {
-      fontSize: 8, // Smaller for better fit
+      fontSize: 8,
       fontFamily: "Inter-SemiBold",
     },
     valueContainer: {
       alignItems: "center",
       justifyContent: "center",
-      flex: 1, // Take available space
+      flex: 1,
       paddingVertical: 6,
       paddingHorizontal: 6,
     },
     valueText: {
-      fontSize: 36, // Larger for emphasis
+      fontSize: 36,
       fontFamily: "Inter-Bold",
       color: theme.text,
       textAlign: "center",
@@ -736,14 +695,14 @@ const createStyles = (theme: any) =>
       paddingVertical: 8,
       borderTopWidth: 1,
       borderTopColor: theme.borderLight || "rgba(0,0,0,0.05)",
-      marginTop: "auto", // Push to bottom
+      marginTop: "auto",
     },
     timeContainer: {
       flexDirection: "row",
       alignItems: "center",
     },
     timeText: {
-      fontSize: 10, // Smaller for better fit
+      fontSize: 10,
       fontFamily: "Inter-Regular",
       color: theme.textSecondary,
       marginLeft: 4,
