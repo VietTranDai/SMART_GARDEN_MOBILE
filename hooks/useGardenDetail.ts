@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useInterval } from "./useInterval";
 import { Alert, Garden, GardenActivity, WateringSchedule } from "@/types";
-import { Sensor } from "@/components/common/SensorDetailView";
+import { UISensor } from "@/components/garden/GardenSensorSection";
 import {
   HourlyForecast,
   WeatherObservation,
@@ -28,8 +28,8 @@ interface GardenDetailState {
   alerts: Alert[];
   wateringSchedule: WateringSchedule[];
   activities: GardenActivity[];
-  sensors: Sensor[];
-  previousSensorData: Sensor[];
+  sensors: UISensor[];
+  previousSensorData: UISensor[];
   isLoading: boolean;
   isRefreshing: boolean;
   isSensorDataLoading: boolean;
@@ -184,7 +184,7 @@ export function useGardenDetail({ gardenId }: UseGardenDetailProps) {
   /**
    * Validate and process sensor data to ensure it's safe for display
    */
-  const validateSensorData = useCallback((sensorData: any[]): Sensor[] => {
+  const validateSensorData = useCallback((sensorData: any[]): UISensor[] => {
     if (!Array.isArray(sensorData)) return [];
 
     // Map API sensor data to the format required by the UI components
@@ -335,7 +335,7 @@ export function useGardenDetail({ gardenId }: UseGardenDetailProps) {
    * Determine if a sensor value has increased or decreased
    */
   const getSensorTrend = useCallback(
-    (currentSensor: Sensor): "up" | "down" | "stable" | null => {
+    (currentSensor: UISensor): "up" | "down" | "stable" | null => {
       if (!state.previousSensorData || state.previousSensorData.length === 0)
         return null;
 

@@ -8,16 +8,30 @@ import {
   Platform,
 } from "react-native";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import SensorDetailView, { Sensor } from "@/components/common/SensorDetailView";
+import SensorDetailView from "@/components/common/SensorDetailView";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { LinearGradient } from "expo-linear-gradient";
+import { SensorType, SensorUnit } from "@/types/gardens/sensor.types";
+
+// Define the interface for UI display of sensors
+export interface UISensor {
+  id: number;
+  type: SensorType;
+  name?: string;
+  value: number;
+  unit: SensorUnit;
+  lastUpdated?: string;
+  lastReadingAt?: string;
+  recentValues?: { timestamp: string; value: number }[];
+}
 
 interface GardenSensorSectionProps {
-  sensors: Sensor[];
+  sensors: UISensor[];
   isSensorDataLoading: boolean;
   sensorDataError: string | null;
   lastSensorUpdate: Date | null;
   getTimeSinceUpdate: () => string;
-  onSelectSensor: (sensor: Sensor) => void;
+  onSelectSensor: (sensor: UISensor) => void;
   onRefreshSensors: () => void;
   title?: string;
 }
@@ -38,15 +52,23 @@ const GardenSensorSection: React.FC<GardenSensorSectionProps> = ({
   const theme = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  // Loading state with skeleton effect
+  // Loading state with ActivityIndicator instead of skeleton
   if (isSensorDataLoading && sensors.length === 0) {
     return (
       <View style={styles.container}>
-        <View style={styles.sensorLoadingContainer}>
-          <ActivityIndicator size="large" color={theme.primary} />
-          <Text style={[styles.loadingText, { marginTop: 12 }]}>
-            Đang tải dữ liệu cảm biến...
+        <View style={styles.headerContainer}>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>
+            {title}
           </Text>
+        </View>
+
+        <View style={styles.sensorLoadingContainer}>
+          <ActivityIndicator
+            size="large"
+            color={theme.primary}
+            style={styles.loadingIndicator}
+          />
+          <Text style={styles.loadingText}>Đang tải dữ liệu cảm biến...</Text>
         </View>
       </View>
     );
@@ -57,26 +79,37 @@ const GardenSensorSection: React.FC<GardenSensorSectionProps> = ({
     return (
       <View style={styles.container}>
         <View style={styles.sensorErrorContainer}>
-          <MaterialCommunityIcons
-            name="alert-circle-outline"
-            size={40}
-            color={theme.error}
-          />
-          <Text style={[styles.errorText, { marginTop: 12 }]}>
-            {sensorDataError}
-          </Text>
-          <Text style={styles.errorHelpText}>
-            Không thể tải dữ liệu cảm biến. Vui lòng kiểm tra kết nối mạng.
-          </Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={onRefreshSensors}
-            accessible={true}
-            accessibilityLabel="Thử lại tải dữ liệu cảm biến"
-            accessibilityRole="button"
+          <LinearGradient
+            colors={[`${theme.error}10`, "transparent"]}
+            style={styles.errorGradient}
           >
-            <Text style={styles.retryButtonText}>Thử lại</Text>
-          </TouchableOpacity>
+            <MaterialCommunityIcons
+              name="alert-circle-outline"
+              size={48}
+              color={theme.error}
+            />
+            <Text style={[styles.errorText, styles.errorTextMargin]}>
+              {sensorDataError}
+            </Text>
+            <Text style={styles.errorHelpText}>
+              Không thể tải dữ liệu cảm biến. Vui lòng kiểm tra kết nối mạng.
+            </Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={onRefreshSensors}
+              accessible={true}
+              accessibilityLabel="Thử lại tải dữ liệu cảm biến"
+              accessibilityRole="button"
+            >
+              <Text style={styles.retryButtonText}>Thử lại</Text>
+              <Feather
+                name="refresh-cw"
+                size={16}
+                color="white"
+                style={styles.retryIcon}
+              />
+            </TouchableOpacity>
+          </LinearGradient>
         </View>
       </View>
     );
@@ -117,17 +150,29 @@ const GardenSensorSection: React.FC<GardenSensorSectionProps> = ({
 const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
-      marginVertical: 12,
-      paddingBottom: 8,
+      marginVertical: 8,
+      paddingBottom: 4,
+    },
+    headerContainer: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8,
+      marginHorizontal: 16,
+      height: 28,
+    },
+    headerTitle: {
+      fontSize: 16,
+      fontFamily: "Inter-SemiBold",
     },
     sensorLoadingContainer: {
-      padding: 30,
+      padding: 24,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: theme.card,
       borderRadius: 16,
       marginHorizontal: 16,
-      marginVertical: 10,
+      marginVertical: 8,
       borderWidth: 1,
       borderColor: theme.borderLight || "rgba(0,0,0,0.05)",
       ...Platform.select({
@@ -142,18 +187,25 @@ const createStyles = (theme: any) =>
         },
       }),
     },
+    loadingIndicator: {
+      marginBottom: 12,
+    },
     sensorErrorContainer: {
-      padding: 24,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: theme.cardAlt,
       borderRadius: 16,
       marginHorizontal: 16,
-      marginVertical: 10,
+      marginVertical: 8,
       borderWidth: 1,
-      borderColor:
-        `rgba(${theme.error.replace(/[^\d,]/g, "")},0.2)` ||
-        "rgba(255,59,48,0.2)",
+      borderColor: `${theme.error}20`,
+      overflow: "hidden",
+    },
+    errorGradient: {
+      width: "100%",
+      padding: 24,
+      alignItems: "center",
+      justifyContent: "center",
     },
     loadingText: {
       color: theme.textSecondary,
@@ -167,6 +219,9 @@ const createStyles = (theme: any) =>
       fontFamily: "Inter-SemiBold",
       textAlign: "center",
     },
+    errorTextMargin: {
+      marginTop: 16,
+    },
     errorHelpText: {
       color: theme.textSecondary,
       fontSize: 14,
@@ -177,33 +232,40 @@ const createStyles = (theme: any) =>
       paddingHorizontal: 20,
     },
     retryButton: {
-      marginTop: 8,
+      marginTop: 12,
       paddingHorizontal: 24,
-      paddingVertical: 10,
+      paddingVertical: 12,
       backgroundColor: theme.primary,
-      borderRadius: 10,
+      borderRadius: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
     },
     retryButtonText: {
       color: "#fff",
       fontSize: 15,
       fontFamily: "Inter-SemiBold",
     },
+    retryIcon: {
+      marginLeft: 8,
+    },
     lastUpdateContainer: {
       alignItems: "center",
       justifyContent: "center",
-      marginTop: 4,
+      marginTop: 0,
+      marginBottom: 8,
       marginHorizontal: 16,
     },
     updateInfoContainer: {
       flexDirection: "row",
       alignItems: "center",
-      padding: 8,
-      borderRadius: 20,
+      padding: 6,
+      borderRadius: 16,
       backgroundColor: theme.backgroundSecondary || "rgba(0,0,0,0.03)",
     },
     lastUpdateText: {
       marginLeft: 6,
-      fontSize: 13,
+      fontSize: 12,
       color: theme.textSecondary,
       fontFamily: "Inter-Regular",
     },

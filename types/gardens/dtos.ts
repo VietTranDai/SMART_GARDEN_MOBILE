@@ -87,6 +87,8 @@ export interface GardenDisplayDto {
   daysUntilHarvest: number;
   growthProgress: number;
 
+  lastWatered?: string;
+
   // Plant information
   plantName?: string;
   plantGrowStage?: string;

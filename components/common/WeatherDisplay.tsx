@@ -8,7 +8,6 @@ import {
   ScrollView,
 } from "react-native";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
-import Gradient from "@/components/ui/Gradient";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import {
   WeatherObservation,
@@ -17,7 +16,7 @@ import {
   WeatherDisplayProps,
 } from "@/types/weather/weather.types";
 import { weatherService } from "@/service/api";
-
+import { LinearGradient } from "expo-linear-gradient";
 /**
  * A component to display current weather and forecast information
  */
@@ -104,7 +103,7 @@ const WeatherDisplay = memo(
 
     return (
       <View style={styles.container}>
-        <Gradient
+        <LinearGradient
           colors={[gradientStart, gradientEnd]}
           style={styles.cardContent}
           start={{ x: 0, y: 0 }}
@@ -219,7 +218,7 @@ const WeatherDisplay = memo(
               <Text style={styles.tipText}>{tip}</Text>
             </View>
           )}
-        </Gradient>
+        </LinearGradient>
       </View>
     );
   }

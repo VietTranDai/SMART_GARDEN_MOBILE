@@ -31,7 +31,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { GardenStatus, GardenType } from "@/types";
 import { Garden } from "@/types/gardens/garden.types";
 import env from "@/config/environment";
-import FastImage from "react-native-fast-image";
+import { Image } from "expo-image";
 import SkeletonPlaceholder from "@/components/ui/SkeletonPlaceholder";
 import useHomeData from "@/hooks/useHomeData";
 import { gardenService } from "@/service/api";
@@ -111,18 +111,17 @@ const GardenItem = React.memo(
           accessibilityHint={`Nhấn để xem chi tiết về khu vườn ${item.name}`}
         >
           <View style={styles.imageThumbnailContainer}>
-            <FastImage
+            <Image
               source={{
                 uri: item.profilePicture
                   ? `${env.apiUrl}${item.profilePicture}`
                   : gardenService.getDefaultGardenImage(item.type).uri,
-                priority: FastImage.priority.normal,
               }}
               style={styles.gardenThumbnail}
-              resizeMode={FastImage.resizeMode.cover}
-              onLoadStart={() => {}}
-              onError={() => {}}
-              accessibilityIgnoresInvertColors={true}
+              contentFit="cover"
+              priority="normal"
+              placeholder={require("@/assets/images/garden-placeholder.png")}
+              transition={300}
             />
             <GradientOverlay style={styles.imageGradient} />
           </View>

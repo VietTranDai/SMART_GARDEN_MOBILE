@@ -20,7 +20,6 @@ import {
   Ionicons,
 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import Gradient from "@/components/ui/Gradient";
 import { Image } from "expo-image";
 
 // Import custom components
@@ -28,7 +27,9 @@ import WeatherDisplay from "@/components/common/WeatherDisplay";
 import GardenStatusCard from "@/components/common/GardenStatusCard";
 import AlertsList from "@/components/common/AlertsList";
 import AdviceModal from "@/components/common/AdviceModal";
-import GardenSensorSection from "@/components/garden/GardenSensorSection";
+import GardenSensorSection, {
+  UISensor,
+} from "@/components/garden/GardenSensorSection";
 import ActivityList from "@/components/garden/ActivityList";
 import env from "@/config/environment";
 
@@ -39,16 +40,9 @@ import { useGardenDetail } from "@/hooks/useGardenDetail";
 import alertService from "@/service/api/alert.service";
 import { apiClient } from "@/service";
 
-import {
-  Alert,
-  AlertStatus,
-  Garden,
-  GardenStatus,
-  TaskStatus,
-  WateringSchedule,
-} from "@/types";
+import { AlertStatus, Garden, GardenStatus, TaskStatus } from "@/types";
 import Toast from "react-native-toast-message";
-import { getSensorStatus } from "@/hooks/useSensorData";
+import { LinearGradient } from "expo-linear-gradient";
 
 enum DetailSectionType {
   STATUS = "STATUS",
@@ -575,7 +569,7 @@ export default function GardenDetailScreen() {
               style={styles.headerImage}
             />
           )}
-          <Gradient
+          <LinearGradient
             style={styles.headerGradient}
             colors={["rgba(0,0,0,0.5)", "transparent"]}
             start={{ x: 0, y: 0 }}
