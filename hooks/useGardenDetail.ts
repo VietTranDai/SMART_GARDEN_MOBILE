@@ -7,6 +7,11 @@ import {
   WeatherObservation,
   DailyForecast,
 } from "@/types/weather/weather.types";
+import {
+  GardenPlantDetails,
+  GardenPhoto,
+  SensorHistory,
+} from "@/types/gardens/garden.types";
 
 // Import services
 import gardenService from "@/service/api/garden.service";
@@ -15,6 +20,7 @@ import sensorService from "@/service/api/sensor.service";
 import activityService from "@/service/api/activity.service";
 import alertService from "@/service/api/alert.service";
 import wateringScheduleService from "@/service/api/watering.service";
+import taskService from "@/service/api/task.service";
 
 interface UseGardenDetailProps {
   gardenId: string | null;
@@ -30,6 +36,10 @@ interface GardenDetailState {
   activities: GardenActivity[];
   sensors: UISensor[];
   previousSensorData: UISensor[];
+  plantDetails: GardenPlantDetails | null;
+  gardenPhotos: GardenPhoto[];
+  sensorHistory: Record<string, SensorHistory>;
+  tasks: any[];
   isLoading: boolean;
   isRefreshing: boolean;
   isSensorDataLoading: boolean;
@@ -55,6 +65,10 @@ export function useGardenDetail({ gardenId }: UseGardenDetailProps) {
     activities: [],
     sensors: [],
     previousSensorData: [],
+    plantDetails: null,
+    gardenPhotos: [],
+    sensorHistory: {},
+    tasks: [],
     isLoading: true,
     isRefreshing: false,
     isSensorDataLoading: false,
@@ -78,85 +92,135 @@ export function useGardenDetail({ gardenId }: UseGardenDetailProps) {
   /**
    * Load all garden data from API
    */
-  const loadGardenData = useCallback(async (id: string) => {
-    if (!id) return;
+  const loadGardenData = useCallback(
+    async (id: string) => {
+      if (!id) return;
 
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
+      setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-    try {
-      // Load garden details
-      const gardenData = await gardenService.getGardenById(id);
-      if (!gardenData) {
-        throw new Error("Không thể tải dữ liệu vườn.");
-      }
-
-      setState((prev) => ({ ...prev, garden: gardenData }));
-
-      // Load weather data with better error handling
       try {
-        const weatherData = await weatherService.getCurrentWeather(id);
-        setState((prev) => ({ ...prev, currentWeather: weatherData }));
-      } catch (error) {
-        console.error("Failed to load weather data:", error);
-      }
+        // Load garden details
+        const gardenData = await gardenService.getGardenById(id);
+        if (!gardenData) {
+          throw new Error("Không thể tải dữ liệu vườn.");
+        }
 
-      // Load hourly forecast
-      try {
-        const hourlyData = await weatherService.getHourlyForecast(id);
-        setState((prev) => ({ ...prev, hourlyForecast: hourlyData || [] }));
-      } catch (error) {
-        console.error("Failed to load hourly forecast:", error);
-      }
+        setState((prev) => ({ ...prev, garden: gardenData }));
 
-      // Load daily forecast
-      try {
-        const dailyData = await weatherService.getDailyForecast(id);
-        setState((prev) => ({ ...prev, dailyForecast: dailyData || [] }));
-      } catch (error) {
-        console.error("Failed to load daily forecast:", error);
-      }
+        // Create an array of promises to fetch data in parallel
+        const dataPromises = [
+          // Load plant details if the garden has a plant
+          gardenData.plantName
+            ? gardenService.getGardenPlantDetails(id).catch((error) => {
+                console.error("Failed to load plant details:", error);
+                return null;
+              })
+            : Promise.resolve(null),
 
-      // Load sensors
-      await refreshSensorData(id);
+          // Load garden photos
+          gardenService.getGardenPhotos(id).catch((error) => {
+            console.error("Failed to load garden photos:", error);
+            return [];
+          }),
 
-      // Load alerts
-      try {
-        const alertData = await alertService.getAlertsByGarden(id);
-        setState((prev) => ({ ...prev, alerts: alertData || [] }));
-      } catch (error) {
-        console.error("Failed to load alerts:", error);
-      }
+          // Load sensor history
+          gardenService.getGardenSensorHistory(id, 7).catch((error) => {
+            console.error("Failed to load sensor history:", error);
+            return {};
+          }),
 
-      // Load watering schedule
-      try {
-        const response =
-          await wateringScheduleService.getGardenWateringSchedules(id);
-        setState((prev) => ({ ...prev, wateringSchedule: response || [] }));
-      } catch (error) {
-        console.error("Failed to load watering schedule:", error);
-      }
+          // Load tasks
+          taskService.getTasksByGarden(id).catch((error) => {
+            console.error("Failed to load tasks:", error);
+            return [];
+          }),
 
-      // Load activities
-      try {
-        const response = await activityService.getActivitiesByGarden(id);
-        setState((prev) => ({ ...prev, activities: response || [] }));
+          // Load weather data
+          weatherService.getCurrentWeather(id).catch((error) => {
+            console.error("Failed to load weather data:", error);
+            return null;
+          }),
+
+          // Load hourly forecast
+          weatherService.getHourlyForecast(id).catch((error) => {
+            console.error("Failed to load hourly forecast:", error);
+            return [];
+          }),
+
+          // Load daily forecast
+          weatherService.getDailyForecast(id).catch((error) => {
+            console.error("Failed to load daily forecast:", error);
+            return [];
+          }),
+
+          // Load alerts
+          alertService.getAlertsByGarden(id).catch((error) => {
+            console.error("Failed to load alerts:", error);
+            return [];
+          }),
+
+          // Load watering schedule
+          wateringScheduleService
+            .getGardenWateringSchedules(id)
+            .catch((error) => {
+              console.error("Failed to load watering schedule:", error);
+              return [];
+            }),
+
+          // Load activities
+          activityService.getActivitiesByGarden(id).catch((error) => {
+            console.error("Failed to load activities:", error);
+            return [];
+          }),
+        ];
+
+        // Wait for all promises to resolve
+        const [
+          plantDetails,
+          photos,
+          sensorHistory,
+          tasks,
+          weatherData,
+          hourlyData,
+          dailyData,
+          alertData,
+          wateringData,
+          activities,
+        ] = await Promise.all(dataPromises);
+
+        // Update state with all data
+        setState((prev) => ({
+          ...prev,
+          plantDetails,
+          gardenPhotos: photos || [],
+          sensorHistory: sensorHistory || {},
+          tasks: tasks || [],
+          currentWeather: weatherData,
+          hourlyForecast: hourlyData || [],
+          dailyForecast: dailyData || [],
+          alerts: alertData || [],
+          wateringSchedule: wateringData || [],
+          activities: activities || [],
+        }));
+
+        // Load sensors (can't be parallelized due to state dependencies)
+        await refreshSensorData(id);
       } catch (error) {
-        console.error("Failed to load activities:", error);
+        console.error("Failed to load garden data:", error);
+        setState((prev) => ({
+          ...prev,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Không thể tải dữ liệu vườn. Vui lòng thử lại sau.",
+          garden: null,
+        }));
+      } finally {
+        setState((prev) => ({ ...prev, isLoading: false }));
       }
-    } catch (error) {
-      console.error("Failed to load garden data:", error);
-      setState((prev) => ({
-        ...prev,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Không thể tải dữ liệu vườn. Vui lòng thử lại sau.",
-        garden: null,
-      }));
-    } finally {
-      setState((prev) => ({ ...prev, isLoading: false }));
-    }
-  }, []);
+    },
+    [refreshSensorData]
+  );
 
   /**
    * Handle refresh operation

@@ -32,6 +32,11 @@ export const GARDEN_ENDPOINTS = {
   UPDATE: (gardenId: string | number) => `/gardens/me/${gardenId}`,
   DELETE: (gardenId: string | number) => `/gardens/me/${gardenId}`,
   ADVICE: (gardenId: string | number) => `/gardens/me/${gardenId}/advice`,
+  PLANT_DETAILS: (gardenId: string | number) =>
+    `/gardens/me/${gardenId}/plant-details`,
+  PHOTOS: (gardenId: string | number) => `/gardens/me/${gardenId}/photos`,
+  SENSOR_HISTORY: (gardenId: string | number, days: number = 7) =>
+    `/gardens/me/${gardenId}/sensor-history?days=${days}`,
 };
 
 // Plant endpoints
@@ -163,6 +168,15 @@ export const ALERT_ENDPOINTS = {
   RESOLVE_ALERT: (alertId: string | number) => `/alerts/${alertId}/resolve`,
 };
 
+// Photo evaluation endpoints
+export const PHOTO_ENDPOINTS = {
+  LIST_BY_GARDEN: (gardenId: string | number) =>
+    `/photo-evaluations/garden/${gardenId}`,
+  DETAIL: (photoId: string | number) => `/photo-evaluations/${photoId}`,
+  UPLOAD: (gardenId: string | number) =>
+    `/photo-evaluations/garden/${gardenId}/upload`,
+};
+
 // Combine all endpoints for easier imports
 export default {
   AUTH: AUTH_ENDPOINTS,
@@ -176,4 +190,5 @@ export default {
   COMMUNITY: COMMUNITY_ENDPOINTS,
   WEATHER: WEATHER_ENDPOINTS,
   ALERT: ALERT_ENDPOINTS,
+  PHOTO: PHOTO_ENDPOINTS,
 };

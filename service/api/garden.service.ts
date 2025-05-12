@@ -1,11 +1,18 @@
 import { CreateGardenDto, UpdateGardenDto, GardenDisplayDto } from "@/types";
 import apiClient from "../apiClient";
-import { GARDEN_ENDPOINTS, PLANT_ENDPOINTS } from "../endpoints";
+import {
+  GARDEN_ENDPOINTS,
+  PLANT_ENDPOINTS,
+  PHOTO_ENDPOINTS,
+} from "../endpoints";
 import {
   Garden,
   GardenType,
   GardenStatus,
   GardenAdvice,
+  GardenPlantDetails,
+  GardenPhoto,
+  SensorHistory,
 } from "@/types/gardens/garden.types";
 
 /**
@@ -350,6 +357,106 @@ class GardenService {
     } catch (error) {
       console.error(`Error enriching garden with plant data:`, error);
       return garden; // Return original garden if enrichment fails
+    }
+  }
+
+  /**
+   * Get detailed plant information including growth stage data for a garden
+   * @param gardenId Garden ID to get plant details for
+   * @returns Plant details with growth stage information
+   */
+  async getGardenPlantDetails(
+    gardenId: number | string
+  ): Promise<GardenPlantDetails | null> {
+    try {
+      const response = await apiClient.get(
+        GARDEN_ENDPOINTS.PLANT_DETAILS(gardenId)
+      );
+      if (!response || !response.data) {
+        console.warn(`No plant details returned for garden ${gardenId}`);
+        return null;
+      }
+      return response.data.data || null;
+    } catch (error) {
+      console.error(
+        `Error fetching plant details for garden ${gardenId}:`,
+        error
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Get photo evaluations for a garden
+   * @param gardenId Garden ID to get photos for
+   * @returns List of photo evaluations for the garden
+   */
+  async getGardenPhotos(gardenId: number | string): Promise<GardenPhoto[]> {
+    try {
+      const response = await apiClient.get(GARDEN_ENDPOINTS.PHOTOS(gardenId));
+      if (!response || !response.data) {
+        console.warn(`No photos returned for garden ${gardenId}`);
+        return [];
+      }
+      return response.data.data || [];
+    } catch (error) {
+      console.error(`Error fetching photos for garden ${gardenId}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get historical sensor data for a garden
+   * @param gardenId Garden ID to get sensor history for
+   * @param days Number of days of history to retrieve (default: 7)
+   * @returns Historical sensor data for the garden
+   */
+  async getGardenSensorHistory(
+    gardenId: number | string,
+    days: number = 7
+  ): Promise<Record<string, SensorHistory>> {
+    try {
+      const response = await apiClient.get(
+        GARDEN_ENDPOINTS.SENSOR_HISTORY(gardenId, days)
+      );
+      if (!response || !response.data) {
+        console.warn(`No sensor history returned for garden ${gardenId}`);
+        return {};
+      }
+      return response.data.data || {};
+    } catch (error) {
+      console.error(
+        `Error fetching sensor history for garden ${gardenId}:`,
+        error
+      );
+      return {};
+    }
+  }
+
+  /**
+   * Upload a photo for a garden
+   * @param gardenId Garden ID to upload photo for
+   * @param photoData Form data with photo file
+   * @returns Uploaded photo evaluation data
+   */
+  async uploadGardenPhoto(
+    gardenId: number | string,
+    photoData: FormData
+  ): Promise<GardenPhoto | null> {
+    try {
+      const response = await apiClient.post(
+        PHOTO_ENDPOINTS.UPLOAD(gardenId),
+        photoData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      return response.data.data || null;
+    } catch (error) {
+      console.error(`Error uploading photo for garden ${gardenId}:`, error);
+      throw error;
     }
   }
 }

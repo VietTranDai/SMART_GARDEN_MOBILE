@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Platform,
   RefreshControl,
   Dimensions,
+  ScrollView,
 } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
@@ -16,9 +17,15 @@ import { LineChart } from "react-native-chart-kit";
 import { LinearGradient } from "expo-linear-gradient";
 import { SensorType, SensorUnit } from "@/types/gardens/sensor.types";
 import { UISensor } from "@/components/garden/GardenSensorSection";
+import {
+  SensorHistory,
+  SensorHistoryPoint,
+  GardenGrowthStage,
+} from "@/types/gardens/garden.types";
 
 // Get screen width for responsive grid
 const screenWidth = Dimensions.get("window").width;
+const CHART_WIDTH = screenWidth - 32;
 
 interface SensorDetailViewProps {
   sensors: UISensor[];
@@ -26,6 +33,10 @@ interface SensorDetailViewProps {
   title?: string;
   isRefreshing?: boolean;
   onRefresh?: () => void;
+  sensorHistories?: Record<string, SensorHistory>;
+  currentGrowthStage?: GardenGrowthStage;
+  isSensorDataLoading?: boolean;
+  lastSensorUpdate?: string;
 }
 
 // Separate component for sensor items
@@ -375,9 +386,22 @@ export default function SensorDetailView({
   title = "Số liệu Cảm biến",
   isRefreshing = false,
   onRefresh,
+  sensorHistories,
+  currentGrowthStage,
+  isSensorDataLoading,
+  lastSensorUpdate,
 }: SensorDetailViewProps) {
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  const [selectedSensorType, setSelectedSensorType] = useState<string | null>(
+    sensorHistories && Object.keys(sensorHistories).length > 0
+      ? Object.keys(sensorHistories)[0]
+      : null
+  );
+
+  // Use isSensorDataLoading for refresh state if provided
+  const effectiveIsRefreshing =
+    isSensorDataLoading !== undefined ? isSensorDataLoading : isRefreshing;
 
   // Get display name for sensor type
   const getSensorName = (type: string): string => {
@@ -499,6 +523,339 @@ export default function SensorDetailView({
     );
   }
 
+  // Helper functions for sensor history chart
+  const getSelectedSensorHistory = (): SensorHistory | null => {
+    if (
+      !selectedSensorType ||
+      !sensorHistories ||
+      !sensorHistories[selectedSensorType]
+    ) {
+      return null;
+    }
+    return sensorHistories[selectedSensorType];
+  };
+
+  // Get optimal range for the selected sensor type
+  const getOptimalRange = (sensorType: string): [number, number] | null => {
+    if (!currentGrowthStage) return null;
+
+    switch (sensorType) {
+      case SensorType.TEMPERATURE:
+        return [
+          currentGrowthStage.optimalTemperatureMin,
+          currentGrowthStage.optimalTemperatureMax,
+        ];
+      case SensorType.HUMIDITY:
+        return [
+          currentGrowthStage.optimalHumidityMin,
+          currentGrowthStage.optimalHumidityMax,
+        ];
+      case SensorType.SOIL_MOISTURE:
+        return [
+          currentGrowthStage.optimalSoilMoistureMin,
+          currentGrowthStage.optimalSoilMoistureMax,
+        ];
+      default:
+        return null;
+    }
+  };
+
+  // Format date for display on chart
+  const formatChartDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return `${date.getDate()}/${date.getMonth() + 1}`;
+  };
+
+  // Get color for sensor chart
+  const getSensorColor = (type: string): string => {
+    switch (type) {
+      case SensorType.TEMPERATURE:
+        return "#FF3B30";
+      case SensorType.HUMIDITY:
+        return "#007AFF";
+      case SensorType.SOIL_MOISTURE:
+        return "#34C759";
+      case SensorType.LIGHT:
+        return "#FFCC00";
+      case SensorType.RAINFALL:
+        return "#5856D6";
+      case SensorType.WATER_LEVEL:
+        return "#5AC8FA";
+      case SensorType.SOIL_PH:
+        return "#AF52DE";
+      default:
+        return "#8E8E93";
+    }
+  };
+
+  // Get unit display text
+  const getUnitDisplay = (unit: string): string => {
+    switch (unit) {
+      case SensorUnit.CELSIUS:
+        return "°C";
+      case SensorUnit.PERCENT:
+        return "%";
+      case SensorUnit.LUX:
+        return "lux";
+      case SensorUnit.MILLIMETER:
+        return "mm";
+      case SensorUnit.PH:
+        return "pH";
+      // Fix linter errors by using strings instead of enum values
+      case "METER":
+        return "m";
+      case "LITER":
+        return "L";
+      default:
+        return unit;
+    }
+  };
+
+  // Get display values for chart
+  const getChartData = () => {
+    const selectedHistory = getSelectedSensorHistory();
+    if (
+      !selectedHistory ||
+      !selectedHistory.data ||
+      selectedHistory.data.length === 0
+    ) {
+      return {
+        labels: ["", "", "", "", ""],
+        datasets: [
+          {
+            data: [0, 0, 0, 0, 0],
+            color: () => getSensorColor(selectedSensorType || ""),
+            strokeWidth: 2,
+          },
+        ],
+      };
+    }
+
+    // Sort data points by timestamp
+    const sortedData = [...selectedHistory.data].sort(
+      (a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+
+    // Get last 7 points or all if less than 7
+    const displayData = sortedData.slice(-7);
+
+    return {
+      labels: displayData.map((point) => formatChartDate(point.timestamp)),
+      datasets: [
+        {
+          data: displayData.map((point) => point.value),
+          color: () => getSensorColor(selectedSensorType || ""),
+          strokeWidth: 2,
+        },
+      ],
+    };
+  };
+
+  // Get current value and trend
+  const getCurrentValueAndTrend = (): {
+    value: number;
+    trend: "up" | "down" | "stable";
+  } => {
+    const selectedHistory = getSelectedSensorHistory();
+    if (
+      !selectedHistory ||
+      !selectedHistory.data ||
+      selectedHistory.data.length < 2
+    ) {
+      return { value: 0, trend: "stable" };
+    }
+
+    // Sort data points by timestamp
+    const sortedData = [...selectedHistory.data].sort(
+      (a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+
+    const lastValue = sortedData[sortedData.length - 1].value;
+    const previousValue = sortedData[sortedData.length - 2].value;
+
+    let trend: "up" | "down" | "stable" = "stable";
+    if (lastValue > previousValue + 0.1) {
+      trend = "up";
+    } else if (lastValue < previousValue - 0.1) {
+      trend = "down";
+    }
+
+    return { value: lastValue, trend };
+  };
+
+  // Render sensor history chart
+  const renderSensorHistoryChart = () => {
+    if (!sensorHistories || Object.keys(sensorHistories).length === 0) {
+      return null;
+    }
+
+    const selectedHistory = getSelectedSensorHistory();
+    if (!selectedHistory) return null;
+
+    const { value, trend } = getCurrentValueAndTrend();
+    const optimalRange = getOptimalRange(selectedSensorType || "");
+
+    let statusColor = theme.success;
+    let statusText = "Tối ưu";
+
+    if (optimalRange) {
+      const [min, max] = optimalRange;
+      if (value < min) {
+        statusColor = theme.warning;
+        statusText = "Thấp";
+      } else if (value > max) {
+        statusColor = theme.error;
+        statusText = "Cao";
+      }
+    }
+
+    return (
+      <View style={styles.historyChartContainer}>
+        <View style={styles.historyHeader}>
+          <Text style={styles.historyTitle}>Lịch sử cảm biến</Text>
+        </View>
+
+        {/* Sensor type selection buttons */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.sensorTypeScroll}
+          contentContainerStyle={styles.sensorTypeContainer}
+        >
+          {Object.keys(sensorHistories).map((sensorType) => (
+            <TouchableOpacity
+              key={sensorType}
+              style={[
+                styles.sensorTypeButton,
+                selectedSensorType === sensorType && {
+                  backgroundColor: `${getSensorColor(sensorType)}20`,
+                },
+              ]}
+              onPress={() => setSelectedSensorType(sensorType)}
+            >
+              <MaterialCommunityIcons
+                name={getSensorIcon(sensorType as SensorType) as any}
+                size={18}
+                color={
+                  selectedSensorType === sensorType
+                    ? getSensorColor(sensorType)
+                    : theme.textSecondary
+                }
+              />
+              <Text
+                style={[
+                  styles.sensorTypeText,
+                  selectedSensorType === sensorType
+                    ? {
+                        color: getSensorColor(sensorType),
+                        fontFamily: "Inter-SemiBold",
+                      }
+                    : { color: theme.textSecondary },
+                ]}
+              >
+                {getSensorName(sensorType)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Current value and status */}
+        <View style={styles.currentValueContainer}>
+          <View style={styles.valueAndTrend}>
+            <Text style={styles.currentValue}>{value.toFixed(1)}</Text>
+            <Text style={styles.unitText}>
+              {getUnitDisplay(selectedHistory.unit)}
+            </Text>
+            {trend === "up" && (
+              <Ionicons
+                name="arrow-up"
+                size={20}
+                color={theme.warning}
+                style={styles.trendIcon}
+              />
+            )}
+            {trend === "down" && (
+              <Ionicons
+                name="arrow-down"
+                size={20}
+                color={theme.info}
+                style={styles.trendIcon}
+              />
+            )}
+          </View>
+
+          <View
+            style={[
+              styles.historyStatusBadge,
+              { backgroundColor: statusColor },
+            ]}
+          >
+            <Text style={styles.historyStatusText}>{statusText}</Text>
+          </View>
+        </View>
+
+        {/* Optimal range */}
+        {optimalRange && (
+          <View style={styles.optimalRangeContainer}>
+            <Text style={styles.optimalRangeLabel}>Khoảng tối ưu:</Text>
+            <Text style={styles.optimalRangeValue}>
+              {optimalRange[0]} - {optimalRange[1]}{" "}
+              {getUnitDisplay(selectedHistory.unit)}
+            </Text>
+          </View>
+        )}
+
+        {/* Chart */}
+        <View style={styles.chartContainer}>
+          <LineChart
+            data={getChartData()}
+            width={CHART_WIDTH}
+            height={220}
+            chartConfig={{
+              backgroundColor: theme.background,
+              backgroundGradientFrom: theme.background,
+              backgroundGradientTo: theme.background,
+              decimalPlaces: 1,
+              color: (opacity = 1) =>
+                `${getSensorColor(selectedSensorType || "")}${Math.round(
+                  opacity * 255
+                )
+                  .toString(16)
+                  .padStart(2, "0")}`,
+              labelColor: (opacity = 1) => theme.text,
+              propsForDots: {
+                r: "5",
+                strokeWidth: "2",
+                stroke: theme.background,
+              },
+              propsForBackgroundLines: {
+                stroke: theme.borderLight,
+                strokeDasharray: "5, 5",
+              },
+              useShadowColorFromDataset: true,
+            }}
+            bezier
+            style={styles.chart}
+            fromZero={
+              selectedSensorType === SensorType.RAINFALL ||
+              selectedSensorType === SensorType.WATER_LEVEL
+            }
+            yAxisSuffix={
+              selectedHistory.unit
+                ? ` ${getUnitDisplay(selectedHistory.unit)}`
+                : ""
+            }
+            yAxisInterval={1}
+          />
+        </View>
+
+        <Text style={styles.chartHint}>Dữ liệu 7 ngày gần nhất</Text>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       {title && (
@@ -510,7 +867,7 @@ export default function SensorDetailView({
             <TouchableOpacity
               onPress={onRefresh}
               style={styles.headerRefreshButton}
-              disabled={isRefreshing}
+              disabled={effectiveIsRefreshing}
               accessibilityLabel="Làm mới dữ liệu cảm biến"
               accessibilityRole="button"
             >
@@ -518,12 +875,13 @@ export default function SensorDetailView({
                 name="refresh"
                 size={16}
                 color={theme.primary}
-                style={isRefreshing ? styles.refreshingIcon : null}
+                style={effectiveIsRefreshing ? styles.refreshingIcon : null}
               />
             </TouchableOpacity>
           )}
         </View>
       )}
+
       <FlatList
         data={sensors}
         renderItem={({ item, index }) => (
@@ -555,7 +913,7 @@ export default function SensorDetailView({
         refreshControl={
           onRefresh ? (
             <RefreshControl
-              refreshing={isRefreshing}
+              refreshing={effectiveIsRefreshing}
               onRefresh={onRefresh}
               colors={[theme.primary]}
               tintColor={theme.primary}
@@ -568,6 +926,7 @@ export default function SensorDetailView({
           </Text>
         }
         removeClippedSubviews={Platform.OS === "android"} // Performance optimization
+        ListFooterComponent={renderSensorHistoryChart}
       />
     </View>
   );
@@ -742,5 +1101,114 @@ const createStyles = (theme: any) =>
       fontSize: 16,
       textAlign: "center",
       fontFamily: "Inter-Regular",
+    },
+
+    // Sensor history chart styles
+    historyChartContainer: {
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      padding: 16,
+      marginTop: 16,
+      marginHorizontal: 16,
+      ...Platform.select({
+        ios: {
+          shadowColor: theme.shadow,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+        },
+        android: {
+          elevation: 3,
+        },
+      }),
+    },
+    historyHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    historyTitle: {
+      fontSize: 16,
+      fontFamily: "Inter-SemiBold",
+      color: theme.text,
+    },
+    sensorTypeScroll: {
+      marginBottom: 16,
+    },
+    sensorTypeContainer: {
+      paddingRight: 16,
+    },
+    sensorTypeButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      backgroundColor: theme.backgroundSecondary,
+      borderRadius: 16,
+      marginRight: 8,
+    },
+    sensorTypeText: {
+      fontSize: 14,
+      fontFamily: "Inter-Medium",
+      marginLeft: 6,
+    },
+    currentValueContainer: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    valueAndTrend: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    currentValue: {
+      fontSize: 28,
+      fontFamily: "Inter-Bold",
+      color: theme.text,
+    },
+    trendIcon: {
+      marginLeft: 8,
+    },
+    historyStatusBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 12,
+    },
+    historyStatusText: {
+      fontSize: 12,
+      fontFamily: "Inter-SemiBold",
+      color: "#fff",
+    },
+    optimalRangeContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    optimalRangeLabel: {
+      fontSize: 14,
+      fontFamily: "Inter-Medium",
+      color: theme.textSecondary,
+    },
+    optimalRangeValue: {
+      fontSize: 14,
+      fontFamily: "Inter-SemiBold",
+      color: theme.success,
+      marginLeft: 6,
+    },
+    chartContainer: {
+      marginVertical: 8,
+      alignItems: "center",
+    },
+    chart: {
+      borderRadius: 16,
+    },
+    chartHint: {
+      fontSize: 12,
+      fontFamily: "Inter-Regular",
+      color: theme.textTertiary,
+      textAlign: "center",
+      marginTop: 8,
     },
   });

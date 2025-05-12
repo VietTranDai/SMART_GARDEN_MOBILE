@@ -75,3 +75,105 @@ export interface GardenAdvice {
   completed?: boolean;
   thumbnail?: string;
 }
+
+/**
+ * Interface for garden plant details with growth stage information
+ */
+export interface GardenPlantDetails {
+  plantId: number;
+  name: string;
+  scientificName?: string;
+  family?: string;
+  description?: string;
+  growthDuration: number;
+  currentGrowthStage: GardenGrowthStage;
+  nextGrowthStage?: GardenGrowthStage;
+  growthStages: GardenGrowthStage[];
+  daysSincePlanting: number;
+  daysUntilHarvest: number;
+  growthProgress: number;
+  imageUrl?: string;
+}
+
+/**
+ * Interface for garden growth stage information
+ */
+export interface GardenGrowthStage {
+  id: number;
+  plantId: number;
+  stageName: string;
+  order: number;
+  duration: number;
+  description?: string;
+  optimalTemperatureMin: number;
+  optimalTemperatureMax: number;
+  optimalHumidityMin: number;
+  optimalHumidityMax: number;
+  optimalSoilMoistureMin: number;
+  optimalSoilMoistureMax: number;
+  optimalPHMin?: number;
+  optimalPHMax?: number;
+  optimalLightMin?: number;
+  optimalLightMax?: number;
+  lightRequirement?: string;
+  waterRequirement?: string;
+  nutrientRequirement?: string;
+  careInstructions?: string;
+  pestSusceptibility?: string;
+  imageUrl?: string;
+  iconUrl?: string;
+}
+
+/**
+ * Interface for garden photo evaluations
+ */
+export interface GardenPhoto {
+  id: number;
+  gardenId: number;
+  taskId?: number;
+  gardenerId: number;
+  photoUrl: string;
+  thumbnailUrl?: string;
+  plantName?: string;
+  plantGrowStage?: string;
+  aiFeedback?: string;
+  confidence?: number;
+  notes?: string;
+  evaluatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Interface for sensor history data
+ */
+export interface SensorHistory {
+  sensorId: number;
+  sensorType: string;
+  sensorName: string;
+  unit: string;
+  data: SensorHistoryPoint[];
+}
+
+/**
+ * Interface for a single sensor history data point
+ */
+export interface SensorHistoryPoint {
+  timestamp: string;
+  value: number;
+}
+
+/**
+ * Interface for the complete garden detail data
+ */
+export interface GardenDetailData {
+  garden: Garden;
+  plantDetails?: GardenPlantDetails;
+  photos: GardenPhoto[];
+  sensorHistory: Record<string, SensorHistory>;
+  tasks: any[];
+  activities: any[];
+  alerts: any[];
+  wateringSchedules: any[];
+  weather: any;
+}

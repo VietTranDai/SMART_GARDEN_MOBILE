@@ -21,6 +21,7 @@ import {
 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 
 // Import custom components
 import WeatherDisplay from "@/components/common/WeatherDisplay";
@@ -30,6 +31,7 @@ import AdviceModal from "@/components/common/AdviceModal";
 import GardenSensorSection, {
   UISensor,
 } from "@/components/garden/GardenSensorSection";
+import SensorDetailView from "@/components/common/SensorDetailView";
 import ActivityList from "@/components/garden/ActivityList";
 import env from "@/config/environment";
 
@@ -39,10 +41,15 @@ import { useGardenDetail } from "@/hooks/useGardenDetail";
 // Import API services
 import alertService from "@/service/api/alert.service";
 import { apiClient } from "@/service";
+import { gardenService } from "@/service/api";
 
 import { AlertStatus, Garden, GardenStatus, TaskStatus } from "@/types";
 import Toast from "react-native-toast-message";
 import { LinearGradient } from "expo-linear-gradient";
+
+// Import new components
+import PlantDetailCard from "@/components/garden/PlantDetailCard";
+import GardenPhotoGallery from "@/components/garden/GardenPhotoGallery";
 
 enum DetailSectionType {
   STATUS = "STATUS",
@@ -52,6 +59,8 @@ enum DetailSectionType {
   SENSORS = "SENSORS",
   ACTIVITY = "ACTIVITY",
   ACTIONS = "ACTIONS",
+  PLANT_DETAILS = "PLANT_DETAILS",
+  PHOTOS = "PHOTOS",
 }
 
 interface DetailSection {
@@ -122,6 +131,9 @@ export default function GardenDetailScreen() {
     closeWeatherModal,
     getSensorTrend,
     getTimeSinceUpdate,
+    plantDetails,
+    sensorHistory,
+    gardenPhotos,
   } = useGardenDetail({ gardenId: id || null });
 
   // Create memoized styles
@@ -298,6 +310,15 @@ export default function GardenDetailScreen() {
       { type: DetailSectionType.STATUS, key: "status", data: [garden] },
     ];
 
+    // Add plant details section if plant info is available
+    if (garden.plantName && plantDetails) {
+      dataSections.push({
+        type: DetailSectionType.PLANT_DETAILS,
+        key: "plant-details",
+        data: [plantDetails],
+      });
+    }
+
     if (activeAlerts.length > 0) {
       dataSections.push({
         type: DetailSectionType.ALERTS,
@@ -320,11 +341,30 @@ export default function GardenDetailScreen() {
       });
     }
 
+    // Combined sensor section with both current data and history
     dataSections.push({
       type: DetailSectionType.SENSORS,
       key: "sensors",
-      data: [sensors],
+      data: [
+        {
+          sensors: sensors,
+          sensorHistories: sensorHistory,
+          currentGrowthStage: plantDetails?.currentGrowthStage,
+          isSensorDataLoading: isSensorDataLoading,
+          isRefreshing: isRefreshing,
+          lastSensorUpdate: lastSensorUpdate,
+        },
+      ],
     });
+
+    // Add photos gallery if there are photos
+    if (gardenPhotos && gardenPhotos.length > 0) {
+      dataSections.push({
+        type: DetailSectionType.PHOTOS,
+        key: "photos",
+        data: [{ photos: gardenPhotos, gardenId: id }],
+      });
+    }
 
     if (activities.length > 0) {
       dataSections.push({
@@ -347,7 +387,20 @@ export default function GardenDetailScreen() {
     });
 
     return dataSections;
-  }, [garden, alerts, wateringSchedule, sensors, activities, id]);
+  }, [
+    garden,
+    alerts,
+    wateringSchedule,
+    sensors,
+    activities,
+    id,
+    plantDetails,
+    sensorHistory,
+    gardenPhotos,
+    isSensorDataLoading,
+    lastSensorUpdate,
+    isRefreshing,
+  ]);
 
   const renderSectionItem = ({
     section,
@@ -453,15 +506,44 @@ export default function GardenDetailScreen() {
         );
       case DetailSectionType.SENSORS:
         return (
-          <GardenSensorSection
-            sensors={sensors}
-            isSensorDataLoading={isSensorDataLoading}
-            sensorDataError={sensorDataError}
-            lastSensorUpdate={lastSensorUpdate}
-            getTimeSinceUpdate={getTimeSinceUpdate}
+          <SensorDetailView
+            sensors={item.sensors}
+            sensorHistories={item.sensorHistories}
+            currentGrowthStage={item.currentGrowthStage}
+            isSensorDataLoading={item.isSensorDataLoading}
+            isRefreshing={item.isRefreshing}
+            lastSensorUpdate={item.lastSensorUpdate}
             onSelectSensor={(sensor) => router.push(`/sensors/${sensor.id}`)}
-            onRefreshSensors={() => id && refreshSensorData(id)}
+            onRefresh={() => id && refreshSensorData(id)}
             title="Thông tin cảm biến vườn"
+          />
+        );
+      case DetailSectionType.PHOTOS:
+        return (
+          <GardenPhotoGallery
+            photos={item.photos}
+            gardenId={item.gardenId}
+            onUploadPhoto={async (gardenId, formData) => {
+              try {
+                await gardenService.uploadGardenPhoto(gardenId, formData);
+                if (id) loadGardenData(id);
+                Toast.show({
+                  type: "success",
+                  text1: "Tải ảnh lên thành công",
+                  position: "bottom",
+                  visibilityTime: 2000,
+                });
+              } catch (error) {
+                console.error("Error uploading photo:", error);
+                Toast.show({
+                  type: "error",
+                  text1: "Lỗi khi tải ảnh lên",
+                  text2: "Vui lòng thử lại sau",
+                  position: "bottom",
+                  visibilityTime: 3000,
+                });
+              }
+            }}
           />
         );
       case DetailSectionType.ACTIVITY:
@@ -474,6 +556,13 @@ export default function GardenDetailScreen() {
           );
         }
         return <ActivityList activities={activitiesToRender} />;
+      case DetailSectionType.PLANT_DETAILS:
+        return (
+          <PlantDetailCard
+            plantDetails={item}
+            onViewFullDetails={() => console.log("View plant details")}
+          />
+        );
       case DetailSectionType.ACTIONS:
         return (
           <View
@@ -500,7 +589,7 @@ export default function GardenDetailScreen() {
                 styles.actionButton,
                 { backgroundColor: theme.primaryLight },
               ]}
-              onPress={() => console.log("Image upload TBD")}
+              onPress={() => item.gardenId && handleUploadPhoto(item.gardenId)}
             >
               <FontAwesome5 name="camera" size={16} color={theme.primary} />
               <Text style={[styles.actionButtonText, { color: theme.primary }]}>
@@ -520,7 +609,8 @@ export default function GardenDetailScreen() {
     // Determine section title based on section type
     switch (section.type) {
       case DetailSectionType.STATUS:
-        return null; // No header for the status section
+      case DetailSectionType.PLANT_DETAILS:
+        return null; // No header for status and plant details sections
       case DetailSectionType.WEATHER:
         title = "Thời tiết";
         break;
@@ -532,6 +622,8 @@ export default function GardenDetailScreen() {
         break;
       case DetailSectionType.SENSORS:
         return null; // Handled within the SensorDetailView component
+      case DetailSectionType.PHOTOS:
+        return null; // Handled within the GardenPhotoGallery component
       case DetailSectionType.ACTIVITY:
         title = "Hoạt động gần đây";
         break;
@@ -716,6 +808,65 @@ export default function GardenDetailScreen() {
         </View>
       </Modal>
     );
+  };
+
+  // Upload photo handler function
+  const handleUploadPhoto = async (gardenId: string | number) => {
+    try {
+      // Request permission
+      const permissionResult =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permissionResult.granted) {
+        Toast.show({
+          type: "error",
+          text1: "Không có quyền truy cập thư viện ảnh",
+          position: "bottom",
+          visibilityTime: 3000,
+        });
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        // Create form data for upload
+        const formData = new FormData();
+        formData.append("photo", {
+          uri: result.assets[0].uri,
+          type: "image/jpeg",
+          name: "garden-photo.jpg",
+        } as any);
+
+        // Upload photo
+        await gardenService.uploadGardenPhoto(gardenId, formData);
+
+        // Refresh data
+        if (id) loadGardenData(id);
+
+        Toast.show({
+          type: "success",
+          text1: "Tải ảnh lên thành công",
+          position: "bottom",
+          visibilityTime: 2000,
+        });
+      }
+    } catch (error) {
+      console.error("Error uploading photo:", error);
+      Toast.show({
+        type: "error",
+        text1: "Lỗi khi tải ảnh lên",
+        text2: "Vui lòng thử lại sau",
+        position: "bottom",
+        visibilityTime: 3000,
+      });
+    }
   };
 
   // Loading state
