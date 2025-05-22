@@ -247,94 +247,63 @@ class SensorService {
    */
 
   /**
-   * Get sensor status based on sensor value and type
-   */
-  getSensorStatus(
-    value: number,
-    type: SensorType
-  ): "normal" | "warning" | "critical" {
-    switch (type) {
-      case SensorType.TEMPERATURE:
-        if (value < 10 || value > 35) return "critical";
-        if (value < 15 || value > 30) return "warning";
-        return "normal";
-
-      case SensorType.HUMIDITY:
-      case SensorType.SOIL_MOISTURE:
-        if (value < 20 || value > 90) return "critical";
-        if (value < 30 || value > 80) return "warning";
-        return "normal";
-
-      case SensorType.LIGHT:
-        if (value < 100 || value > 10000) return "critical";
-        if (value < 500 || value > 8000) return "warning";
-        return "normal";
-
-      case SensorType.SOIL_PH:
-        if (value < 4.5 || value > 8.5) return "critical";
-        if (value < 5.5 || value > 7.5) return "warning";
-        return "normal";
-
-      case SensorType.WATER_LEVEL:
-        if (value < 0.1) return "critical";
-        if (value < 0.3) return "warning";
-        return "normal";
-
-      default:
-        return "normal";
-    }
-  }
-
-  /**
-   * Get the display name for a sensor type
+   * Get human-readable name for a sensor type
+   * @param type Sensor type
+   * @returns Human-readable name
    */
   getSensorTypeName(type: SensorType): string {
     switch (type) {
       case SensorType.TEMPERATURE:
         return "Nhiệt độ";
       case SensorType.HUMIDITY:
-        return "Độ ẩm không khí";
+        return "Độ ẩm";
       case SensorType.SOIL_MOISTURE:
         return "Độ ẩm đất";
       case SensorType.LIGHT:
         return "Ánh sáng";
-      case SensorType.SOIL_PH:
-        return "Độ pH";
       case SensorType.WATER_LEVEL:
         return "Mực nước";
       case SensorType.RAINFALL:
         return "Lượng mưa";
+      case SensorType.SOIL_PH:
+        return "Độ pH đất";
       default:
-        return "Cảm biến";
+        return type;
     }
   }
 
   /**
-   * Get the display text for a sensor unit
+   * Get icon name for a sensor type
+   * @param type Sensor type
+   * @returns Icon name (for MaterialCommunityIcons)
    */
-  getSensorUnitText(unit: string): string {
-    switch (unit) {
-      case SensorUnit.CELSIUS:
-        return "°C";
-      case SensorUnit.PERCENT:
-        return "%";
-      case SensorUnit.LUX:
-        return "lux";
-      case SensorUnit.PH:
-        return "pH";
-      case SensorUnit.LITER:
-        return "L";
-      case SensorUnit.MILLIMETER:
-        return "mm";
+  getSensorIcon(type: SensorType): string {
+    switch (type) {
+      case SensorType.TEMPERATURE:
+        return "thermometer";
+      case SensorType.HUMIDITY:
+        return "water-percent";
+      case SensorType.SOIL_MOISTURE:
+        return "water-outline";
+      case SensorType.LIGHT:
+        return "white-balance-sunny";
+      case SensorType.WATER_LEVEL:
+        return "water";
+      case SensorType.RAINFALL:
+        return "weather-pouring";
+      case SensorType.SOIL_PH:
+        return "flask-outline";
       default:
-        return "";
+        return "gauge";
     }
   }
 
   /**
-   * Get the unit for a sensor type
+   * Get appropriate unit for a sensor type
+   * @param type Sensor type
+   * @returns Unit
    */
-  getSensorUnitForType(type: SensorType): string {
+  getSensorUnitForType(type: SensorType): SensorUnit {
     switch (type) {
       case SensorType.TEMPERATURE:
         return SensorUnit.CELSIUS;
@@ -343,38 +312,97 @@ class SensorService {
         return SensorUnit.PERCENT;
       case SensorType.LIGHT:
         return SensorUnit.LUX;
-      case SensorType.SOIL_PH:
-        return SensorUnit.PH;
       case SensorType.WATER_LEVEL:
-        return SensorUnit.LITER;
+        return SensorUnit.METER;
       case SensorType.RAINFALL:
         return SensorUnit.MILLIMETER;
+      case SensorType.SOIL_PH:
+        return SensorUnit.PH;
       default:
-        return "";
+        return SensorUnit.PERCENT;
     }
   }
 
   /**
-   * Get the icon name for a sensor type
+   * Get human-readable text for a unit
+   * @param unit Sensor unit
+   * @returns Human-readable text
    */
-  getSensorIconName(type: SensorType): string {
+  getSensorUnitText(unit: SensorUnit): string {
+    switch (unit) {
+      case SensorUnit.CELSIUS:
+        return "°C";
+      case SensorUnit.PERCENT:
+        return "%";
+      case SensorUnit.LUX:
+        return "lux";
+      case SensorUnit.MILLIMETER:
+        return "mm";
+      case SensorUnit.PH:
+        return "pH";
+      case SensorUnit.METER:
+        return "m";
+      default:
+        return unit;
+    }
+  }
+
+  /**
+   * Determine sensor status based on value and type
+   * @param value Sensor value
+   * @param type Sensor type
+   * @returns Status (normal, warning, critical)
+   */
+  getSensorStatus(
+    value: number,
+    type: string
+  ): "normal" | "warning" | "critical" {
     switch (type) {
       case SensorType.TEMPERATURE:
-        return "thermometer-outline";
+        if (value > 35) return "critical";
+        if (value > 30) return "warning";
+        return "normal";
       case SensorType.HUMIDITY:
-        return "water-outline";
+        if (value < 20) return "critical";
+        if (value < 40) return "warning";
+        return "normal";
       case SensorType.SOIL_MOISTURE:
-        return "leaf-outline";
+        if (value < 15) return "critical";
+        if (value < 30) return "warning";
+        return "normal";
       case SensorType.LIGHT:
-        return "sunny-outline";
+        return "normal";
       case SensorType.SOIL_PH:
-        return "flask-outline";
-      case SensorType.WATER_LEVEL:
-        return "beaker-outline";
-      case SensorType.RAINFALL:
-        return "rainy-outline";
+        if (value < 4.5 || value > 8.5) return "critical";
+        if (value < 5.5 || value > 7.5) return "warning";
+        return "normal";
       default:
-        return "hardware-chip-outline";
+        return "normal";
+    }
+  }
+
+  /**
+   * Format timestamp to a friendly relative time
+   * @param timestamp Timestamp to format
+   * @returns Friendly relative time
+   */
+  formatTimeAgo(timestamp?: string): string {
+    if (!timestamp) return "Chưa cập nhật";
+
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return "Định dạng không hợp lệ";
+
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) {
+      return "Vừa cập nhật";
+    } else if (diffInSeconds < 3600) {
+      return `${Math.floor(diffInSeconds / 60)} phút trước`;
+    } else if (diffInSeconds < 86400) {
+      return `${Math.floor(diffInSeconds / 3600)} giờ trước`;
+    } else {
+      return `${Math.floor(diffInSeconds / 86400)} ngày trước`;
     }
   }
 

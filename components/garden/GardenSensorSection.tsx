@@ -12,6 +12,10 @@ import SensorDetailView from "@/components/common/SensorDetailView";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { LinearGradient } from "expo-linear-gradient";
 import { SensorType, SensorUnit } from "@/types/gardens/sensor.types";
+import Colors from "@/constants/Colors"; // Import Colors for theme type
+
+// Define a more specific type for the theme object
+type AppThemeType = typeof Colors.light;
 
 // Define the interface for UI display of sensors
 export interface UISensor {
@@ -146,7 +150,7 @@ const GardenSensorSection: React.FC<GardenSensorSectionProps> = ({
   );
 };
 
-const createStyles = (theme: any) =>
+const createStyles = (theme: AppThemeType) =>
   StyleSheet.create({
     container: {
       marginVertical: 8,

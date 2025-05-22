@@ -9,37 +9,9 @@ import {
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { GardenStatus, GardenType } from "@/types/gardens/garden.types";
+import { Garden, GardenStatus, GardenType } from "@/types/gardens/garden.types";
 import { gardenService } from "@/service/api";
 // import MapView, { Marker } from "react-native-maps";
-
-/**
- * Interface for Garden data display
- */
-export interface Garden {
-  id: number;
-  name: string;
-  status: GardenStatus;
-  type: GardenType;
-  profilePicture?: string;
-
-  // Location information
-  street?: string;
-  ward?: string;
-  district?: string;
-  city?: string;
-  lat?: number;
-  lng?: number;
-
-  // Plant information
-  plantName?: string;
-  plantGrowStage?: string;
-  plantStartDate?: string;
-  plantDuration?: number;
-
-  createdAt: string;
-  updatedAt: string;
-}
 
 interface GardenStatusCardProps {
   garden: Garden;

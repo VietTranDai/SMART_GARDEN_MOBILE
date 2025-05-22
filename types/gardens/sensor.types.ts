@@ -20,8 +20,7 @@ export enum SensorUnit {
   LUX = "lux",
   PH = "pH",
   LITER = "L",
-  M = "m",
-  MM = "mm",
+  METER = "m",
   MILLIMETER = "mm",
 }
 

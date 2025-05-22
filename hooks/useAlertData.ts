@@ -23,7 +23,7 @@ export default function useAlertData() {
   const fetchGardenAlerts = useCallback(
     async (gardenId: number) => {
       // Skip if already loading
-      if (alertsLoading[gardenId]) return;
+      // if (alertsLoading[gardenId]) return; // Check is removed or handled differently
 
       try {
         // Set loading state
@@ -63,7 +63,7 @@ export default function useAlertData() {
         }));
       }
     },
-    [alertsLoading]
+    [] // alertsLoading removed
   );
 
   /**

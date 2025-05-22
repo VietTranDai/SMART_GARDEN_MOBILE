@@ -13,14 +13,6 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import useSectionAnimation from "@/hooks/useSectionAnimation";
 import { AlertType, Severity } from "@/types/alerts/alert.types";
 
-interface Alert {
-  id: number;
-  type: AlertType;
-  message: string;
-  severity: Severity;
-  timestamp: string;
-}
-
 interface AlertCenterProps {
   alerts: Record<string, any[]>;
   selectedGardenId?: number | null;

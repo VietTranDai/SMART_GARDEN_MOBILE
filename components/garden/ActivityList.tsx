@@ -9,6 +9,10 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { ActivityType, GardenActivity } from "@/types";
+import Colors from "@/constants/Colors"; // Import Colors for theme type
+
+// Define a more specific type for the theme object
+type AppThemeType = typeof Colors.light;
 
 // Props for the ActivityList component
 interface ActivityListProps {
@@ -24,7 +28,9 @@ export default function ActivityList({
   const styles = createStyles(theme);
 
   // Helper function to get the appropriate icon for each activity type
-  const getActivityIcon = (type: ActivityType) => {
+  const getActivityIcon = (
+    type: ActivityType
+  ): React.ComponentProps<typeof MaterialCommunityIcons>["name"] => {
     switch (type) {
       case ActivityType.WATERING:
         return "water";
@@ -141,7 +147,7 @@ export default function ActivityList({
   );
 }
 
-const createStyles = (theme: any) =>
+const createStyles = (theme: AppThemeType) =>
   StyleSheet.create({
     listContainer: {
       paddingTop: 8,

@@ -2,15 +2,15 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true, // bật toàn bộ strict checks
-    "esModuleInterop": true, // cho phép import CommonJS modules
-    "jsx": "react-native", // bắt buộc để TS parse .tsx trong RN/Expo
-    "allowJs": true, // nhập cả file .js nếu có
-    "moduleResolution": "node",
-    "resolveJsonModule": true, // cho phép import .json
-    "skipLibCheck": true, // bỏ qua kiểm tra types trong node_modules
-    "noEmit": true, // không sinh file .js đầu ra
-    "baseUrl": ".", // để paths hoạt động
+    "strict": true,
+    "esModuleInterop": true,
+    "jsx": "react-native",
+    "allowJs": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
     }

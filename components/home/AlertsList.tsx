@@ -9,44 +9,52 @@ import {
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
-interface Alert {
-  id: string;
-  type: "warning" | "error" | "info" | "success";
-  message: string;
-  timestamp: Date;
-  gardenId: string;
-  gardenName: string;
-}
+import { Alert, AlertType } from "@/types";
+import Colors from "@/constants/Colors";
 
 interface AlertsListProps {
-  alerts: Alert[];
+  alerts: (Alert & { gardenName?: string })[];
   onAlertPress: (alert: Alert) => void;
   pendingCount?: number;
 }
 
-const ALERT_ICONS: Record<
-  Alert["type"],
-  keyof typeof MaterialCommunityIcons.glyphMap
-> = {
-  warning: "alert",
-  error: "alert-circle",
-  info: "information",
-  success: "check-circle",
-};
+type ThemeColors = typeof Colors.light;
 
-type ThemeColors = {
-  warningLight: string;
-  errorLight: string;
-  infoLight: string;
-  successLight: string;
-  warning: string;
-  error: string;
-  info: string;
-  success: string;
-  text: string;
-  textSecondary: string;
-  card: string;
-  shadow: string;
+const ALERT_ICONS: Partial<
+  Record<AlertType, keyof typeof MaterialCommunityIcons.glyphMap>
+> = {
+  [AlertType.PLANT_CONDITION]: "alert",
+  [AlertType.SENSOR_ERROR]: "alert-circle",
+  [AlertType.SYSTEM]: "information",
+  [AlertType.WEATHER]: "weather-cloudy-alert",
+  [AlertType.ACTIVITY]: "calendar-alert",
+  [AlertType.MAINTENANCE]: "tools",
+  [AlertType.SECURITY]: "shield-alert",
+  [AlertType.OTHER]: "information-outline",
+};
+const DEFAULT_ALERT_ICON: keyof typeof MaterialCommunityIcons.glyphMap =
+  "bell-alert-outline";
+
+const getAlertThemeColorKeys = (
+  alertType: AlertType
+): {
+  iconColorKey: keyof ThemeColors;
+  backgroundColorKey: keyof ThemeColors;
+} => {
+  switch (alertType) {
+    case AlertType.PLANT_CONDITION:
+    case AlertType.ACTIVITY:
+      return { iconColorKey: "warning", backgroundColorKey: "statusWarningBg" };
+    case AlertType.SENSOR_ERROR:
+    case AlertType.SECURITY:
+      return { iconColorKey: "error", backgroundColorKey: "statusDangerBg" };
+    case AlertType.SYSTEM:
+    case AlertType.MAINTENANCE:
+    case AlertType.OTHER:
+    case AlertType.WEATHER:
+    default:
+      return { iconColorKey: "info", backgroundColorKey: "statusInfoBg" };
+  }
 };
 
 export default function AlertsList({
@@ -54,7 +62,7 @@ export default function AlertsList({
   onAlertPress,
   pendingCount = 0,
 }: AlertsListProps) {
-  const theme = useAppTheme() as unknown as ThemeColors;
+  const theme = useAppTheme();
   const styles = createStyles(theme);
 
   if (alerts.length === 0) {
@@ -76,37 +84,48 @@ export default function AlertsList({
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.scrollContent}
     >
-      {alerts.map((alert) => (
-        <TouchableOpacity
-          key={alert.id}
-          style={styles.alertCard}
-          onPress={() => onAlertPress(alert)}
-        >
-          <View
-            style={[
-              styles.iconContainer,
-              { backgroundColor: theme[`${alert.type}Light`] },
-            ]}
+      {alerts.map((alert) => {
+        const alertColorKeys = getAlertThemeColorKeys(alert.type);
+        const iconName = ALERT_ICONS[alert.type] || DEFAULT_ALERT_ICON;
+
+        return (
+          <TouchableOpacity
+            key={alert.id}
+            style={styles.alertCard}
+            onPress={() => onAlertPress(alert)}
           >
-            <MaterialCommunityIcons
-              name={ALERT_ICONS[alert.type]}
-              size={24}
-              color={theme[alert.type]}
-            />
-          </View>
-          <View style={styles.alertContent}>
-            <Text style={styles.alertMessage} numberOfLines={2}>
-              {alert.message}
-            </Text>
-            <View style={styles.alertFooter}>
-              <Text style={styles.gardenName}>{alert.gardenName}</Text>
-              <Text style={styles.timestamp}>
-                {new Date(alert.timestamp).toLocaleTimeString()}
-              </Text>
+            <View
+              style={[
+                styles.iconContainer,
+                {
+                  backgroundColor: theme[
+                    alertColorKeys.backgroundColorKey
+                  ] as string,
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={iconName}
+                size={24}
+                color={theme[alertColorKeys.iconColorKey] as string}
+              />
             </View>
-          </View>
-        </TouchableOpacity>
-      ))}
+            <View style={styles.alertContent}>
+              <Text style={styles.alertMessage} numberOfLines={2}>
+                {alert.message}
+              </Text>
+              <View style={styles.alertFooter}>
+                {alert.gardenName && (
+                  <Text style={styles.gardenName}>{alert.gardenName}</Text>
+                )}
+                <Text style={styles.timestamp}>
+                  {new Date(alert.createdAt).toLocaleTimeString()}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
     </ScrollView>
   );
 }

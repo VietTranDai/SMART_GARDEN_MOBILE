@@ -1,3 +1,4 @@
+import React from "react";
 import { Text, type TextProps, StyleSheet } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
 

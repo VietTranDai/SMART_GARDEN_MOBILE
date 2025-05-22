@@ -226,7 +226,7 @@ export default function useSensorData() {
         }));
       }
     },
-    [sensorDataLoading]
+    []
   );
 
   /**
@@ -332,17 +332,19 @@ export default function useSensorData() {
    * Lấy các chỉ số mới nhất cho một vườn cụ thể
    */
   const getLatestReadings = useCallback(
-    (gardenId: number) => {
+    (gardenId: number): Record<string, SensorData | undefined> => {
       if (typeof gardenId !== "number" || isNaN(gardenId)) return {};
 
-      const sensorData = gardenSensorData[gardenId] || {};
-      const latestReadings: Record<string, SensorData | null> = {};
+      const currentGardenData = gardenSensorData[gardenId] || {};
+      const latestReadings: Record<string, SensorData | undefined> = {};
 
       // Lấy chỉ số mới nhất cho từng loại cảm biến
-      Object.keys(sensorData).forEach((sensorType) => {
+      Object.keys(currentGardenData).forEach((sensorType) => {
         try {
           const typedSensorType = sensorType as SensorType;
-          const readings = safeArray<SensorData>(sensorData[typedSensorType]);
+          const readings = safeArray<SensorData>(
+            currentGardenData[typedSensorType]
+          );
 
           if (readings.length > 0) {
             // Sort để đảm bảo lấy được chỉ số mới nhất
@@ -352,20 +354,20 @@ export default function useSensorData() {
             if (sorted.length > 0 && isSensorData(sorted[0])) {
               latestReadings[typedSensorType] = sorted[0];
             } else {
-              latestReadings[typedSensorType] = null;
+              latestReadings[typedSensorType] = undefined;
             }
           } else {
-            latestReadings[typedSensorType] = null;
+            latestReadings[typedSensorType] = undefined;
           }
         } catch (err) {
           console.error(`Error getting latest reading for ${sensorType}:`, err);
-          latestReadings[sensorType as SensorType] = null;
+          latestReadings[sensorType as SensorType] = undefined;
         }
       });
 
       return latestReadings;
     },
-    [gardenSensorData, safeArray, sortSensorDataByTimestamp]
+    [safeArray, sortSensorDataByTimestamp]
   );
 
   /**

@@ -93,6 +93,11 @@ export interface GardenPlantDetails {
   daysUntilHarvest: number;
   growthProgress: number;
   imageUrl?: string;
+  waterRequirement?: string;
+  lightRequirement?: string;
+  plantedAt?: string;
+  expectedHarvestDate?: string;
+  plantVariety?: string;
 }
 
 /**

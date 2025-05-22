@@ -35,14 +35,14 @@ interface EnhancedSensorCardProps {
 }
 
 // Map of sensor units to display strings
-const UNIT_DISPLAY = {
-  [SensorUnit.CELSIUS]: "°C",
-  [SensorUnit.PERCENT]: "%",
-  [SensorUnit.LUX]: "lux",
-  [SensorUnit.METER]: "m",
-  [SensorUnit.MILLIMETER]: "mm",
-  [SensorUnit.PH]: "pH",
-};
+// const UNIT_DISPLAY = {
+//   [SensorUnit.CELSIUS]: "°C",
+//   [SensorUnit.PERCENT]: "%",
+//   [SensorUnit.LUX]: "lux",
+//   [SensorUnit.METER]: "m",
+//   [SensorUnit.MILLIMETER]: "mm",
+//   [SensorUnit.PH]: "pH",
+// };
 
 // Map of sensor types to human-readable names
 const SENSOR_NAME_MAP: Record<SensorType, string> = {
@@ -52,6 +52,7 @@ const SENSOR_NAME_MAP: Record<SensorType, string> = {
   [SensorType.LIGHT]: "Ánh sáng",
   [SensorType.WATER_LEVEL]: "Mực nước",
   [SensorType.SOIL_PH]: "Độ pH đất",
+  [SensorType.RAINFALL]: "Lượng mưa",
 };
 
 export default function EnhancedSensorCard({
@@ -161,10 +162,18 @@ export default function EnhancedSensorCard({
   };
 
   // Get icon name for sensor type
-  const getSensorIconName = (sensorType: SensorType): string => {
-    // Use custom iconName if provided
-    if (iconName) return iconName;
-    
+  const getSensorIconName = (
+    sensorType: SensorType
+  ): React.ComponentProps<typeof MaterialCommunityIcons>["name"] => {
+    // Use custom iconName if provided and is a valid MDI icon name
+    // This check is simplified; a proper check would involve a list of all MDI names.
+    if (iconName && typeof iconName === "string") {
+      // Basic check
+      return iconName as React.ComponentProps<
+        typeof MaterialCommunityIcons
+      >["name"];
+    }
+
     // Otherwise use default icon mapping
     switch (sensorType) {
       case SensorType.TEMPERATURE:
@@ -172,17 +181,17 @@ export default function EnhancedSensorCard({
       case SensorType.HUMIDITY:
         return "water-percent";
       case SensorType.SOIL_MOISTURE:
-        return "water-outline";
+        return "water-outline"; // Assuming this is MaterialCommunityIcons, not Ionicons
       case SensorType.LIGHT:
         return "white-balance-sunny";
       case SensorType.WATER_LEVEL:
-        return "water";
-      case SensorType.RAINFALL:
-        return "weather-pouring";
+        return "water"; // or "cup-water" or "waves"
+      // case SensorType.RAINFALL: // RAINFALL is not in the SENSOR_NAME_MAP, might not be a used type here
+      //   return "weather-pouring";
       case SensorType.SOIL_PH:
         return "flask-outline";
       default:
-        return "gauge";
+        return "gauge"; // Default icon
     }
   };
 
@@ -242,8 +251,8 @@ export default function EnhancedSensorCard({
           ? theme.success
           : theme.error
         : overallTrend === "up"
-        ? theme.success
-        : theme.warning;
+          ? theme.success
+          : theme.warning;
 
     return (
       <View style={styles.trendContainer}>
@@ -254,8 +263,8 @@ export default function EnhancedSensorCard({
               overallTrend === "up"
                 ? "trending-up"
                 : overallTrend === "down"
-                ? "trending-down"
-                : "trending-neutral"
+                  ? "trending-down"
+                  : "trending-neutral"
             }
             size={14}
             color={trendColor}
@@ -264,8 +273,8 @@ export default function EnhancedSensorCard({
             {overallTrend === "up"
               ? "Tăng"
               : overallTrend === "down"
-              ? "Giảm"
-              : "Ổn định"}
+                ? "Giảm"
+                : "Ổn định"}
           </Text>
         </View>
 
@@ -285,8 +294,8 @@ export default function EnhancedSensorCard({
               point.value > prevPoint.value
                 ? "up"
                 : point.value < prevPoint.value
-                ? "down"
-                : "flat";
+                  ? "down"
+                  : "flat";
 
             // Determine line color based on direction and status
             const lineColor =
@@ -295,10 +304,10 @@ export default function EnhancedSensorCard({
                   ? theme.error
                   : theme.success
                 : direction === "down"
-                ? status === "critical"
-                  ? theme.success
-                  : theme.error
-                : theme.textTertiary;
+                  ? status === "critical"
+                    ? theme.success
+                    : theme.error
+                  : theme.textTertiary;
 
             return (
               <View key={index} style={styles.trendLineContainer}>
@@ -320,8 +329,8 @@ export default function EnhancedSensorCard({
                             direction === "up"
                               ? "-45deg"
                               : direction === "down"
-                              ? "45deg"
-                              : "0deg",
+                                ? "45deg"
+                                : "0deg",
                         },
                       ],
                     },
@@ -373,7 +382,7 @@ export default function EnhancedSensorCard({
             ]}
           >
             <MaterialCommunityIcons
-              name={getSensorIconName(type) as any}
+              name={getSensorIconName(type)}
               size={22}
               color={statusColor}
             />

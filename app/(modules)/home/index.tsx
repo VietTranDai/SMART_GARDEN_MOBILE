@@ -1197,7 +1197,9 @@ function HomeScreenContent() {
       >
         {/* Render all sections using the new HomeSections component */}
         <HomeSections
-          gardens={Array.isArray(gardens) ? gardens : []}
+          gardens={
+            Array.isArray(gardens) ? (gardens as any as GardenDisplayDto[]) : []
+          }
           selectedGardenId={selectedGardenId}
           onSelectGarden={selectGarden}
           sections={sections}
@@ -1215,7 +1217,7 @@ function HomeScreenContent() {
           onShowWeatherDetail={handleShowWeatherDetail}
           onScrollToWeatherSection={handleScrollToWeatherSection}
           onShowAlertDetails={handleShowAlertDetails}
-          adviceLoading={weatherDetailLoading || {}}
+          adviceLoading={gardenAdviceLoading || {}}
           weatherDetailLoading={weatherDetailLoading || {}}
           getSensorStatus={getSensorStatus}
         />
@@ -1303,7 +1305,7 @@ function HomeScreenContent() {
             ? optimalGardenTimes[selectedGardenForWeather].WATERING
             : []
         }
-        garden={selectedGardenForModal}
+        garden={selectedGardenForModal as any as GardenDisplayDto | undefined}
         isLoading={
           selectedGardenForWeather !== null &&
           weatherDetailLoading &&
@@ -1329,7 +1331,9 @@ function HomeScreenContent() {
         }
         gardenName={
           selectedGardenForAlerts !== null
-            ? gardens.find((g) => g.id === selectedGardenForAlerts)?.name || ""
+            ? (gardens as any as GardenDisplayDto[]).find(
+                (g) => g.id === selectedGardenForAlerts
+              )?.name || ""
             : ""
         }
         sensorData={

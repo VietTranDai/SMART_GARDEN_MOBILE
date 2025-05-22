@@ -67,16 +67,13 @@ export default function useWeatherDataDisplay(
   const getWeatherTip = (weather: WeatherObservation | null) => {
     if (!weather) return "Không có dữ liệu thời tiết.";
 
-    const { temperatureC, conditionCode, humidity, windKph } = weather;
+    const { temp, iconCode, humidity, windSpeed } = weather;
 
-    if (temperatureC > 30) {
+    if (temp > 30) {
       return "Thời tiết nóng! Tưới cây vào sáng sớm hoặc chiều tối.";
     }
 
-    // Bảo vệ phương thức includes khỏi undefined
-    const condition = conditionCode || "";
-
-    if (condition.includes("rain") || condition.includes("drizzle")) {
+    if (iconCode.includes("rain") || iconCode.includes("drizzle")) {
       return "Đang có mưa, không cần tưới thêm nước.";
     }
 
@@ -84,7 +81,7 @@ export default function useWeatherDataDisplay(
       return "Độ ẩm thấp, nên tưới thêm nước cho cây.";
     }
 
-    if (windKph > 20) {
+    if (windSpeed > 20) {
       return "Gió khá mạnh, cần đảm bảo cây được bảo vệ.";
     }
 
@@ -135,11 +132,11 @@ export default function useWeatherDataDisplay(
   };
 
   // Get icon for weather condition
-  const getWeatherIcon = (condition?: string) => {
-    if (!condition) return "partly-sunny-outline";
+  const getWeatherIcon = (iconCode?: string) => {
+    if (!iconCode) return "partly-sunny-outline";
 
     // Convert condition to lowercase for easier comparison
-    const code = condition.toLowerCase();
+    const code = iconCode.toLowerCase();
 
     if (code.includes("thunderstorm")) return "thunderstorm-outline";
     if (code.includes("rain") || code.includes("drizzle"))

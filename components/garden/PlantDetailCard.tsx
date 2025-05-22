@@ -9,6 +9,7 @@ import {
   Platform,
 } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import Colors from "@/constants/Colors";
 import {
   GardenPlantDetails,
   GardenGrowthStage,
@@ -19,6 +20,11 @@ import {
   Ionicons,
 } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+// @ts-ignore: Module not found or type declarations missing
+import * as Progress from "react-native-progress";
+
+// Define a more specific type for the theme object
+type AppThemeType = typeof Colors.light;
 
 interface PlantDetailCardProps {
   plantDetails: GardenPlantDetails;
@@ -32,419 +38,457 @@ const PlantDetailCard: React.FC<PlantDetailCardProps> = ({
   const theme = useAppTheme();
   const styles = createStyles(theme);
 
+  // Use growthProgress directly from plantDetails if available
+  const growthProgress = plantDetails.growthProgress ?? 0;
+
+  const renderGrowthStages = () => {
+    if (!plantDetails.growthStages || plantDetails.growthStages.length === 0) {
+      return null;
+    }
+
+    // Sort stages by order
+    const sortedStages = [...plantDetails.growthStages].sort(
+      (a, b) => a.order - b.order
+    );
+
+    return (
+      <View style={styles.timelineContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.timelineScroll}
+        >
+          {sortedStages.map((stage, index) => {
+            const isCurrentStage =
+              stage.stageName === plantDetails.currentGrowthStage?.stageName;
+            // Assuming currentGrowthStage.order is available for comparison
+            const isPastStage =
+              stage.order <= (plantDetails.currentGrowthStage?.order || 0);
+
+            return (
+              <View key={`stage-${index}`} style={styles.timelineStage}>
+                <View
+                  style={[
+                    styles.stageCircle,
+                    isPastStage
+                      ? styles.completedStageCircle
+                      : styles.pendingStageCircle,
+                    isCurrentStage && styles.currentStageCircle,
+                  ]}
+                >
+                  {isCurrentStage && (
+                    <View style={styles.currentStageIndicator} />
+                  )}
+                </View>
+
+                <View style={styles.stageLine} />
+
+                <Text
+                  style={[
+                    styles.stageName,
+                    isCurrentStage && styles.currentStageName,
+                  ]}
+                  numberOfLines={2}
+                >
+                  {stage.stageName}
+                </Text>
+                {/* Display stage order instead of dayNumber if dayNumber is not on type */}
+                <Text style={styles.stageDays}>Giai đoạn {stage.order}</Text>
+              </View>
+            );
+          })}
+        </ScrollView>
+      </View>
+    );
+  };
+
+  // Generate optimal condition panel
+  const renderOptimalConditions = () => {
+    if (!plantDetails.currentGrowthStage) return null;
+
+    const {
+      optimalTemperatureMin,
+      optimalTemperatureMax,
+      optimalHumidityMin,
+      optimalHumidityMax,
+      optimalSoilMoistureMin,
+      optimalSoilMoistureMax,
+      optimalLightMin,
+      optimalLightMax,
+    } = plantDetails.currentGrowthStage;
+    // These properties are on GardenGrowthStage type, so this is fine.
+
+    return (
+      <View style={styles.optimalConditionsContainer}>
+        <Text style={styles.optimalConditionsTitle}>
+          Điều kiện tối ưu cho giai đoạn hiện tại
+        </Text>
+
+        <View style={styles.conditionsGrid}>
+          <View style={styles.conditionItem}>
+            <MaterialCommunityIcons
+              name="thermometer"
+              size={20}
+              color={theme.primary}
+            />
+            <Text style={styles.conditionLabel}>Nhiệt độ</Text>
+            <Text style={styles.conditionValue}>
+              {optimalTemperatureMin} - {optimalTemperatureMax}°C
+            </Text>
+          </View>
+
+          <View style={styles.conditionItem}>
+            <MaterialCommunityIcons
+              name="water-percent"
+              size={20}
+              color={theme.info}
+            />
+            <Text style={styles.conditionLabel}>Độ ẩm</Text>
+            <Text style={styles.conditionValue}>
+              {optimalHumidityMin} - {optimalHumidityMax}%
+            </Text>
+          </View>
+
+          <View style={styles.conditionItem}>
+            <MaterialCommunityIcons
+              name="water-outline"
+              size={20}
+              color={theme.accent}
+            />
+            <Text style={styles.conditionLabel}>Độ ẩm đất</Text>
+            <Text style={styles.conditionValue}>
+              {optimalSoilMoistureMin} - {optimalSoilMoistureMax}%
+            </Text>
+          </View>
+
+          <View style={styles.conditionItem}>
+            <MaterialCommunityIcons
+              name="white-balance-sunny"
+              size={20}
+              color={theme.warning}
+            />
+            <Text style={styles.conditionLabel}>Ánh sáng</Text>
+            <Text style={styles.conditionValue}>
+              {optimalLightMin} - {optimalLightMax} lux
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   if (!plantDetails) {
     return null;
   }
 
-  // Optimals from current growth stage
-  const {
-    optimalTemperatureMin,
-    optimalTemperatureMax,
-    optimalHumidityMin,
-    optimalHumidityMax,
-    optimalSoilMoistureMin,
-    optimalSoilMoistureMax,
-    optimalLightMin,
-    optimalLightMax,
-    lightRequirement,
-    waterRequirement,
-  } = plantDetails.currentGrowthStage;
-
-  // Calculate progress percentage
-  const progressPercentage = plantDetails.growthProgress;
-
-  // Get appropriate color for progress
-  const getProgressColor = (progress: number) => {
-    if (progress < 25) return theme.info;
-    if (progress < 50) return theme.primary;
-    if (progress < 75) return theme.warning;
-    return theme.success;
-  };
-
-  const progressColor = getProgressColor(progressPercentage);
-
-  // Create growth stage markers
-  const createGrowthStageMarkers = () => {
-    if (!plantDetails.growthStages || plantDetails.growthStages.length === 0) {
-      return [];
-    }
-
-    const totalDuration = plantDetails.growthDuration;
-    let cumulativeDuration = 0;
-
-    return plantDetails.growthStages.map((stage, index) => {
-      const position = (cumulativeDuration / totalDuration) * 100;
-      cumulativeDuration += stage.duration;
-
-      const isActive = index <= plantDetails.currentGrowthStage.order;
-
-      return {
-        position,
-        label: stage.stageName,
-        isActive,
-      };
-    });
-  };
-
-  const growthStageMarkers = createGrowthStageMarkers();
+  // Assuming plantDetails.plantedAt and plantDetails.expectedHarvestDate might be added to the type later
+  // For now, provide fallback or use daysSincePlanting/daysUntilHarvest if more appropriate display is desired
+  const plantedAtDate = plantDetails.plantedAt
+    ? new Date(plantDetails.plantedAt).toLocaleDateString("vi-VN")
+    : "Chưa có";
+  const harvestDate = plantDetails.expectedHarvestDate
+    ? new Date(plantDetails.expectedHarvestDate).toLocaleDateString("vi-VN")
+    : "Chưa có";
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.titleContainer}>
+      <View style={styles.headerContainer}>
+        <View style={styles.headerLeft}>
           <Text style={styles.title}>Thông tin cây trồng</Text>
-          <Text style={styles.plantName}>{plantDetails.name}</Text>
-          {plantDetails.scientificName && (
-            <Text style={styles.scientificName}>
-              {plantDetails.scientificName}
-            </Text>
+          {plantDetails.imageUrl && (
+            <Image
+              source={{ uri: plantDetails.imageUrl }}
+              style={styles.plantIcon}
+              // @ts-ignore: contentFit is a valid prop for expo-image but may have type issues
+              contentFit="cover"
+            />
           )}
         </View>
-        {plantDetails.imageUrl && (
-          <Image
-            source={{ uri: plantDetails.imageUrl }}
-            style={styles.plantImage}
-          />
-        )}
-        {!plantDetails.imageUrl && (
-          <View
-            style={[
-              styles.plantImagePlaceholder,
-              { backgroundColor: `${theme.primaryLight}50` },
-            ]}
+
+        {onViewFullDetails && (
+          <TouchableOpacity
+            style={styles.viewDetailsButton}
+            onPress={onViewFullDetails}
           >
-            <FontAwesome5 name="seedling" size={28} color={theme.primary} />
-          </View>
+            <Text style={styles.viewDetailsText}>Xem chi tiết</Text>
+            <Ionicons name="chevron-forward" size={16} color={theme.primary} />
+          </TouchableOpacity>
         )}
       </View>
 
-      <View style={styles.growthContainer}>
-        <View style={styles.growthHeader}>
-          <Text style={styles.sectionTitle}>Tiến độ phát triển</Text>
-          <View style={styles.daysContainer}>
-            <MaterialCommunityIcons
-              name="calendar-clock"
-              size={16}
-              color={theme.primary}
-            />
-            <Text style={styles.daysText}>
-              {plantDetails.daysUntilHarvest} ngày đến khi thu hoạch
+      <View style={styles.contentContainer}>
+        <View style={styles.infoContainer}>
+          <View style={styles.plantNameContainer}>
+            <Text style={styles.plantName}>{plantDetails.name}</Text>
+            <Text style={styles.plantVariety}>
+              {plantDetails.plantVariety || ""}
             </Text>
           </View>
+
+          <View style={styles.growthInfoContainer}>
+            <View style={styles.growthInfoItem}>
+              <Text style={styles.infoLabel}>Ngày trồng</Text>
+              <Text style={styles.infoValue}>{plantedAtDate}</Text>
+            </View>
+
+            <View style={styles.growthInfoItem}>
+              <Text style={styles.infoLabel}>Dự kiến thu hoạch</Text>
+              <Text style={styles.infoValue}>{harvestDate}</Text>
+            </View>
+          </View>
         </View>
 
-        {/* Progress bar */}
-        <View style={styles.progressBarContainer}>
-          <View style={styles.progressBar}>
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${progressPercentage}%`,
-                  backgroundColor: progressColor,
-                },
-              ]}
-            />
+        <View style={styles.progressContainer}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressTitle}>Tiến độ phát triển</Text>
+            <Text style={styles.currentStageText}>
+              {plantDetails.currentGrowthStage?.stageName || "Đang phát triển"}
+            </Text>
           </View>
 
-          {/* Stage markers */}
-          {growthStageMarkers.map((marker, index) => (
-            <View
-              key={`marker-${index}`}
-              style={[styles.stageMarker, { left: `${marker.position}%` }]}
-            >
-              <View
-                style={[
-                  styles.markerDot,
-                  marker.isActive
-                    ? { backgroundColor: progressColor }
-                    : { backgroundColor: theme.borderLight },
-                ]}
-              />
-              <Text
-                style={[
-                  styles.markerLabel,
-                  marker.isActive
-                    ? { color: theme.text }
-                    : { color: theme.textTertiary },
-                ]}
-              >
-                {marker.label}
-              </Text>
-            </View>
-          ))}
+          <Progress.Bar
+            progress={growthProgress}
+            width={null}
+            height={10}
+            color={theme.success}
+            unfilledColor={theme.backgroundSecondary}
+            borderWidth={0}
+            style={styles.progressBar}
+          />
+
+          <View style={styles.progressLabels}>
+            <Text style={styles.progressStart}>Mới trồng</Text>
+            <Text style={styles.progressEnd}>Thu hoạch</Text>
+          </View>
         </View>
 
-        <Text style={styles.currentStageText}>
-          Giai đoạn hiện tại:{" "}
-          <Text style={{ fontFamily: "Inter-SemiBold" }}>
-            {plantDetails.currentGrowthStage.stageName}
-          </Text>{" "}
-          ({plantDetails.growthProgress}%)
-        </Text>
+        {renderGrowthStages()}
+        {renderOptimalConditions()}
       </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.optimalConditionsScroll}
-      >
-        <View style={styles.optimalConditionsContainer}>
-          <View style={styles.optimalItem}>
-            <View style={styles.optimalIconContainer}>
-              <MaterialCommunityIcons
-                name="thermometer"
-                size={22}
-                color={theme.primary}
-              />
-            </View>
-            <Text style={styles.optimalTitle}>Nhiệt độ tối ưu</Text>
-            <Text style={styles.optimalValue}>
-              {optimalTemperatureMin}°C - {optimalTemperatureMax}°C
-            </Text>
-          </View>
-
-          <View style={styles.optimalItem}>
-            <View style={styles.optimalIconContainer}>
-              <MaterialCommunityIcons
-                name="water-percent"
-                size={22}
-                color={theme.primary}
-              />
-            </View>
-            <Text style={styles.optimalTitle}>Độ ẩm tối ưu</Text>
-            <Text style={styles.optimalValue}>
-              {optimalHumidityMin}% - {optimalHumidityMax}%
-            </Text>
-          </View>
-
-          <View style={styles.optimalItem}>
-            <View style={styles.optimalIconContainer}>
-              <Ionicons name="water" size={22} color={theme.primary} />
-            </View>
-            <Text style={styles.optimalTitle}>Độ ẩm đất</Text>
-            <Text style={styles.optimalValue}>
-              {optimalSoilMoistureMin}% - {optimalSoilMoistureMax}%
-            </Text>
-          </View>
-
-          <View style={styles.optimalItem}>
-            <View style={styles.optimalIconContainer}>
-              <Ionicons name="sunny" size={22} color={theme.primary} />
-            </View>
-            <Text style={styles.optimalTitle}>Ánh sáng</Text>
-            <Text style={styles.optimalValue}>
-              {lightRequirement || "Trung bình"}
-            </Text>
-          </View>
-
-          <View style={styles.optimalItem}>
-            <View style={styles.optimalIconContainer}>
-              <MaterialCommunityIcons
-                name="watering-can"
-                size={22}
-                color={theme.primary}
-              />
-            </View>
-            <Text style={styles.optimalTitle}>Nước</Text>
-            <Text style={styles.optimalValue}>
-              {waterRequirement || "Trung bình"}
-            </Text>
-          </View>
-        </View>
-      </ScrollView>
-
-      <TouchableOpacity
-        style={styles.viewDetailsButton}
-        onPress={onViewFullDetails}
-      >
-        <Text style={styles.viewDetailsText}>Xem thông tin chi tiết</Text>
-        <Ionicons name="chevron-forward" size={16} color={theme.primary} />
-      </TouchableOpacity>
     </View>
   );
 };
 
-const createStyles = (theme: any) =>
+const createStyles = (theme: AppThemeType) =>
   StyleSheet.create({
     container: {
       backgroundColor: theme.card,
       borderRadius: 16,
-      padding: 16,
-      marginBottom: 16,
-      ...Platform.select({
-        ios: {
-          shadowColor: theme.shadow,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
-        },
-        android: {
-          elevation: 3,
-        },
-      }),
+      marginHorizontal: 16,
+      marginVertical: 8,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
     },
-    header: {
+    headerContainer: {
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.borderLight,
     },
-    titleContainer: {
-      flex: 1,
+    headerLeft: {
+      flexDirection: "row",
+      alignItems: "center",
     },
     title: {
       fontSize: 16,
       fontFamily: "Inter-SemiBold",
       color: theme.text,
-      marginBottom: 6,
+    },
+    plantIcon: {
+      width: 24,
+      height: 24,
+      marginLeft: 8,
+      borderRadius: 12,
+    },
+    viewDetailsButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 8,
+    },
+    viewDetailsText: {
+      fontSize: 14,
+      fontFamily: "Inter-Medium",
+      color: theme.primary,
+      marginRight: 4,
+    },
+    contentContainer: {
+      padding: 16,
+    },
+    infoContainer: {
+      marginBottom: 16,
+    },
+    plantNameContainer: {
+      marginBottom: 12,
     },
     plantName: {
       fontSize: 20,
       fontFamily: "Inter-Bold",
       color: theme.text,
-      marginBottom: 2,
+      marginBottom: 4,
     },
-    scientificName: {
-      fontSize: 14,
-      fontFamily: "Inter-Italic",
-      color: theme.textSecondary,
-      fontStyle: "italic",
-    },
-    plantImage: {
-      width: 80,
-      height: 80,
-      borderRadius: 12,
-      marginLeft: 12,
-    },
-    plantImagePlaceholder: {
-      width: 80,
-      height: 80,
-      borderRadius: 12,
-      marginLeft: 12,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: theme.backgroundSecondary,
-    },
-    growthContainer: {
-      marginBottom: 16,
-    },
-    growthHeader: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 12,
-    },
-    sectionTitle: {
-      fontSize: 15,
-      fontFamily: "Inter-SemiBold",
-      color: theme.text,
-    },
-    daysContainer: {
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: theme.backgroundSecondary,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-      borderRadius: 12,
-    },
-    daysText: {
-      fontSize: 13,
-      fontFamily: "Inter-Medium",
-      color: theme.textSecondary,
-      marginLeft: 6,
-    },
-    progressBarContainer: {
-      marginVertical: 10,
-      height: 40,
-      position: "relative",
-    },
-    progressBar: {
-      height: 6,
-      backgroundColor: theme.borderLight,
-      borderRadius: 3,
-      marginTop: 20,
-    },
-    progressFill: {
-      height: "100%",
-      borderRadius: 3,
-    },
-    stageMarker: {
-      position: "absolute",
-      top: 0,
-      alignItems: "center",
-      transform: [{ translateX: -8 }],
-    },
-    markerDot: {
-      width: 16,
-      height: 16,
-      borderRadius: 8,
-      borderWidth: 2,
-      borderColor: theme.background,
-    },
-    markerLabel: {
-      fontSize: 10,
-      fontFamily: "Inter-Medium",
-      marginTop: 4,
-      maxWidth: 60,
-      textAlign: "center",
-    },
-    currentStageText: {
+    plantVariety: {
       fontSize: 14,
       fontFamily: "Inter-Regular",
       color: theme.textSecondary,
-      marginTop: 8,
     },
-    optimalConditionsScroll: {
-      marginBottom: 16,
-    },
-    optimalConditionsContainer: {
+    growthInfoContainer: {
       flexDirection: "row",
-      paddingVertical: 8,
+      justifyContent: "space-between",
     },
-    optimalItem: {
-      marginRight: 16,
-      padding: 12,
-      backgroundColor: theme.backgroundSecondary,
-      borderRadius: 12,
-      alignItems: "center",
-      width: 120,
+    growthInfoItem: {
+      flex: 1,
     },
-    optimalIconContainer: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: theme.primaryLight,
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 8,
-    },
-    optimalTitle: {
+    infoLabel: {
       fontSize: 12,
-      fontFamily: "Inter-Medium",
+      fontFamily: "Inter-Regular",
       color: theme.textSecondary,
-      marginBottom: 4,
-      textAlign: "center",
+      marginBottom: 2,
     },
-    optimalValue: {
+    infoValue: {
       fontSize: 14,
       fontFamily: "Inter-SemiBold",
       color: theme.text,
-      textAlign: "center",
     },
-    viewDetailsButton: {
+    progressContainer: {
+      marginBottom: 20,
+    },
+    progressHeader: {
       flexDirection: "row",
+      justifyContent: "space-between",
       alignItems: "center",
-      justifyContent: "center",
-      paddingVertical: 12,
-      backgroundColor: theme.primaryLight,
-      borderRadius: 12,
+      marginBottom: 8,
     },
-    viewDetailsText: {
+    progressTitle: {
+      fontSize: 14,
+      fontFamily: "Inter-Medium",
+      color: theme.text,
+    },
+    currentStageText: {
       fontSize: 14,
       fontFamily: "Inter-SemiBold",
-      color: theme.primary,
-      marginRight: 4,
+      color: theme.success,
+    },
+    progressBar: {
+      width: "100%",
+      borderRadius: 5,
+    },
+    progressLabels: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginTop: 4,
+    },
+    progressStart: {
+      fontSize: 12,
+      fontFamily: "Inter-Regular",
+      color: theme.textSecondary,
+    },
+    progressEnd: {
+      fontSize: 12,
+      fontFamily: "Inter-Regular",
+      color: theme.textSecondary,
+    },
+    timelineContainer: {
+      marginBottom: 20,
+    },
+    timelineScroll: {
+      paddingRight: 16,
+      paddingVertical: 8,
+    },
+    timelineStage: {
+      width: 80,
+      alignItems: "center",
+      marginRight: 16,
+    },
+    stageCircle: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    completedStageCircle: {
+      backgroundColor: theme.success,
+    },
+    pendingStageCircle: {
+      backgroundColor: theme.backgroundSecondary,
+      borderWidth: 1,
+      borderColor: theme.borderLight,
+    },
+    currentStageCircle: {
+      backgroundColor: theme.success,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+    },
+    currentStageIndicator: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: theme.card,
+    },
+    stageLine: {
+      height: 20,
+      width: 1,
+      backgroundColor: theme.borderLight,
+      marginVertical: 4,
+    },
+    stageName: {
+      fontSize: 12,
+      fontFamily: "Inter-Medium",
+      color: theme.textSecondary,
+      textAlign: "center",
+      marginBottom: 2,
+      height: 32,
+    },
+    currentStageName: {
+      color: theme.text,
+      fontFamily: "Inter-SemiBold",
+    },
+    stageDays: {
+      fontSize: 10,
+      fontFamily: "Inter-Regular",
+      color: theme.textTertiary,
+    },
+    optimalConditionsContainer: {
+      backgroundColor: theme.backgroundSecondary,
+      borderRadius: 12,
+      padding: 16,
+    },
+    optimalConditionsTitle: {
+      fontSize: 14,
+      fontFamily: "Inter-SemiBold",
+      color: theme.text,
+      marginBottom: 12,
+    },
+    conditionsGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+    },
+    conditionItem: {
+      width: "48%",
+      backgroundColor: theme.card,
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 8,
+    },
+    conditionLabel: {
+      fontSize: 12,
+      fontFamily: "Inter-Regular",
+      color: theme.textSecondary,
+      marginTop: 4,
+      marginBottom: 2,
+    },
+    conditionValue: {
+      fontSize: 14,
+      fontFamily: "Inter-SemiBold",
+      color: theme.text,
     },
   });
 
