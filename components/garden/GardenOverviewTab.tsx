@@ -1,5 +1,5 @@
 import React from "react";
-import { ScrollView, StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import {
   Garden,
@@ -43,49 +43,70 @@ const GardenOverviewTab: React.FC<GardenOverviewTabProps> = ({
     (a) => a.status !== AlertStatus.RESOLVED && a.status !== AlertStatus.IGNORED
   );
 
+  const handleViewPlantDetails = () => {
+    console.log(
+      "View Plant Details pressed for garden:",
+      garden?.name,
+      "Plant:",
+      plantDetails?.name
+    );
+    // Placeholder: Implement navigation or modal display for plant details here
+    // Example: router.push(`/gardens/${garden.id}/plant/${plantDetails?.plantId}`);
+    // Or: showPlantDetailModal(plantDetails);
+  };
+
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      showsVerticalScrollIndicator={false}
-    >
-      <GardenStatusCard
-        garden={garden}
-        onViewPlantDetails={() => {}}
-        onShowAdvice={onShowAdvice}
-        topRightComponent={
-          <WeatherButton
-            currentWeather={currentWeather}
-            onPress={onShowWeather}
-          />
-        }
-      />
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.cardContainer, { marginTop: 16 }]}>
+        <GardenStatusCard
+          garden={garden}
+          onViewPlantDetails={handleViewPlantDetails}
+          onShowAdvice={onShowAdvice}
+          topRightComponent={
+            <WeatherButton
+              currentWeather={currentWeather}
+              onPress={onShowWeather}
+            />
+          }
+        />
+      </View>
 
       {plantDetails && (
-        <PlantDetailCard
-          plantDetails={plantDetails}
-          onViewFullDetails={() => {}}
-        />
+        <View style={styles.cardContainer}>
+          <PlantDetailCard
+            plantDetails={plantDetails}
+            onViewFullDetails={() => {}}
+          />
+        </View>
       )}
 
       {activeAlerts.length > 0 && (
-        <AlertsList
-          alerts={activeAlerts}
-          onResolveAlert={onResolveAlert}
-          onIgnoreAlert={onIgnoreAlert}
-        />
+        <View style={styles.cardContainer}>
+          <AlertsList
+            alerts={activeAlerts}
+            onResolveAlert={onResolveAlert}
+            onIgnoreAlert={onIgnoreAlert}
+          />
+        </View>
       )}
 
       {activities.length > 0 && (
-        <ActivityList activities={activities.slice(0, 5)} />
+        <View style={styles.cardContainer}>
+          <ActivityList activities={activities.slice(0, 5)} />
+        </View>
       )}
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  cardContainer: {
+    marginBottom: 16,
   },
 });
 

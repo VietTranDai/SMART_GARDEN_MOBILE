@@ -17,30 +17,31 @@ import {
 } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SensorType } from "@/types/gardens/sensor.types";
+import { Alert, AlertType, Severity } from "@/types";
 
 const { width } = Dimensions.get("window");
 
 // Define alert interface based on the application's data structure
-interface GardenAlert {
-  id: string | number;
-  type: string;
-  title: string;
-  message: string;
-  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  timestamp: string;
-  sensorType?: SensorType;
-  sensorId?: string | number;
-  sensorValue?: number;
-  sensorUnit?: string;
-  isRead?: boolean;
-  isResolved?: boolean;
-  gardenId?: number;
-}
+// interface GardenAlert {
+//   id: string | number;
+//   type: string;
+//   title: string;
+//   message: string;
+//   severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+//   timestamp: string;
+//   sensorType?: SensorType;
+//   sensorId?: string | number;
+//   sensorValue?: number;
+//   sensorUnit?: string;
+//   isRead?: boolean;
+//   isResolved?: boolean;
+//   gardenId?: number;
+// }
 
 interface AlertDetailsModalProps {
   isVisible: boolean;
   onClose: () => void;
-  alerts: GardenAlert[];
+  alerts: Alert[];
   gardenName: string;
   sensorData: Record<string, any[]>;
   theme: any;
@@ -48,32 +49,43 @@ interface AlertDetailsModalProps {
 }
 
 // Map alert types sang icon, màu sắc và nhãn
-const ALERT_TYPE_MAP: Record<
-  string,
-  { icon: string; color: string; label: string }
+const ALERT_TYPE_MAP: Partial<
+  Record<AlertType, { icon: string; color: string; label: string }>
 > = {
-  SENSOR_THRESHOLD: {
+  [AlertType.SENSOR_ERROR]: {
     icon: "hardware-chip-outline",
     color: "#3498db",
     label: "Cảm biến",
   },
-  WEATHER: { icon: "cloudy-outline", color: "#9b59b6", label: "Thời tiết" },
-  PEST: { icon: "bug-outline", color: "#e74c3c", label: "Sâu bệnh" },
-  WATER: { icon: "water-outline", color: "#3498db", label: "Nước" },
-  NUTRIENT: { icon: "flask-outline", color: "#27ae60", label: "Dinh dưỡng" },
-  SOIL: { icon: "leaf-outline", color: "#e67e22", label: "Đất" },
-  LIGHT: { icon: "sunny-outline", color: "#f1c40f", label: "Ánh sáng" },
+  [AlertType.WEATHER]: {
+    icon: "cloudy-outline",
+    color: "#9b59b6",
+    label: "Thời tiết",
+  },
+  [AlertType.PLANT_CONDITION]: {
+    icon: "bug-outline",
+    color: "#e74c3c",
+    label: "Sâu bệnh",
+  },
+  // Add other AlertType mappings as needed, e.g., for WATER, NUTRIENT, SOIL, LIGHT if they are valid AlertTypes
+  // For now, assuming these might be custom types not in the global AlertType enum.
+  // If they are, they should be added to the AlertType enum and mapped here.
+  // Example:
+  // [AlertType.WATER]: { icon: "water-outline", color: "#3498db", label: "Nước" },
 };
 
 // Map severity sang màu sắc và nhãn
-const SEVERITY_MAP: Record<
-  string,
-  { color: string; label: string; value: number }
+const SEVERITY_MAP: Partial<
+  Record<Severity, { color: string; label: string; value: number }>
 > = {
-  CRITICAL: { color: "#e74c3c", label: "Rất nghiêm trọng", value: 4 },
-  HIGH: { color: "#e67e22", label: "Nghiêm trọng", value: 3 },
-  MEDIUM: { color: "#f1c40f", label: "Trung bình", value: 2 },
-  LOW: { color: "#3498db", label: "Nhẹ", value: 1 },
+  [Severity.CRITICAL]: {
+    color: "#e74c3c",
+    label: "Rất nghiêm trọng",
+    value: 4,
+  },
+  [Severity.HIGH]: { color: "#e67e22", label: "Nghiêm trọng", value: 3 },
+  [Severity.MEDIUM]: { color: "#f1c40f", label: "Trung bình", value: 2 },
+  [Severity.LOW]: { color: "#3498db", label: "Nhẹ", value: 1 },
 };
 
 const AlertDetailsModal = ({
@@ -103,20 +115,27 @@ const AlertDetailsModal = ({
 
   // Helper function to get icon and color based on alert severity
   const getAlertStyleInfo = useCallback(
-    (severity: string, type: string) => {
-      // Get styles from type map
-      const typeInfo = ALERT_TYPE_MAP[type] || {
+    (alertSeverity: Severity | undefined, alertType: AlertType) => {
+      const defaultTypeInfo = {
         icon: "alert-circle-outline",
         color: theme.primary,
         label: "Cảnh báo",
       };
+      // Use enum key directly for lookup
+      const typeInfo = ALERT_TYPE_MAP[alertType]
+        ? ALERT_TYPE_MAP[alertType]!
+        : defaultTypeInfo;
 
-      // Get severity color
-      const severityInfo = SEVERITY_MAP[severity] || {
+      const defaultSeverityInfo = {
         color: theme.primary,
-        label: "Cảnh báo",
+        label: "Thông báo",
         value: 0,
       };
+      const currentSeverityKey = alertSeverity || Severity.LOW;
+      // Use enum key directly for lookup
+      const severityInfo = SEVERITY_MAP[currentSeverityKey]
+        ? SEVERITY_MAP[currentSeverityKey]!
+        : defaultSeverityInfo;
 
       return {
         icon: typeInfo.icon,
@@ -130,48 +149,42 @@ const AlertDetailsModal = ({
   );
 
   // Helper to get sensor name from type
-  const getSensorName = useCallback((type: SensorType): string => {
-    switch (type) {
-      case SensorType.TEMPERATURE:
-        return "Nhiệt độ";
-      case SensorType.HUMIDITY:
-        return "Độ ẩm";
-      case SensorType.SOIL_MOISTURE:
-        return "Ẩm đất";
-      case SensorType.LIGHT:
-        return "Ánh sáng";
-      case SensorType.WATER_LEVEL:
-        return "Mực nước";
-      case SensorType.SOIL_PH:
-        return "pH đất";
-      default:
-        return "Cảm biến";
-    }
-  }, []);
+  // const getSensorName = useCallback((type: SensorType): string => {
+  //   switch (type) {
+  //     case SensorType.TEMPERATURE:
+  //       return "Nhiệt độ";
+  //     case SensorType.HUMIDITY:
+  //       return "Độ ẩm";
+  //     case SensorType.SOIL_MOISTURE:
+  //       return "Ẩm đất";
+  //     case SensorType.LIGHT:
+  //       return "Ánh sáng";
+  //     case SensorType.WATER_LEVEL:
+  //       return "Mực nước";
+  //     case SensorType.SOIL_PH:
+  //       return "pH đất";
+  //     default:
+  //       return "Cảm biến";
+  //   }
+  // }, []);
 
   // Get relevant sensor data for the alert
-  const getSensorDataForAlert = useCallback(
-    (alert: GardenAlert) => {
-      if (!alert.sensorType || !sensorData[alert.sensorType]) return null;
-
-      // Get latest sensor reading
-      const sensorReadings = sensorData[alert.sensorType];
-      if (sensorReadings && sensorReadings.length > 0) {
-        return sensorReadings[0];
-      }
-
-      return null;
-    },
-    [sensorData]
-  );
+  // const getSensorDataForAlert = useCallback(
+  //   (alert: Alert) => {
+  //     // if (!alert.sensorType || !sensorData[alert.sensorType]) return null;
+  //     // For now, sensor specific data cannot be directly linked from Alert type
+  //     return null;
+  //   },
+  //   [sensorData]
+  // );
 
   // Render alert item
   const renderAlertItem = useCallback(
-    ({ item, index }: { item: GardenAlert; index: number }) => {
+    ({ item, index }: { item: Alert; index: number }) => {
       const { icon, backgroundColor, label, severityColor, severityLabel } =
         getAlertStyleInfo(item.severity, item.type);
-      const sensorInfo = item.sensorType ? getSensorName(item.sensorType) : "";
-      const sensorData = getSensorDataForAlert(item);
+      // const sensorInfo = item.sensorType ? getSensorName(item.sensorType) : "";
+      // const sensorDataForDisplay = getSensorDataForAlert(item);
 
       // Animation setup for fade-in effect
       const animatedValue = useMemo(() => new Animated.Value(0), []);
@@ -216,10 +229,10 @@ const AlertDetailsModal = ({
                 <Text
                   style={[styles.categoryLabel, { color: backgroundColor }]}
                 >
-                  {label} {sensorInfo ? `(${sensorInfo})` : ""}
+                  {label}
                 </Text>
                 <Text style={[styles.alertTitleText, { color: theme.text }]}>
-                  {item.title}
+                  {item.message}
                 </Text>
               </View>
               <View style={styles.severityContainer}>
@@ -243,70 +256,51 @@ const AlertDetailsModal = ({
               {item.message}
             </Text>
 
-            {sensorData && (
+            {/* {sensorDataForDisplay && (
               <View style={styles.sensorDataContainer}>
                 <Text
                   style={[styles.sensorLabel, { color: theme.textSecondary }]}
                 >
-                  Dữ liệu cảm biến:
+                  {getSensorName(item.sensorType)}:
                 </Text>
                 <Text style={[styles.sensorValue, { color: theme.text }]}>
-                  {sensorData.value.toFixed(1)} {sensorData.unit || ""}
+                  {sensorDataForDisplay.value} {sensorDataForDisplay.unit}
                 </Text>
               </View>
-            )}
+            )} */}
 
-            <View style={styles.timeContainer}>
-              <View
-                style={[
-                  styles.timeIconContainer,
-                  { backgroundColor: backgroundColor + "50" },
-                ]}
-              >
-                <Ionicons
-                  name="time-outline"
-                  size={16}
-                  color={backgroundColor}
-                />
-              </View>
-              <Text style={[styles.timeText, { color: theme.textSecondary }]}>
-                Phát hiện lúc: {formatDate(item.timestamp)}
+            <View style={styles.footerContainer}>
+              <Text style={[styles.timestamp, { color: theme.textSecondary }]}>
+                {formatDate(item.createdAt)}
               </Text>
+              {onResolveAlert && item.status !== "RESOLVED" && (
+                <View style={styles.actionContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.actionButton,
+                      { backgroundColor: backgroundColor },
+                    ]}
+                    activeOpacity={0.8}
+                    onPress={() => onResolveAlert(item.id)}
+                  >
+                    <Ionicons
+                      name="checkmark-outline"
+                      size={16}
+                      color="#fff"
+                      style={styles.actionIcon}
+                    />
+                    <Text style={styles.actionButtonText}>
+                      Đánh dấu đã xử lý
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
-
-            {/* Action buttons if needed */}
-            {!item.isResolved && onResolveAlert && (
-              <View style={styles.actionContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.actionButton,
-                    { backgroundColor: backgroundColor },
-                  ]}
-                  activeOpacity={0.8}
-                  onPress={() => onResolveAlert(item.id)}
-                >
-                  <Ionicons
-                    name="checkmark-outline"
-                    size={16}
-                    color="#fff"
-                    style={styles.actionIcon}
-                  />
-                  <Text style={styles.actionButtonText}>Đánh dấu đã xử lý</Text>
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
         </Animated.View>
       );
     },
-    [
-      theme,
-      getAlertStyleInfo,
-      formatDate,
-      getSensorName,
-      getSensorDataForAlert,
-      onResolveAlert,
-    ]
+    [theme, getAlertStyleInfo, formatDate, onResolveAlert]
   );
 
   // Component for empty alerts state
@@ -334,15 +328,17 @@ const AlertDetailsModal = ({
     // Map severity to its numerical value for sorting
     return [...alerts].sort((a, b) => {
       // First sort by severity (critical first)
-      const severityA = SEVERITY_MAP[a.severity]?.value || 0;
-      const severityB = SEVERITY_MAP[b.severity]?.value || 0;
+      const severityAValue =
+        SEVERITY_MAP[a.severity || Severity.LOW]?.value || 0;
+      const severityBValue =
+        SEVERITY_MAP[b.severity || Severity.LOW]?.value || 0;
 
-      const severityDiff = severityB - severityA; // Reversed for descending
+      const severityDiff = severityBValue - severityAValue; // Reversed for descending
 
       if (severityDiff !== 0) return severityDiff;
 
       // Then sort by timestamp (newest first)
-      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
   }, [alerts]);
 
@@ -604,6 +600,16 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Regular",
     textAlign: "center",
     lineHeight: 20,
+  },
+  footerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 12,
+  },
+  timestamp: {
+    fontSize: 12,
+    fontFamily: "Inter-Regular",
   },
 });
 

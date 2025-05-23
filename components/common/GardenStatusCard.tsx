@@ -5,7 +5,7 @@ import {
   StyleSheet,
   Pressable,
   Image,
-  AccessibilityProps,
+  Platform,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -156,19 +156,20 @@ export default function GardenStatusCard({
         <Text style={[styles.title, { color: theme.text }]}>
           Trạng thái vườn
         </Text>
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: getGardenStatusColor(garden.status) },
-          ]}
-        >
-          <Text style={styles.statusText}>
-            {gardenService.getGardenStatusText(garden.status)}
-          </Text>
+        <View style={styles.headerRightContent}>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: getGardenStatusColor(garden.status) },
+            ]}
+          >
+            <Text style={styles.statusText}>
+              {gardenService.getGardenStatusText(garden.status)}
+            </Text>
+          </View>
+          {topRightComponent}
         </View>
       </View>
-
-      {topRightComponent}
 
       <View style={styles.infoContainer}>
         <View style={styles.infoRow}>
@@ -270,16 +271,16 @@ export default function GardenStatusCard({
                   accessibilityHint="Hiển thị các lời khuyên cho vườn này"
                   accessibilityRole="button"
                 >
-                  <FontAwesome5
-                    name="lightbulb"
-                    size={12}
-                    color={theme.primary}
-                  />
-                  <Text
-                    style={[styles.actionButtonText, { color: theme.primary }]}
-                  >
-                    Lời khuyên
-                  </Text>
+                  <View style={styles.iconWrapperLờiKhuyên}>
+                    <FontAwesome5
+                      name="lightbulb"
+                      size={12}
+                      color={theme.primary}
+                    />
+                  </View>
+                  <View style={styles.textWrapper}>
+                    <Text style={styles.actionButtonText}>Lời khuyên</Text>
+                  </View>
                 </Pressable>
               )}
               {onViewPlantDetails && (
@@ -298,22 +299,22 @@ export default function GardenStatusCard({
                   accessibilityHint="Hiển thị thông tin chi tiết về cây trồng"
                   accessibilityRole="button"
                 >
-                  <Text
-                    style={[styles.detailsButtonText, { color: theme.primary }]}
-                  >
-                    Chi tiết
-                  </Text>
-                  <FontAwesome5
-                    name="chevron-right"
-                    size={12}
-                    color={theme.primary}
-                  />
+                  <View style={styles.textWrapper}>
+                    <Text style={styles.detailsButtonText}>Chi tiết</Text>
+                  </View>
+                  <View style={styles.iconWrapperChiTiet}>
+                    <FontAwesome5
+                      name="chevron-right"
+                      size={12}
+                      color={theme.primary}
+                    />
+                  </View>
                 </Pressable>
               )}
             </View>
           </View>
 
-          <View style={styles.plantInfoContainer}>
+          <View style={styles.plantBasicInfoRow}>
             <View style={styles.plantImageContainer}>
               <Image
                 source={getPlantImage()}
@@ -325,7 +326,7 @@ export default function GardenStatusCard({
             </View>
 
             <View style={styles.plantDetails}>
-              <View style={styles.plantRow}>
+              <View style={styles.plantDetailItem}>
                 <Text
                   style={[styles.plantLabel, { color: theme.textSecondary }]}
                 >
@@ -336,7 +337,7 @@ export default function GardenStatusCard({
                 </Text>
               </View>
 
-              <View style={styles.plantRow}>
+              <View style={styles.plantDetailItem}>
                 <Text
                   style={[styles.plantLabel, { color: theme.textSecondary }]}
                 >
@@ -347,7 +348,7 @@ export default function GardenStatusCard({
                 </Text>
               </View>
 
-              <View style={styles.plantRow}>
+              <View style={styles.plantDetailItem}>
                 <Text
                   style={[styles.plantLabel, { color: theme.textSecondary }]}
                 >
@@ -360,85 +361,84 @@ export default function GardenStatusCard({
             </View>
           </View>
 
-          {garden.plantDuration && garden.plantStartDate && (
-            <View style={styles.progressContainer}>
-              <View style={styles.progressLabels}>
-                <Text style={[styles.progressLabel, { color: theme.text }]}>
-                  Tiến độ tăng trưởng
-                </Text>
-                <Text style={[styles.progressLabel, { color: theme.text }]}>
-                  {growthProgress}%
-                </Text>
-              </View>
+          <View style={styles.progressContainer}>
+            <View style={styles.progressLabels}>
+              <Text style={[styles.progressLabel, { color: theme.text }]}>
+                Tiến độ tăng trưởng
+              </Text>
+              <Text style={[styles.progressLabel, { color: theme.text }]}>
+                {growthProgress}%
+              </Text>
+            </View>
 
-              {/* Enhanced progress bar with stage markers */}
-              <View style={styles.progressTrackContainer}>
+            {/* Enhanced progress bar with stage markers */}
+            <View style={styles.progressTrackContainer}>
+              <View
+                style={[styles.progressBar, { backgroundColor: theme.border }]}
+              >
                 <View
                   style={[
-                    styles.progressBar,
-                    { backgroundColor: theme.border },
+                    styles.progressFill,
+                    {
+                      width: `${growthProgress}%`,
+                      backgroundColor: getProgressColor(growthProgress),
+                    },
                   ]}
-                >
+                />
+              </View>
+
+              {/* Stage markers */}
+              <View style={styles.stageMarkersContainer}>
+                {progressStages.map((stage, index) => (
                   <View
+                    key={`stage-${index}`}
                     style={[
-                      styles.progressFill,
+                      styles.stageMark,
                       {
-                        width: `${growthProgress}%`,
-                        backgroundColor: getProgressColor(growthProgress),
+                        left: `${stage.percent}%`,
+                        backgroundColor: stage.active
+                          ? getProgressColor(stage.percent)
+                          : theme.background,
                       },
                     ]}
                   />
-                </View>
-
-                {/* Stage markers */}
-                <View style={styles.stageMarkersContainer}>
-                  {progressStages.map((stage, index) => (
-                    <View
-                      key={`stage-${index}`}
-                      style={[
-                        styles.stageMark,
-                        {
-                          left: `${stage.percent}%`,
-                          backgroundColor: stage.active
-                            ? getProgressColor(stage.percent)
-                            : theme.background,
-                        },
-                      ]}
-                    />
-                  ))}
-                </View>
-              </View>
-
-              {/* Stage labels */}
-              <View style={styles.stageLabelsContainer}>
-                {progressStages.map((stage, index) => (
-                  <Text
-                    key={`label-${index}`}
-                    style={[
-                      styles.stageLabel,
-                      {
-                        color: stage.active ? theme.text : theme.textSecondary,
-                        left: `${stage.percent}%`,
-                        transform: [{ translateX: -12 }],
-                      },
-                    ]}
-                  >
-                    {index === 0 || index === progressStages.length - 1
-                      ? stage.label
-                      : ""}
-                  </Text>
                 ))}
               </View>
-
-              {daysRemaining !== null && (
-                <Text
-                  style={[styles.daysRemaining, { color: theme.textSecondary }]}
-                >
-                  {daysRemaining} ngày còn lại đến ngày thu hoạch dự kiến
-                </Text>
-              )}
             </View>
-          )}
+
+            {/* Stage labels */}
+            <View style={styles.stageLabelsContainer}>
+              {progressStages.map((stage, index) => (
+                <Text
+                  key={`label-${index}`}
+                  style={[
+                    styles.stageLabel,
+                    {
+                      color: stage.active ? theme.text : theme.textSecondary,
+                      left: `${stage.percent}%`,
+                      transform: [{ translateX: -12 }],
+                    },
+                  ]}
+                >
+                  {index === 0 || index === progressStages.length - 1
+                    ? stage.label
+                    : ""}
+                </Text>
+              ))}
+            </View>
+
+            {daysRemaining !== null && (
+              <Text
+                style={[styles.daysRemaining, { color: theme.textSecondary }]}
+              >
+                {daysRemaining > 0
+                  ? `${daysRemaining} ngày còn lại đến ngày thu hoạch dự kiến`
+                  : daysRemaining === 0
+                    ? "Đến ngày thu hoạch!"
+                    : "Đã qua ngày thu hoạch"}
+              </Text>
+            )}
+          </View>
         </View>
       ) : (
         <View style={[styles.noPlantContainer, { borderColor: theme.border }]}>
@@ -462,37 +462,41 @@ const createStyles = (theme: any) =>
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
-      padding: 16,
-      paddingBottom: 12,
+      marginBottom: 16,
+    },
+    headerRightContent: {
+      flexDirection: "row",
+      alignItems: "center",
     },
     title: {
-      fontSize: 16,
-      fontFamily: "Inter-Bold",
+      fontSize: 18,
+      fontFamily: "Inter-SemiBold",
+      marginRight: 8,
     },
     statusBadge: {
-      paddingHorizontal: 10,
+      paddingHorizontal: 8,
       paddingVertical: 4,
-      borderRadius: 20,
+      borderRadius: 12,
     },
     statusText: {
-      color: "#FFFFFF",
       fontSize: 12,
       fontFamily: "Inter-Medium",
+      color: "#fff",
     },
     infoContainer: {
-      paddingHorizontal: 16,
-      paddingBottom: 16,
+      paddingTop: 8,
     },
     infoRow: {
       flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
+      alignItems: "flex-start",
       marginBottom: 12,
     },
     labelContainer: {
       flexDirection: "row",
       alignItems: "center",
       gap: 8,
+      flex: 2,
+      marginRight: 8,
     },
     label: {
       fontSize: 14,
@@ -501,8 +505,8 @@ const createStyles = (theme: any) =>
     value: {
       fontSize: 14,
       fontFamily: "Inter-Regular",
-      maxWidth: "60%",
-      textAlign: "right",
+      flex: 3,
+      textAlign: "left",
     },
     mapContainer: {
       height: 120,
@@ -520,45 +524,69 @@ const createStyles = (theme: any) =>
     plantContainer: {
       padding: 16,
       borderTopWidth: 1,
+      marginTop: 16,
     },
     plantHeader: {
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: 12,
+      marginBottom: 16,
     },
     plantTitle: {
       fontSize: 16,
       fontFamily: "Inter-Bold",
+      color: theme.text,
     },
     buttonsContainer: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 8,
+      gap: 10,
     },
     actionButton: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 4,
-      padding: 6,
-      borderRadius: 6,
+      justifyContent: "center",
+      height: 30,
+      paddingHorizontal: 10,
+      borderRadius: 16,
+      backgroundColor: theme.primaryLight,
     },
     actionButtonText: {
       fontSize: 12,
       fontFamily: "Inter-Medium",
+      color: theme.primary,
+      includeFontPadding: false,
+      textAlignVertical: "center",
+      lineHeight: 14,
     },
     detailsButton: {
       flexDirection: "row",
       alignItems: "center",
-      padding: 6,
-      borderRadius: 6,
-      gap: 4,
+      justifyContent: "center",
+      height: 30,
+      paddingHorizontal: 10,
+      borderRadius: 16,
     },
     detailsButtonText: {
       fontSize: 12,
       fontFamily: "Inter-Medium",
+      color: theme.primary,
+      includeFontPadding: false,
+      textAlignVertical: "center",
+      lineHeight: 14,
     },
-    plantInfoContainer: {
+    iconWrapperLờiKhuyên: {
+      alignSelf: "center",
+      marginRight: 5,
+    },
+    iconWrapperChiTiet: {
+      alignSelf: "center",
+      marginLeft: 5,
+    },
+    textWrapper: {
+      alignSelf: "center",
+    },
+    plantBasicInfoRow: {
       flexDirection: "row",
       gap: 12,
       marginBottom: 16,
@@ -579,22 +607,26 @@ const createStyles = (theme: any) =>
     },
     plantDetails: {
       flex: 1,
-      justifyContent: "center",
-      gap: 4,
+      justifyContent: "space-around",
     },
-    plantRow: {
+    plantDetailItem: {
       flexDirection: "row",
-      justifyContent: "space-between",
+      alignItems: "flex-start",
+      marginBottom: 4,
     },
     plantLabel: {
       fontSize: 13,
       fontFamily: "Inter-Medium",
+      flex: 2,
+      marginRight: 4,
+      color: theme.textSecondary,
     },
     plantValue: {
       fontSize: 13,
       fontFamily: "Inter-Regular",
-      maxWidth: "60%",
-      textAlign: "right",
+      flex: 3,
+      textAlign: "left",
+      color: theme.text,
     },
     progressContainer: {
       marginTop: 8,
@@ -657,6 +689,7 @@ const createStyles = (theme: any) =>
       padding: 16,
       alignItems: "center",
       borderTopWidth: 1,
+      marginTop: 16,
     },
     noPlantText: {
       fontSize: 14,

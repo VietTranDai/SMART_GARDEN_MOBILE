@@ -1,5 +1,5 @@
 import React from "react";
-import { ScrollView, StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { GardenPhoto } from "@/types";
 import GardenPhotoGallery from "@/components/garden/GardenPhotoGallery";
@@ -20,17 +20,14 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({
   const theme = useAppTheme();
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <GardenPhotoGallery
         photos={photos}
         gardenId={gardenId}
         onUploadRequested={initiatePhotoUpload}
         isLoading={isLoading}
       />
-    </ScrollView>
+    </View>
   );
 };
 

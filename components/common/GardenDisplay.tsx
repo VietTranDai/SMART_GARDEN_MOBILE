@@ -139,7 +139,7 @@ const GardenCard = memo(
     }, [gardenSensorData, getSensorStatus, garden.id]);
 
     // Lấy tổng số cảnh báo (kết hợp giữa alert từ backend và sensor alerts)
-    const totalAlerts = (garden.alertCount || 0) + getSensorAlerts();
+    const sensorAlertCount = getSensorAlerts();
 
     const handlePress = useCallback(() => {
       Animated.sequence([
@@ -235,7 +235,7 @@ const GardenCard = memo(
               <Text style={styles.gardenImageType}>
                 {getGardenTypeText(garden.type)}
               </Text>
-              {totalAlerts > 0 && (
+              {sensorAlertCount > 0 && (
                 <TouchableOpacity
                   style={[
                     styles.alertBadge,
@@ -256,7 +256,7 @@ const GardenCard = memo(
                 >
                   <Ionicons name="alert-circle" size={12} color="#fff" />
                   <Text style={styles.alertBadgeText}>
-                    {totalAlerts} cảnh báo
+                    {sensorAlertCount} cảnh báo
                   </Text>
                 </TouchableOpacity>
               )}
@@ -296,7 +296,7 @@ const GardenCard = memo(
                 <Ionicons
                   name="alert-circle-outline"
                   size={16}
-                  color={totalAlerts > 0 ? theme.warning : theme.primary}
+                  color={sensorAlertCount > 0 ? theme.warning : theme.primary}
                   style={styles.statIcon}
                 />
                 <View style={styles.statTextContainer}>
@@ -304,10 +304,13 @@ const GardenCard = memo(
                   <Text
                     style={[
                       styles.statValue,
-                      { color: totalAlerts > 0 ? theme.warning : theme.text },
+                      {
+                        color:
+                          sensorAlertCount > 0 ? theme.warning : theme.text,
+                      },
                     ]}
                   >
-                    {totalAlerts}
+                    {sensorAlertCount}
                   </Text>
                 </View>
               </View>
@@ -483,10 +486,10 @@ const GardenCard = memo(
                         gardenWeather.weatherMain === "CLEAR"
                           ? "sunny-outline"
                           : gardenWeather.weatherMain === "CLOUDS"
-                          ? "cloudy-outline"
-                          : gardenWeather.weatherMain === "RAIN"
-                          ? "rainy-outline"
-                          : "cloud-outline"
+                            ? "cloudy-outline"
+                            : gardenWeather.weatherMain === "RAIN"
+                              ? "rainy-outline"
+                              : "cloud-outline"
                       }
                       size={18}
                       color="#4da0ff"

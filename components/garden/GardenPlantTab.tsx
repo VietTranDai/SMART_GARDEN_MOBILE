@@ -1,5 +1,5 @@
 import React from "react";
-import { ScrollView, StyleSheet, View, Text } from "react-native";
+import { StyleSheet, View, Text } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { GardenPlantDetails } from "@/types";
@@ -38,10 +38,7 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({ plantDetails }) => {
   }
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <PlantDetailCard
         plantDetails={plantDetails}
         onViewFullDetails={() => {}}
@@ -129,7 +126,7 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({ plantDetails }) => {
           </View>
         </View>
       </View>
-    </ScrollView>
+    </View>
   );
 };
 

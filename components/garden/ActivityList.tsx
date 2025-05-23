@@ -9,10 +9,6 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { ActivityType, GardenActivity } from "@/types";
-import Colors from "@/constants/Colors"; // Import Colors for theme type
-
-// Define a more specific type for the theme object
-type AppThemeType = typeof Colors.light;
 
 // Props for the ActivityList component
 interface ActivityListProps {
@@ -147,7 +143,7 @@ export default function ActivityList({
   );
 }
 
-const createStyles = (theme: AppThemeType) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     listContainer: {
       paddingTop: 8,

@@ -41,6 +41,7 @@ export interface UpdateGardenDto {
   plantGrowStage?: string;
   plantStartDate?: string;
   plantDuration?: number;
+  lastVisitedAt?: string;
 }
 
 /**

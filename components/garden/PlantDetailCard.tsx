@@ -6,20 +6,11 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
-  Platform,
 } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import Colors from "@/constants/Colors";
-import {
-  GardenPlantDetails,
-  GardenGrowthStage,
-} from "@/types/gardens/garden.types";
-import {
-  FontAwesome5,
-  MaterialCommunityIcons,
-  Ionicons,
-} from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
+import { GardenPlantDetails } from "@/types/gardens/garden.types";
+import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 // @ts-ignore: Module not found or type declarations missing
 import * as Progress from "react-native-progress";
 
@@ -274,7 +265,6 @@ const createStyles = (theme: AppThemeType) =>
     container: {
       backgroundColor: theme.card,
       borderRadius: 16,
-      marginHorizontal: 16,
       marginVertical: 8,
       shadowColor: theme.shadow,
       shadowOffset: { width: 0, height: 2 },
@@ -321,7 +311,7 @@ const createStyles = (theme: AppThemeType) =>
       padding: 16,
     },
     infoContainer: {
-      marginBottom: 16,
+      marginBottom: 20,
     },
     plantNameContainer: {
       marginBottom: 12,

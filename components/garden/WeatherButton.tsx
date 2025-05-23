@@ -68,10 +68,7 @@ const WeatherButton: React.FC<WeatherButtonProps> = ({
 
 const styles = StyleSheet.create({
   weatherButtonContainer: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    zIndex: 5,
+    marginLeft: 8,
   },
   weatherButton: {
     flexDirection: "row",

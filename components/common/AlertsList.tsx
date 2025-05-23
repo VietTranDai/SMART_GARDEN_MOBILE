@@ -6,7 +6,6 @@ import {
   FlatList,
   TouchableOpacity,
   ScrollView,
-  ViewStyle,
 } from "react-native";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -17,7 +16,6 @@ interface AlertsListProps {
   onAlertPress?: (alert: Alert) => void;
   onResolveAlert?: (alertId: string) => void;
   onIgnoreAlert?: (alertId: string) => void;
-  pendingCount?: number;
   compact?: boolean;
   maxItems?: number;
 }
@@ -27,10 +25,6 @@ const ALERT_ICONS: Record<
   | keyof typeof FontAwesome5.glyphMap
   | keyof typeof MaterialCommunityIcons.glyphMap
 > = {
-  [AlertType.WARNING]: "alert",
-  [AlertType.ERROR]: "alert-circle",
-  [AlertType.INFO]: "information",
-  [AlertType.SUCCESS]: "check-circle",
   [AlertType.WEATHER]: "cloud-sun-rain",
   [AlertType.SENSOR_ERROR]: "exclamation-triangle",
   [AlertType.SYSTEM]: "cogs",
@@ -46,7 +40,6 @@ export default function AlertsList({
   onAlertPress,
   onResolveAlert,
   onIgnoreAlert,
-  pendingCount = 0,
   compact = false,
   maxItems,
 }: AlertsListProps) {
@@ -78,14 +71,6 @@ export default function AlertsList({
 
   const getAlertTypeColor = (type: AlertType) => {
     switch (type) {
-      case AlertType.WARNING:
-        return theme.warning;
-      case AlertType.ERROR:
-        return theme.error;
-      case AlertType.INFO:
-        return theme.info;
-      case AlertType.SUCCESS:
-        return theme.success;
       case AlertType.WEATHER:
         return theme.info;
       case AlertType.SENSOR_ERROR:
@@ -251,7 +236,7 @@ export default function AlertsList({
       "tools",
       "shield-alt",
       "bell",
-    ].includes(icon);
+    ].includes(icon as string);
 
     return (
       <TouchableOpacity
@@ -435,7 +420,6 @@ const styles = StyleSheet.create({
   },
   alertCard: {
     flexDirection: "row",
-    backgroundColor: "white",
     borderRadius: 12,
     padding: 12,
     gap: 12,
@@ -476,7 +460,6 @@ const styles = StyleSheet.create({
   },
   // Detailed alert styles
   alertContainer: {
-    backgroundColor: "white",
     borderRadius: 12,
     borderLeftWidth: 4,
     marginBottom: 12,

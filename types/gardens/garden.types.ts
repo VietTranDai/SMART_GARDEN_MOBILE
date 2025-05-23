@@ -56,6 +56,7 @@ export interface Garden {
   // Timestamps
   createdAt?: string;
   updatedAt?: string;
+  lastVisitedAt?: string;
 }
 
 /**

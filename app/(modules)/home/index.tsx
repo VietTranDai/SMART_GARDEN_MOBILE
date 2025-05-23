@@ -60,30 +60,13 @@ import {
 } from "@/types/activities/activity.types";
 
 // Import getSensorStatus from the useSensorData hook
-import { getSensorStatus } from "@/hooks/useSensorData";
+// import { getSensorStatus } from "@/hooks/useSensorData"; // This is not used directly here, passed from useHomeData
 import { GardenAdvice } from "@/types";
 
 // Structure for the main FlatList data
 interface Section {
   type: SectionType;
   key: string;
-}
-
-// Define GardenAlert interface for alert display
-interface GardenAlert {
-  id: string | number;
-  type: string;
-  title: string;
-  message: string;
-  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  timestamp: string;
-  sensorType?: SensorType;
-  sensorId?: string | number;
-  sensorValue?: number;
-  sensorUnit?: string;
-  isRead?: boolean;
-  isResolved?: boolean;
-  gardenId?: number;
 }
 
 // Cập nhật styles để thêm các thuộc tính thiếu với typing đúng
@@ -188,31 +171,31 @@ interface DynamicSectionsProps {
 /**
  * Kiểm tra xem một đối tượng có phải là mảng hợp lệ hay không
  */
-const isValidArray = (data: any): boolean => {
-  return Array.isArray(data);
-};
+// const isValidArray = (data: any): boolean => {
+//   return Array.isArray(data);
+// };
 
 /**
  * Kiểm tra xem một đối tượng có phải là mảng hợp lệ và có phần tử hay không
  */
-const hasItems = (data: any): boolean => {
-  return Array.isArray(data) && data.length > 0;
-};
+// const hasItems = (data: any): boolean => {
+//   return Array.isArray(data) && data.length > 0;
+// };
 
 /**
  * Kiểm tra xem một key có tồn tại trong một đối tượng hay không
  */
-const hasValidProperty = (obj: any, key: string | number): boolean => {
-  return obj && typeof obj === "object" && key in obj;
-};
+// const hasValidProperty = (obj: any, key: string | number): boolean => {
+//   return obj && typeof obj === "object" && key in obj;
+// };
 
 /**
  * Lấy mảng an toàn từ một đối tượng, trả về mảng rỗng nếu không hợp lệ
  */
-const getSafeArray = (data: any): any[] => {
-  if (!Array.isArray(data)) return [];
-  return data.filter((item: any) => item && typeof item === "object");
-};
+// const getSafeArray = (data: any): any[] => {
+//   if (!Array.isArray(data)) return [];
+//   return data.filter((item: any) => item && typeof item === "object");
+// };
 
 /**
  * Lấy mảng các giá trị từ đối tượng một cách an toàn
@@ -232,29 +215,29 @@ const getSafeObjectValues = (obj: any): any[] => {
 /**
  * Làm phẳng mảng một cách an toàn
  */
-const safeArrayFlat = (arr: any[]): any[] => {
-  if (!Array.isArray(arr)) return [];
-  try {
-    // Cách an toàn hơn để làm phẳng mảng
-    const result: any[] = [];
-    for (let i = 0; i < arr.length; i++) {
-      const item = arr[i];
-      if (Array.isArray(item)) {
-        for (let j = 0; j < item.length; j++) {
-          if (item[j] !== undefined && item[j] !== null) {
-            result.push(item[j]);
-          }
-        }
-      } else if (item !== undefined && item !== null) {
-        result.push(item);
-      }
-    }
-    return result;
-  } catch (error) {
-    console.error("Error in safeArrayFlat:", error);
-    return [];
-  }
-};
+// const safeArrayFlat = (arr: any[]): any[] => {
+//   if (!Array.isArray(arr)) return [];
+//   try {
+//     // Cách an toàn hơn để làm phẳng mảng
+//     const result: any[] = [];
+//     for (let i = 0; i < arr.length; i++) {
+//       const item = arr[i];
+//       if (Array.isArray(item)) {
+//         for (let j = 0; j < item.length; j++) {
+//           if (item[j] !== undefined && item[j] !== null) {
+//             result.push(item[j]);
+//           }
+//         }
+//       } else if (item !== undefined && item !== null) {
+//         result.push(item);
+//       }
+//     }
+//     return result;
+//   } catch (error) {
+//     console.error("Error in safeArrayFlat:", error);
+//     return [];
+//   }
+// };
 
 // Sửa đổi các component memos để sử dụng interfaces và các utility functions
 const GardenSection = memo((props: GardenSectionProps) => {
@@ -701,15 +684,6 @@ const DynamicSections = memo((props: DynamicSectionsProps) => {
   }
 });
 
-// Tạo một wrapper component cho HomeScreen
-const HomeScreenWrapper = () => {
-  return (
-    <GardenProvider>
-      <HomeScreenContent />
-    </GardenProvider>
-  );
-};
-
 // Rename HomeScreen thành HomeScreenContent và giữ lại logic
 function HomeScreenContent() {
   const theme = useAppTheme();
@@ -735,6 +709,7 @@ function HomeScreenContent() {
     gardenAlerts,
     getWeatherTip,
     getSensorIconName,
+    getSensorStatus,
     recentActivities,
     upcomingSchedules,
     handleRefresh,
@@ -1131,28 +1106,6 @@ function HomeScreenContent() {
     return gardens.find((g) => g.id === selectedGardenForWeather);
   }, [selectedGardenForWeather, gardens]);
 
-  // Transform alerts to GardenAlert format if needed
-  const getFormattedAlerts = useCallback((alerts: Alert[]): GardenAlert[] => {
-    // Kiểm tra alerts có phải là một mảng hợp lệ không
-    if (!Array.isArray(alerts)) return [];
-
-    return alerts.map((alert) => ({
-      id: alert.id || Date.now(),
-      type: alert.type || "SENSOR_THRESHOLD",
-      title: alert.message,
-      message: alert.message,
-      severity: (alert.severity || "LOW") as
-        | "LOW"
-        | "MEDIUM"
-        | "HIGH"
-        | "CRITICAL",
-      timestamp: alert.createdAt || new Date().toISOString(),
-      sensorType:
-        alert.type === "SENSOR_ERROR" ? SensorType.TEMPERATURE : undefined,
-      gardenId: alert.gardenId,
-    }));
-  }, []);
-
   // After the existing state declarations, add:
   const [gardenAdviceByGarden, setGardenAdviceByGarden] = useState<
     Record<number, GardenAdvice[]>
@@ -1326,7 +1279,7 @@ function HomeScreenContent() {
           typeof gardenAlerts === "object" &&
           selectedGardenForAlerts in gardenAlerts &&
           Array.isArray(gardenAlerts[selectedGardenForAlerts])
-            ? getFormattedAlerts(gardenAlerts[selectedGardenForAlerts])
+            ? gardenAlerts[selectedGardenForAlerts]
             : []
         }
         gardenName={

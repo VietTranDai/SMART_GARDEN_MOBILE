@@ -519,6 +519,8 @@ const createStyles = (theme: any) =>
       shadowOpacity: 0.15,
       shadowRadius: 8,
       position: "relative",
+      borderWidth: 1,
+      borderColor: `${theme.primary}44`,
     },
     imageThumbnailContainer: {
       position: "relative",

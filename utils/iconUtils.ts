@@ -9,45 +9,55 @@ export type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
  * and the desired mapping to full Ionicon names.
  */
 export const getValidIconName = (
-  iconName?: string,
+  iconCode?: string,
   addOutlineSuffix: boolean = true
 ): IoniconName => {
-  const defaultIcon: IoniconName = "cloudy-outline";
-  if (!iconName) {
+  const defaultIcon: IoniconName = "cloud-outline";
+
+  if (!iconCode) {
     return defaultIcon;
   }
 
-  let fullIconName = addOutlineSuffix ? `${iconName}-outline` : iconName;
+  // Mapping from common weather API icon codes to Ionicon names
+  const iconMap: Record<string, IoniconName> = {
+    "01d": "sunny-outline",
+    "01n": "moon-outline",
+    "02d": "partly-sunny-outline",
+    "02n": "cloudy-night-outline",
+    "03d": "cloud-outline", // Scattered clouds day
+    "03n": "cloud-outline", // Scattered clouds night - using same as day for simplicity
+    "04d": "cloudy-outline", // Broken clouds day
+    "04n": "cloudy-outline", // Broken clouds night
+    "09d": "rainy-outline", // Shower rain day
+    "09n": "rainy-outline", // Shower rain night
+    "10d": "rainy-outline", // Rain day
+    "10n": "rainy-outline", // Rain night
+    "11d": "thunderstorm-outline",
+    "11n": "thunderstorm-outline",
+    "13d": "snow-outline",
+    "13n": "snow-outline",
+    "50d": "reorder-three-outline", // Mist day (using a generic fog/mist icon)
+    "50n": "reorder-three-outline", // Mist night
+    // Add more mappings as needed based on your API's icon codes
+  };
 
-  // This is a simplistic check. A more robust solution might involve a mapping object
-  // if API icon codes don't directly translate to Ionicon names by just adding a suffix.
-  // Or, ensure the iconName passed is already a valid Ionicon name or part of one.
+  // Check if the iconCode (without suffix) is in our map
+  if (iconMap[iconCode]) {
+    return iconMap[iconCode];
+  }
 
-  // For now, we'll trust that the constructed name is potentially valid
-  // and rely on Ionicons to handle it (it usually defaults if name is invalid, but that's not ideal).
-  // A truly safe version would check against a comprehensive list of actual Ionicon names.
-  // However, the original list was very small and might not cover all cases from an API.
+  // Fallback if iconCode is not in the map - try to use it directly or with suffix
+  // This part retains some of the old logic but is less likely to be hit if the map is comprehensive
+  let fullIconName = addOutlineSuffix ? `${iconCode}-outline` : iconCode;
 
-  // Placeholder for a more comprehensive validation if needed:
-  const knownValidIcons: IoniconName[] = [
-    "cloudy-outline",
-    "sunny-outline",
-    "rainy-outline",
-    "thunderstorm-outline",
-    "snow-outline",
-    "partly-sunny-outline",
-    "cloud-outline",
-    "close",
-    "chevron-down-outline",
-    // Add more tested Ionicon names here if you want a strict check
-  ];
+  // A simple check to see if the constructed name looks like a plausible Ionicon name
+  // This is not foolproof and relies on Ionicons handling unknown names gracefully.
+  // Consider removing this or making it more robust if issues persist.
+  if (fullIconName.includes("-outline")) {
+    // @ts-ignore - Bypassing strict type check for dynamic name
+    return fullIconName as IoniconName;
+  }
 
-  // If you want to strictly validate against a known list:
-  // if (knownValidIcons.includes(fullIconName as IoniconName)) {
-  //   return fullIconName as IoniconName;
-  // }
-  // return defaultIcon;
-
-  // For now, assume the constructed name is what we intend to try.
-  return fullIconName as IoniconName;
+  // If all else fails, return the default icon
+  return defaultIcon;
 };

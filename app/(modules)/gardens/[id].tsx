@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,7 +17,6 @@ import GardenOverviewTab from "@/components/garden/GardenOverviewTab";
 import GardenSensorsTab from "@/components/garden/GardenSensorsTab";
 import GardenPlantTab from "@/components/garden/GardenPlantTab";
 import GardenPhotosTab from "@/components/garden/GardenPhotosTab";
-import { WeatherObservation, HourlyForecast, DailyForecast } from "@/types";
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -100,11 +99,7 @@ export default function GardenDetailScreen() {
         lastSensorUpdate={lastSensorUpdate || undefined}
         isSensorDataLoading={isSensorDataLoading}
         isRefreshing={isRefreshing}
-        currentGrowthStage={
-          plantDetails?.currentGrowthStage
-            ? String(plantDetails.currentGrowthStage)
-            : undefined
-        }
+        currentGrowthStage={plantDetails?.currentGrowthStage}
         onRefresh={() => id && refreshSensorData(id)}
         onSelectSensor={(sensor) => router.push(`/sensors/${sensor.id}`)}
       />
@@ -146,7 +141,12 @@ export default function GardenDetailScreen() {
   // Loading state
   if (isLoading && !garden) {
     return (
-      <View style={[styles.container, styles.loadingContainer]}>
+      <View
+        style={[
+          styles.loadingContainer,
+          { backgroundColor: theme.background || "#F5F5F5" },
+        ]}
+      >
         <ActivityIndicator size="large" color={theme.primary} />
         <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
           Đang tải chi tiết vườn...
@@ -169,73 +169,79 @@ export default function GardenDetailScreen() {
   }
 
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
       <Stack.Screen options={{ title: garden?.name, headerShown: false }} />
 
       <GardenHeader profilePicture={garden.profilePicture} />
 
-      <Tab.Navigator
-        screenOptions={{
-          tabBarActiveTintColor: theme.primary,
-          tabBarInactiveTintColor: theme.textSecondary,
-          tabBarIndicatorStyle: {
-            backgroundColor: theme.primary,
-          },
-          tabBarStyle: {
-            backgroundColor: theme.background,
-            elevation: 0,
-            shadowOpacity: 0,
-            borderBottomWidth: 1,
-            borderBottomColor: theme.borderLight,
-          },
-          tabBarLabelStyle: {
-            fontSize: 13,
-            fontFamily: "Inter-Medium",
-            textTransform: "none",
-          },
-        }}
-      >
-        <Tab.Screen
-          name="Overview"
-          component={OverviewTab}
-          options={{
-            tabBarLabel: "Tổng quan",
-            tabBarIcon: ({ color }: { color: string }) => (
-              <Ionicons name="home-outline" size={20} color={color} />
-            ),
+      <View style={{ flex: 1 }}>
+        <Tab.Navigator
+          screenOptions={{
+            tabBarActiveTintColor: theme.primary,
+            tabBarInactiveTintColor: theme.textSecondary,
+            tabBarIndicatorStyle: {
+              backgroundColor: theme.primary,
+            },
+            tabBarStyle: {
+              backgroundColor: theme.background,
+              elevation: 0,
+              shadowOpacity: 0,
+              borderBottomWidth: 1,
+              borderBottomColor: theme.borderLight,
+            },
+            tabBarLabelStyle: {
+              fontSize: 13,
+              fontFamily: "Inter-Medium",
+              textTransform: "none",
+            },
           }}
-        />
-        <Tab.Screen
-          name="Sensors"
-          component={SensorsTab}
-          options={{
-            tabBarLabel: "Cảm biến",
-            tabBarIcon: ({ color }: { color: string }) => (
-              <Ionicons name="hardware-chip-outline" size={20} color={color} />
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="Plant"
-          component={PlantTab}
-          options={{
-            tabBarLabel: "Cây trồng",
-            tabBarIcon: ({ color }: { color: string }) => (
-              <Ionicons name="leaf-outline" size={20} color={color} />
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="Photos"
-          component={PhotosTab}
-          options={{
-            tabBarLabel: "Hình ảnh",
-            tabBarIcon: ({ color }: { color: string }) => (
-              <Ionicons name="images-outline" size={20} color={color} />
-            ),
-          }}
-        />
-      </Tab.Navigator>
+        >
+          <Tab.Screen
+            name="Overview"
+            component={OverviewTab}
+            options={{
+              tabBarLabel: "Tổng quan",
+              tabBarIcon: ({ color }: { color: string }) => (
+                <Ionicons name="home-outline" size={20} color={color} />
+              ),
+            }}
+          />
+          <Tab.Screen
+            name="Sensors"
+            component={SensorsTab}
+            options={{
+              tabBarLabel: "Cảm biến",
+              tabBarIcon: ({ color }: { color: string }) => (
+                <Ionicons
+                  name="hardware-chip-outline"
+                  size={20}
+                  color={color}
+                />
+              ),
+            }}
+          />
+          <Tab.Screen
+            name="Plant"
+            component={PlantTab}
+            options={{
+              tabBarLabel: "Cây trồng",
+              tabBarIcon: ({ color }: { color: string }) => (
+                <Ionicons name="leaf-outline" size={20} color={color} />
+              ),
+            }}
+          />
+          <Tab.Screen
+            name="Photos"
+            component={PhotosTab}
+            options={{
+              tabBarLabel: "Hình ảnh",
+              tabBarIcon: ({ color }: { color: string }) => (
+                <Ionicons name="images-outline" size={20} color={color} />
+              ),
+            }}
+          />
+        </Tab.Navigator>
+      </View>
 
       {/* Weather modal */}
       <WeatherModal
@@ -257,7 +263,7 @@ export default function GardenDetailScreen() {
         theme={theme}
         adviceType="garden"
       />
-    </>
+    </View>
   );
 }
 

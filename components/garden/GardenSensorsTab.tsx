@@ -1,11 +1,12 @@
 import React from "react";
-import { ScrollView, StyleSheet, View, Text } from "react-native";
+import { StyleSheet, View, Text } from "react-native";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { UISensor } from "@/components/garden/GardenSensorSection";
 import SensorDetailView from "@/components/common/SensorDetailView";
 import SensorHistoryChart from "@/components/garden/SensorHistoryChart";
 import { SensorHistory } from "@/types";
 import { SensorType } from "@/types/gardens/sensor.types";
+import { GardenGrowthStage } from "@/types/gardens/garden.types";
 
 interface GardenSensorsTabProps {
   sensors: UISensor[];
@@ -13,7 +14,7 @@ interface GardenSensorsTabProps {
   lastSensorUpdate?: string;
   isSensorDataLoading: boolean;
   isRefreshing: boolean;
-  currentGrowthStage?: string;
+  currentGrowthStage?: GardenGrowthStage;
   onRefresh: () => void;
   onSelectSensor: (sensor: UISensor) => void;
 }
@@ -31,10 +32,7 @@ const GardenSensorsTab: React.FC<GardenSensorsTabProps> = ({
   const theme = useAppTheme();
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <SensorDetailView
         sensors={sensors}
         sensorHistories={sensorHistory}
@@ -62,7 +60,7 @@ const GardenSensorsTab: React.FC<GardenSensorsTabProps> = ({
           ))}
         </View>
       )}
-    </ScrollView>
+    </View>
   );
 };
 
