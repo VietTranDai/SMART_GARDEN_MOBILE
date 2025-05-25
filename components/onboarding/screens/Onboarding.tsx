@@ -13,7 +13,7 @@ import {
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { onboardingData } from "../data/onboardingData";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { StatusBar } from "expo-status-bar";
 import { useTheme } from "@/contexts/ThemeContext";
 import { setItem } from "@/utils/asyncStorage";
@@ -141,12 +141,12 @@ export default function OnboardingScreen() {
                 item.id === "1"
                   ? "leaf"
                   : item.id === "2"
-                  ? "grid"
-                  : item.id === "3"
-                  ? "analytics"
-                  : item.id === "4"
-                  ? "notifications"
-                  : "sunny"
+                    ? "grid"
+                    : item.id === "3"
+                      ? "analytics"
+                      : item.id === "4"
+                        ? "notifications"
+                        : "sunny"
               }
               size={60}
               color={theme.primary}

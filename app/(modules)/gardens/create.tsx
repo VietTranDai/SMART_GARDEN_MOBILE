@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { Ionicons } from "@expo/vector-icons";
 
 // TODO: Define GardenType enum or import from constants

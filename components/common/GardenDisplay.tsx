@@ -12,8 +12,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAppTheme } from "@/hooks/useAppTheme";
-import useSectionAnimation from "@/hooks/useSectionAnimation";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
+import useSectionAnimation from "@/hooks/ui/useSectionAnimation";
 import { GardenType } from "@/types/gardens/garden.types";
 import { GardenDisplayDto } from "@/types/gardens/dtos";
 import { SensorType, SensorData } from "@/types/gardens/sensor.types";
@@ -511,7 +511,12 @@ const GardenCard = memo(
       prevProps.gardenSensorData === nextProps.gardenSensorData &&
       prevProps.adviceLoading === nextProps.adviceLoading &&
       prevProps.weatherLoading === nextProps.weatherLoading &&
-      prevProps.gardenWeather === nextProps.gardenWeather
+      // Check gardenWeather content instead of just reference
+      ((prevProps.gardenWeather === null && nextProps.gardenWeather === null) ||
+        (prevProps.gardenWeather !== null &&
+          nextProps.gardenWeather !== null &&
+          prevProps.gardenWeather.weatherMain ===
+            nextProps.gardenWeather.weatherMain))
     );
   }
 );

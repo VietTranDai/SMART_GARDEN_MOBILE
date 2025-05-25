@@ -7,7 +7,7 @@ import {
   Animated,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 
 interface ErrorViewProps {
   message: string;

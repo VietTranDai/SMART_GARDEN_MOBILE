@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { View, Text, StyleSheet, Dimensions } from "react-native";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { LineChart } from "react-native-chart-kit";
 import { SensorHistory } from "@/types/gardens/garden.types";
 import { SensorType } from "@/types/gardens/sensor.types";

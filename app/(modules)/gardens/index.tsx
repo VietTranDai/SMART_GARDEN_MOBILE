@@ -20,7 +20,7 @@ import {
   ViewStyle,
 } from "react-native";
 import { router, Stack } from "expo-router";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import {
   Ionicons,
   MaterialCommunityIcons,

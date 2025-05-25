@@ -3,7 +3,7 @@ import { View, StyleSheet, Image, Text } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Redirect } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -30,7 +30,7 @@ export default function Index() {
 
       <View style={[styles.contentContainer, { paddingTop: insets.top + 20 }]}>
         <Image
-          source={{uri: 'https://picsum.photos/300/200' }}
+          source={{ uri: "https://picsum.photos/300/200" }}
           style={styles.logo}
           resizeMode="contain"
         />

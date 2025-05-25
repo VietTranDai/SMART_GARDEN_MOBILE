@@ -14,7 +14,7 @@ import {
   Platform,
 } from "react-native";
 import { Stack, useLocalSearchParams, router } from "expo-router";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LineChart } from "react-native-chart-kit";
 import { TouchableOpacity } from "react-native-gesture-handler";
@@ -175,11 +175,14 @@ export default function SensorDetailScreen() {
     fetchSensorDetails();
 
     // Set up auto-refresh interval (every 5 minutes)
-    const refreshInterval = setInterval(() => {
-      if (parsedId) {
-        fetchSensorData(parsedId, selectedTimeRange);
-      }
-    }, 5 * 60 * 1000);
+    const refreshInterval = setInterval(
+      () => {
+        if (parsedId) {
+          fetchSensorData(parsedId, selectedTimeRange);
+        }
+      },
+      5 * 60 * 1000
+    );
 
     return () => clearInterval(refreshInterval);
   }, [fetchSensorDetails, parsedId, selectedTimeRange]);
@@ -442,8 +445,8 @@ export default function SensorDetailScreen() {
               {sensorStatus === "normal"
                 ? "Bình thường"
                 : sensorStatus === "warning"
-                ? "Cảnh báo"
-                : "Nguy hiểm"}
+                  ? "Cảnh báo"
+                  : "Nguy hiểm"}
             </Text>
           </View>
 

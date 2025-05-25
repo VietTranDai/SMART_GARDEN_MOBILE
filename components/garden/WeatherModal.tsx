@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import WeatherDisplay from "@/components/common/WeatherDisplay";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { WeatherObservation, HourlyForecast, DailyForecast } from "@/types";
 import { getValidIconName } from "@/utils/iconUtils";
 

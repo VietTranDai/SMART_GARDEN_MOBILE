@@ -1,7 +1,7 @@
 import React from "react";
 import { StyleSheet, View, Text } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { GardenPlantDetails } from "@/types";
 import PlantDetailCard from "@/components/garden/PlantDetailCard";
 

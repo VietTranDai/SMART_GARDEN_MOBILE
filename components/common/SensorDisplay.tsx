@@ -15,8 +15,8 @@ import {
   FontAwesome5,
 } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAppTheme } from "@/hooks/useAppTheme";
-import useSectionAnimation from "@/hooks/useSectionAnimation";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
+import useSectionAnimation from "@/hooks/ui/useSectionAnimation";
 import {
   SensorData,
   SensorType,
@@ -223,8 +223,8 @@ const SensorCard = memo(
                     status === "normal"
                       ? theme.successLight
                       : status === "warning"
-                      ? theme.warningLight
-                      : theme.errorLight,
+                        ? theme.warningLight
+                        : theme.errorLight,
                 },
               ]}
             >
@@ -236,16 +236,16 @@ const SensorCard = memo(
                       status === "normal"
                         ? theme.success
                         : status === "warning"
-                        ? theme.warning
-                        : theme.error,
+                          ? theme.warning
+                          : theme.error,
                   },
                 ]}
               >
                 {status === "normal"
                   ? "Bình thường"
                   : status === "warning"
-                  ? "Cảnh báo"
-                  : "Nguy hiểm"}
+                    ? "Cảnh báo"
+                    : "Nguy hiểm"}
               </Text>
             </View>
           </View>
@@ -280,8 +280,8 @@ const SensorCard = memo(
                           status === "normal"
                             ? theme.primary
                             : status === "warning"
-                            ? theme.warning
-                            : theme.error,
+                              ? theme.warning
+                              : theme.error,
                       },
                     ]}
                   />

@@ -13,7 +13,7 @@ import {
 import { Stack, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { plantService, gardenService } from "@/service/api";
 import { Garden } from "@/types/gardens";
 import { PlantType } from "@/types/plants";

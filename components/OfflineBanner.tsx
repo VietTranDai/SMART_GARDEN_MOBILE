@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { useNetwork } from "@/contexts/NetworkContext";
 
 // Mock NetInfo for environments where the native module isn't available

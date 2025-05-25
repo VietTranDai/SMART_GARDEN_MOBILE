@@ -18,7 +18,6 @@ import {
 } from "@expo/vector-icons";
 import { WeatherAdvice } from "@/types/weather/weather.types";
 import { GardenAdvice } from "@/types/gardens/garden.types";
-import { LinearGradient } from "expo-linear-gradient";
 
 const { width } = Dimensions.get("window");
 
@@ -271,25 +270,19 @@ const AdviceModal = ({
   // Render advice item - handling both types
   const renderAdviceItem = useCallback(
     ({ item, index }: { item: AdviceItem; index: number }) => {
-      // Xử lý đơn giản hóa, lấy dữ liệu trực tiếp
-      const anyItem = item as any;
+      const anyItem = item as any; // Keep for accessing other properties like priority, description etc.
 
-      // Chọn phân loại dựa trên dữ liệu có sẵn
-      const category = anyItem.category?.toUpperCase() || "DEFAULT";
-      const categoryInfo = CATEGORY_ICON_MAP[category] || {
-        icon: "leaf-outline",
-        color: theme.primary,
-        label: "Chăm sóc",
-      };
+      // Call getIconForAdvice to get consistent icon, color, and label
+      const iconInfo = getIconForAdvice(item);
 
-      // Hiển thị theo định dạng đơn giản nhất
       return (
         <View
           style={[
             styles.adviceItem,
             {
               backgroundColor: theme.card,
-              borderLeftColor: categoryInfo.color,
+              borderLeftColor: iconInfo.backgroundColor, // Use color from iconInfo
+              borderColor: theme.border,
               marginBottom: index === advice.length - 1 ? 0 : 16,
             },
           ]}
@@ -298,16 +291,19 @@ const AdviceModal = ({
             <View
               style={[
                 styles.iconContainer,
-                { backgroundColor: categoryInfo.color },
+                { backgroundColor: iconInfo.backgroundColor }, // Use color from iconInfo
               ]}
             >
-              <Ionicons name={categoryInfo.icon} size={22} color="#fff" />
+              {iconInfo.icon}
             </View>
             <View style={styles.adviceTitle}>
               <Text
-                style={[styles.categoryLabel, { color: categoryInfo.color }]}
+                style={[
+                  styles.categoryLabel,
+                  { color: iconInfo.backgroundColor },
+                ]}
               >
-                {categoryInfo.label}
+                {iconInfo.label}
               </Text>
               <Text style={[styles.actionText, { color: theme.text }]}>
                 {anyItem.action || anyItem.title || "Lời khuyên chăm sóc"}
@@ -323,7 +319,12 @@ const AdviceModal = ({
           )}
 
           {anyItem.reason && (
-            <View style={styles.reasonContainer}>
+            <View
+              style={[
+                styles.reasonContainer,
+                { backgroundColor: theme.backgroundSecondary },
+              ]}
+            >
               <Text
                 style={[styles.reasonLabel, { color: theme.textSecondary }]}
               >
@@ -340,13 +341,13 @@ const AdviceModal = ({
               <View
                 style={[
                   styles.timeIconContainer,
-                  { backgroundColor: categoryInfo.color + "50" },
+                  { backgroundColor: `${iconInfo.backgroundColor}2A` },
                 ]}
               >
                 <Ionicons
                   name="time-outline"
                   size={14}
-                  color={categoryInfo.color}
+                  color={iconInfo.backgroundColor} // Use color from iconInfo for icon
                 />
               </View>
               <Text style={[styles.timeText, { color: theme.textSecondary }]}>
@@ -357,7 +358,7 @@ const AdviceModal = ({
         </View>
       );
     },
-    [theme, formatTimeOrDate, renderPriorityIndicator]
+    [theme, formatTimeOrDate, renderPriorityIndicator, getIconForAdvice] // Added getIconForAdvice to dependencies
   );
 
   // Component for empty advice state
@@ -365,7 +366,7 @@ const AdviceModal = ({
     <View style={styles.emptyContainer}>
       <Image
         source={{
-          uri: "https://images.unsplash.com/photo-1523348837708-15d4a09cfac2?q=80&w=300",
+          uri: "https://via.placeholder.com/120/E8F5E9/2E7D32?text=No+Advice", // Placeholder
         }}
         style={styles.emptyImage}
       />
@@ -397,17 +398,14 @@ const AdviceModal = ({
       onRequestClose={onClose}
     >
       <View
-        style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}
+        style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.6)" }]}
       >
         <View
           style={[styles.modalContainer, { backgroundColor: theme.background }]}
         >
-          {/* Header with gradient */}
-          <LinearGradient
-            colors={[theme.primary, `${theme.primary}90`]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.modalHeader}
+          {/* Header with solid color */}
+          <View
+            style={[styles.modalHeader, { backgroundColor: theme.primary }]}
           >
             <View style={styles.headerContent}>
               <View style={styles.headerIconContainer}>
@@ -425,7 +423,7 @@ const AdviceModal = ({
             >
               <Ionicons name="close" size={24} color="#fff" />
             </TouchableOpacity>
-          </LinearGradient>
+          </View>
 
           {/* Content */}
           <View style={styles.modalContent}>
@@ -442,7 +440,7 @@ const AdviceModal = ({
               <View style={styles.centerContainer}>
                 <Image
                   source={{
-                    uri: "https://images.unsplash.com/photo-1555861496-0666c8981751?q=80&w=300",
+                    uri: "https://via.placeholder.com/100/FFEBEE/D32F2F?text=Error", // Placeholder
                   }}
                   style={styles.errorImage}
                 />
@@ -485,76 +483,79 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.6)",
   },
   modalContainer: {
     width: width * 0.9,
     maxWidth: 500,
-    maxHeight: "85%",
-    borderRadius: 16,
+    maxHeight: "90%",
+    borderRadius: 20,
     overflow: "hidden",
-    elevation: 5,
+    elevation: 8,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    flex: 1,
   },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingTop: 20,
+    paddingBottom: 16,
   },
   headerContent: {
     flexDirection: "row",
     alignItems: "center",
   },
   headerIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.25)",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+    marginRight: 16,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontFamily: "Inter-Bold",
     color: "#fff",
   },
   gardenName: {
     fontSize: 14,
     fontFamily: "Inter-Regular",
-    color: "rgba(255,255,255,0.8)",
-    marginTop: 2,
+    color: "rgba(255,255,255,0.85)",
+    marginTop: 4,
   },
   closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(0,0,0,0.1)",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.25)",
     justifyContent: "center",
     alignItems: "center",
   },
   modalContent: {
-    flexGrow: 1,
-    flexShrink: 0,
-    flexBasis: "0%",
+    flex: 1,
+    paddingBottom: 8,
   },
   adviceList: {
-    padding: 16,
-    paddingTop: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
   },
   adviceItem: {
-    borderRadius: 12,
-    borderLeftWidth: 4,
+    borderRadius: 16,
+    borderLeftWidth: 5,
     padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    borderWidth: 1,
   },
   adviceHeader: {
     flexDirection: "row",
@@ -562,51 +563,53 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   iconContainer: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
+    marginRight: 16,
   },
   adviceTitle: {
     flex: 1,
   },
   categoryLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Inter-Medium",
-    marginBottom: 2,
+    marginBottom: 4,
     textTransform: "uppercase",
+    opacity: 0.9,
   },
   actionText: {
-    fontSize: 16,
+    fontSize: 17,
     fontFamily: "Inter-SemiBold",
+    lineHeight: 22,
   },
   descriptionText: {
     fontSize: 14,
     fontFamily: "Inter-Regular",
-    lineHeight: 20,
-    marginBottom: 12,
+    lineHeight: 21,
+    marginBottom: 14,
   },
   reasonContainer: {
-    marginBottom: 12,
-    backgroundColor: "rgba(0,0,0,0.03)",
+    marginBottom: 14,
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   reasonLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Inter-SemiBold",
-    marginBottom: 4,
+    marginBottom: 5,
   },
   reasonText: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: "Inter-Regular",
-    lineHeight: 18,
+    lineHeight: 20,
   },
   timeContainer: {
     flexDirection: "row",
     alignItems: "center",
+    marginTop: 8,
   },
   timeIconContainer: {
     width: 28,
@@ -614,81 +617,95 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 8,
+    marginRight: 10,
   },
   timeText: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Inter-Regular",
   },
   priorityContainer: {
     alignItems: "flex-end",
     justifyContent: "center",
+    marginLeft: 8,
   },
   priorityBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
     borderWidth: 1,
   },
   priorityText: {
-    fontSize: 11,
+    fontSize: 12, // Tăng nhẹ
     fontFamily: "Inter-SemiBold",
     textTransform: "uppercase",
+    // color is set inline based on priority and theme
   },
   centerContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 24,
+    padding: 30, // Tăng padding
   },
   loadingText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: "Inter-Regular",
-    marginTop: 12,
+    marginTop: 16, // Tăng khoảng cách
+    // color is set inline using theme.textSecondary
   },
   errorImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    marginBottom: 16,
+    // Hoặc sử dụng Icon thay thế
+    width: 100, // Điều chỉnh kích thước
+    height: 100,
+    borderRadius: 20, // Bo tròn nếu là ảnh
+    marginBottom: 20,
+    opacity: 0.7,
   },
   errorText: {
-    fontSize: 14,
+    fontSize: 16, // Tăng kích thước
     fontFamily: "Inter-Medium",
     textAlign: "center",
-    marginBottom: 16,
+    marginBottom: 20, // Tăng khoảng cách
+    lineHeight: 22,
+    // color is set inline using theme.error
   },
   retryButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    paddingVertical: 12, // Tăng padding
+    paddingHorizontal: 24, // Tăng padding
+    borderRadius: 10, // Bo tròn hơn
+    marginTop: 8,
+    // backgroundColor is set inline using theme.primary
   },
   retryText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: "Inter-SemiBold",
+    // color is set inline as "#fff"
   },
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 24,
+    padding: 30, // Tăng padding
   },
   emptyImage: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    marginBottom: 16,
+    // Hoặc sử dụng Icon thay thế
+    width: 120, // Điều chỉnh kích thước
+    height: 120,
+    borderRadius: 24, // Bo tròn nếu là ảnh
+    marginBottom: 24,
+    opacity: 0.8,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 20, // Tăng kích thước
     fontFamily: "Inter-Bold",
-    marginBottom: 8,
+    marginBottom: 10, // Tăng khoảng cách
+    // color is set inline using theme.primary
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: "Inter-Regular",
     textAlign: "center",
-    lineHeight: 20,
+    lineHeight: 22, // Tăng lineHeight
+    // color is set inline using theme.textSecondary
   },
 });
 

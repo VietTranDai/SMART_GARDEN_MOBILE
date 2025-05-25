@@ -1,5 +1,5 @@
 import { View, type ViewProps } from "react-native";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 
 export type ThemedViewProps = ViewProps & {
   variant?:

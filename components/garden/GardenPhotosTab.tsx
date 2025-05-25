@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { GardenPhoto } from "@/types";
 import GardenPhotoGallery from "@/components/garden/GardenPhotoGallery";
 

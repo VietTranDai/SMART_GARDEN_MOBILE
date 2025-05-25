@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { TaskStatus, WateringSchedule } from "@/types";
 import { taskService, gardenService, wateringService } from "@/service/api";
@@ -65,9 +65,8 @@ export default function GardenScheduleScreen() {
       setGarden(gardenData);
 
       // Get watering schedules for this garden
-      const scheduleData = await wateringService.getGardenWateringSchedules(
-        gardenId
-      );
+      const scheduleData =
+        await wateringService.getGardenWateringSchedules(gardenId);
       setSchedule(scheduleData as WateringSchedule[]);
     } catch (error) {
       console.error("Failed to load schedule:", error);

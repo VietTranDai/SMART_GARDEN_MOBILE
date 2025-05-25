@@ -75,7 +75,6 @@ export default function useGardenManagement(): GardenManagementHook {
               : g
           )
         );
-        // console.log(`Garden ${gardenId} marked as visited at ${now}.`);
       } else {
         console.warn(
           `Failed to mark garden ${gardenId} as visited via API, server did not return updated garden.`

@@ -18,7 +18,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, FontAwesome5, Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import communityService from "@/service/api/community.service";
 import { Post, Comment, CreateCommentDto } from "@/types";
 import { VoteDto, VoteTargetType } from "@/types/social/post.types";

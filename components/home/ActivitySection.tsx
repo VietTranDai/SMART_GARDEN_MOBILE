@@ -1,9 +1,9 @@
 import React, { memo, useMemo } from "react";
 import { View, Text, StyleSheet, Animated } from "react-native";
-import { useAppTheme } from "@/hooks/useAppTheme";
-import useSectionAnimation from "@/hooks/useSectionAnimation";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
+import useSectionAnimation from "@/hooks/ui/useSectionAnimation";
 import ActivityTimeline from "@/components/home/ActivityTimeline";
-import useActivityDisplay from "@/hooks/useActivityDisplay";
+import useActivityDisplay from "@/hooks/activity/useActivityDisplay";
 import {
   ActivityDisplay,
   ScheduleDisplay,

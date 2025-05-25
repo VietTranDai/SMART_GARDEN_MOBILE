@@ -2,7 +2,7 @@ import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 
 interface GardenActionButtonsProps {
   gardenId: string | number;

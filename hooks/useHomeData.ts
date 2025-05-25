@@ -5,12 +5,12 @@ import { SensorType } from "@/types/gardens/sensor.types";
 
 // Import custom hooks
 import { useGardenDetail } from "./garden/useGardenDetail";
-import useSensorData, { getSensorStatus } from "./useSensorData";
-import useWeatherData from "./useWeatherData";
-import useAlertData from "./useAlertData";
-import useActivityData from "./useActivityData";
+import useSensorData, { getSensorStatus } from "./sensor/useSensorData";
+import useWeatherData from "./weather/useWeatherData";
+import useAlertData from "./alert/useAlertData";
+import useActivityData from "./activity/useActivityData";
 import gardenService from "@/service/api/garden.service";
-import useGardenManagement from "./useGardenManagement";
+import useGardenManagement from "./garden/useGardenManagement";
 
 /**
  * Main hook for Home screen data management
@@ -31,7 +31,7 @@ export default function useHomeData() {
   });
   const sensorData = useSensorData();
   const weatherData = useWeatherData();
-  const alertData = useAlertData();
+  const alertDataHook = useAlertData();
   const activityData = useActivityData();
 
   // UI state
@@ -43,9 +43,19 @@ export default function useHomeData() {
     fetchSensorData: fetchSensorDataFromHook,
     getLatestReadings: getLatestReadingsFromHook,
   } = sensorData;
+
   // Destructure functions from other data hooks for stable dependencies
   const { fetchCompleteWeatherData, fetchWeatherAdvice } = weatherData;
-  const { fetchGardenAlerts } = alertData;
+  const {
+    fetchGardenAlerts,
+    fetchAllGardenAlerts,
+    getActiveAlertCount,
+    alertsLoading,
+    alertsError,
+    gardenAlerts: gardenAlertsFromAlertHook,
+    resolveAlert,
+    ignoreAlert,
+  } = alertDataHook;
   const { loadActivitiesAndSchedules } = activityData;
 
   /**
@@ -58,24 +68,13 @@ export default function useHomeData() {
       try {
         // Fetch sensor data
         await fetchSensorDataFromHook(gardenId);
-
-        // const weatherResult = await weatherData.fetchCompleteWeatherData(gardenId);
-        const weatherResult = await fetchCompleteWeatherData(gardenId);
-
-        // Fetch weather advice
-        // await weatherData.fetchWeatherAdvice(gardenId);
+        await fetchCompleteWeatherData(gardenId);
         await fetchWeatherAdvice(gardenId);
-
-        // Fetch alerts
-        // await alertData.fetchGardenAlerts(gardenId);
         await fetchGardenAlerts(gardenId);
-
-        // Fetch activities and schedules
-        // await activityData.loadActivitiesAndSchedules(gardenId);
         await loadActivitiesAndSchedules(gardenId);
 
         // Update garden alert count
-        const alertCount = alertData.getActiveAlertCount(gardenId);
+        const alertCount = getActiveAlertCount(gardenId);
         updateGardenAlertCount(gardenId, alertCount);
 
         // Update garden sensor data
@@ -96,16 +95,14 @@ export default function useHomeData() {
     },
     [
       fetchSensorDataFromHook,
-      // weatherData, // Removed
-      // alertData, // Removed
-      // activityData, // Removed
-      fetchCompleteWeatherData, // Added
-      fetchWeatherAdvice, // Added
-      fetchGardenAlerts, // Added
-      loadActivitiesAndSchedules, // Added
+      fetchCompleteWeatherData,
+      fetchWeatherAdvice,
+      fetchGardenAlerts,
+      loadActivitiesAndSchedules,
       updateGardenAlertCount,
       updateGardenSensorData,
       getLatestReadingsFromHook,
+      getActiveAlertCount,
     ]
   );
 
@@ -117,7 +114,6 @@ export default function useHomeData() {
 
     // Cleanup when component unmounts
     return () => {
-      // Stop polling
       sensorData.stopPolling();
     };
   }, []);
@@ -152,11 +148,11 @@ export default function useHomeData() {
       if (gardens.length > 0) {
         // Fetch alerts for all gardens
         const gardenIds = gardens.map((garden) => garden.id);
-        await alertData.fetchAllGardenAlerts(gardenIds);
+        await fetchAllGardenAlerts(gardenIds);
 
         // Update alert counts for each garden
         gardens.forEach((garden) => {
-          const alertCount = alertData.getActiveAlertCount(garden.id);
+          const alertCount = getActiveAlertCount(garden.id);
           updateGardenAlertCount(garden.id, alertCount);
         });
 
@@ -170,10 +166,11 @@ export default function useHomeData() {
     }
   }, [
     gardenManagement.fetchGardens,
-    alertData,
     selectedGardenId,
     setSelectedGardenId,
     updateGardenAlertCount,
+    fetchAllGardenAlerts,
+    getActiveAlertCount,
   ]);
 
   /**
@@ -265,8 +262,8 @@ export default function useHomeData() {
     getWeatherTip: weatherData.getWeatherTip,
 
     // Alerts
-    alertsLoading: alertData.alertsLoading,
-    alertsError: alertData.alertsError,
+    alertsLoading,
+    alertsError,
 
     // Activities
     recentActivities: activityData.recentActivities,
@@ -275,7 +272,7 @@ export default function useHomeData() {
     schedulesLoading: activityData.schedulesLoading,
 
     // Alerts from alertData hook
-    gardenAlerts: alertData.gardenAlerts,
+    gardenAlerts: gardenAlertsFromAlertHook,
 
     // Functions
     selectGarden,
@@ -284,8 +281,8 @@ export default function useHomeData() {
     fetchWeatherAdvice,
     fetchGardenAdvice,
     calculateOptimalTimes: weatherData.calculateOptimalTimes,
-    resolveAlert: alertData.resolveAlert,
-    ignoreAlert: alertData.ignoreAlert,
+    resolveAlert,
+    ignoreAlert,
     completeActivity: activityData.completeActivity,
     completeWateringSchedule: activityData.completeWateringSchedule,
     skipScheduledActivity: activityData.skipScheduledActivity,

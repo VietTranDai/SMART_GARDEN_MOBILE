@@ -11,7 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 
 // Import custom hooks
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { useGardenDetail } from "@/hooks/garden/useGardenDetail";
 
 // Import custom components

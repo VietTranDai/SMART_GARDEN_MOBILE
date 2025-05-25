@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { Stack, useRouter, useGlobalSearchParams } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { taskService, gardenService, wateringService } from "@/service/api";
 import { Garden, WateringSchedule, TaskStatus } from "@/types";
 
@@ -56,9 +56,8 @@ export default function WateringScheduleScreen() {
       setGarden(gardenData);
 
       // Fetch watering schedules
-      const schedulesData = await wateringService.getGardenWateringSchedules(
-        gardenId
-      );
+      const schedulesData =
+        await wateringService.getGardenWateringSchedules(gardenId);
       setSchedules(schedulesData);
     } catch (err) {
       console.error("Failed to fetch data:", err);
@@ -142,9 +141,8 @@ export default function WateringScheduleScreen() {
     try {
       const gardenId = typeof id === "string" ? id : id.toString();
 
-      const newSchedule = await wateringService.generateAutomaticSchedule(
-        gardenId
-      );
+      const newSchedule =
+        await wateringService.generateAutomaticSchedule(gardenId);
 
       if (newSchedule) {
         setSchedules((prev) => [newSchedule, ...prev]);

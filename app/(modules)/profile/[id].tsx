@@ -18,7 +18,7 @@ import {
   AntDesign,
   Feather,
 } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { useLocalSearchParams, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { gardenService, userService } from "@/service/api";
@@ -610,7 +610,9 @@ export default function GardenerProfileScreen() {
           <View style={styles.profileSection}>
             <Image
               source={{
-                uri: `${env.apiUrl}${gardener.profilePicture}` || "https://i.pravatar.cc/150?img=11",
+                uri:
+                  `${env.apiUrl}${gardener.profilePicture}` ||
+                  "https://i.pravatar.cc/150?img=11",
               }}
               style={styles.profileImage}
             />

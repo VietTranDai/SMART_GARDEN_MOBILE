@@ -1,7 +1,7 @@
 import React, { memo, useMemo } from "react";
 import { View, Text, StyleSheet, Animated } from "react-native";
-import { useAppTheme } from "@/hooks/useAppTheme";
-import useSectionAnimation from "@/hooks/useSectionAnimation";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
+import useSectionAnimation from "@/hooks/ui/useSectionAnimation";
 import GardenDisplay from "@/components/common/GardenDisplay";
 import { GardenDisplayDto } from "@/types/gardens/dtos";
 import { SensorType } from "@/types/gardens/sensor.types";

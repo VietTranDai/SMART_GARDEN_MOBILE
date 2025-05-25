@@ -8,7 +8,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { ThemedView } from "@/components/ThemedView";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 
 const HEADER_HEIGHT = 250;
 

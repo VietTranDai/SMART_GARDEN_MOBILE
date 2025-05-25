@@ -1,7 +1,7 @@
 import React, { PropsWithChildren, useState } from "react";
 import { StyleSheet, TouchableOpacity, View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 
 interface CollapsibleProps {
   title: string;

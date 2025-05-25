@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from "react-native";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import {
   WeatherObservation,
   HourlyForecast,

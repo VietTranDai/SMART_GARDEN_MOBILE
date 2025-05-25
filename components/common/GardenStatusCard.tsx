@@ -8,7 +8,7 @@ import {
   Platform,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { Garden, GardenStatus, GardenType } from "@/types/gardens/garden.types";
 import { gardenService } from "@/service/api";
 // import MapView, { Marker } from "react-native-maps";

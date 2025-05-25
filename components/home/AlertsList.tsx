@@ -8,7 +8,7 @@ import {
   ViewStyle,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { Alert, AlertType } from "@/types";
 import Colors from "@/constants/Colors";
 

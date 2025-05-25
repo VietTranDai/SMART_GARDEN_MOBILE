@@ -7,7 +7,7 @@ import {
   FontAwesome5,
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 
 interface IconSymbolProps {
   name: string;

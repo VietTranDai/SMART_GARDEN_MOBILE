@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import SensorDetailView from "@/components/common/SensorDetailView";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { LinearGradient } from "expo-linear-gradient";
 import { SensorType, SensorUnit } from "@/types/gardens/sensor.types";
 import Colors from "@/constants/Colors"; // Import Colors for theme type

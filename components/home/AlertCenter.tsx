@@ -9,8 +9,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAppTheme } from "@/hooks/useAppTheme";
-import useSectionAnimation from "@/hooks/useSectionAnimation";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
+import useSectionAnimation from "@/hooks/ui/useSectionAnimation";
 import { AlertType, Severity } from "@/types/alerts/alert.types";
 
 interface AlertCenterProps {

@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { ActivityType } from "@/types"; // Import enum ActivityType
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 

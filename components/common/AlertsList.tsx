@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from "react-native";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { Alert, AlertStatus, AlertType } from "@/types";
 
 interface AlertsListProps {

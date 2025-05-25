@@ -1,7 +1,7 @@
 import React from "react";
 import { View, StyleSheet, Platform } from "react-native";
 import { BlurView } from "expo-blur";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 
 interface TabBarBackgroundProps {
   tint?: "light" | "dark" | "default";

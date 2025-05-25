@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { Stack, useRouter, useGlobalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { plantService } from "@/service/api";
 import { Plant, GrowthStage } from "@/types/plants";
 

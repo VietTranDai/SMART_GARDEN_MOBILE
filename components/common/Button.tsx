@@ -9,11 +9,11 @@ import {
   Pressable,
   Animated,
 } from "react-native";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
-import useAnimation from "@/hooks/useAnimation";
+import useAnimation from "@/hooks/ui/useAnimation";
 
 type ButtonVariant =
   | "primary"
@@ -321,8 +321,8 @@ function Button({
               withAnimation && animationType === "opacity" && pressed
                 ? 0.7
                 : isButtonDisabled
-                ? 0.5
-                : 1,
+                  ? 0.5
+                  : 1,
           },
           style,
         ]}

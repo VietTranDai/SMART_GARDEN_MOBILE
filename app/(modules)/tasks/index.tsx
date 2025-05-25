@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { Ionicons, MaterialIcons, Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { taskService } from "@/service/api";

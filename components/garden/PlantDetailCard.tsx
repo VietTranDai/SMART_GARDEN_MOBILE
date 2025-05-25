@@ -7,7 +7,7 @@ import {
   Image,
   ScrollView,
 } from "react-native";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import Colors from "@/constants/Colors";
 import { GardenPlantDetails } from "@/types/gardens/garden.types";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";

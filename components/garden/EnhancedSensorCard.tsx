@@ -8,7 +8,7 @@ import {
   ViewStyle,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { LinearGradient } from "expo-linear-gradient";
 import { SensorType, SensorUnit } from "@/types/gardens/sensor.types";
 

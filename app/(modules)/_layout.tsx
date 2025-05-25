@@ -9,7 +9,7 @@ import {
   AntDesign,
   FontAwesome,
 } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import {
   Platform,
   View,

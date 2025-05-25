@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import ActivityList from "@/components/garden/ActivityList";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { GardenActivity } from "@/types";
@@ -41,7 +41,8 @@ export default function GardenActivityHistoryScreen() {
       setGarden(gardenData);
 
       // Get activities for this garden
-      const activitiesData = await activityService.getActivitiesByGarden(gardenId);
+      const activitiesData =
+        await activityService.getActivitiesByGarden(gardenId);
       setActivities(activitiesData);
     } catch (error) {
       console.error("Failed to load activities:", error);

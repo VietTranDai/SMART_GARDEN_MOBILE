@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { useUser } from "@/contexts/UserContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Ionicons,

@@ -2,6 +2,20 @@ import { useMemo } from "react";
 import { SensorType } from "@/types/gardens/sensor.types";
 import { getSensorStatus } from "./useSensorData";
 
+// Define an interface for the formatted sensor data
+interface FormattedSensorDisplayData {
+  id: string;
+  name: string;
+  value: string;
+  unit: string;
+  type: SensorType;
+  trendData: number[]; // Assuming trendData is an array of numbers
+  status: "normal" | "warning" | "critical";
+  icon: string;
+  lastUpdated: string | number; // Assuming lastUpdated can be string or number
+  rawValue: number;
+}
+
 export default function useSensorDataDisplay(
   sensorData: Record<string, any[]> = {},
   sensorDataLoading: boolean = false,
@@ -9,7 +23,7 @@ export default function useSensorDataDisplay(
 ) {
   // Transform raw sensor data into display-ready format
   const formattedSensors = useMemo(() => {
-    const result = [];
+    const result: FormattedSensorDisplayData[] = []; // Explicitly type result
 
     try {
       if (!sensorData || typeof sensorData !== "object") {
@@ -24,7 +38,12 @@ export default function useSensorDataDisplay(
 
         // Get the most recent data point
         const latestDataPoint = dataPoints[dataPoints.length - 1];
-        if (!latestDataPoint || typeof latestDataPoint !== "object") {
+        if (
+          !latestDataPoint ||
+          typeof latestDataPoint !== "object" ||
+          !latestDataPoint.value
+        ) {
+          // Added check for latestDataPoint.value
           return;
         }
 

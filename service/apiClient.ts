@@ -220,12 +220,12 @@ apiClient.interceptors.request.use(
       }
     }
 
-    // if (env.apiDebug) {
-    //   console.log(
-    //     `→ ${config.method?.toUpperCase()} ${config.url}`,
-    //     config.data || ""
-    //   );
-    // }
+    if (env.apiDebug) {
+      console.log(
+        `→ ${config.method?.toUpperCase()} ${config.url}`,
+        config.data || ""
+      );
+    }
     const data = await getItem<LoginData>(AUTH_KEY);
     if (data?.access_token) {
       config.headers.Authorization = `Bearer ${data.access_token}`;

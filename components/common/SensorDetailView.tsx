@@ -11,7 +11,7 @@ import {
   Dimensions,
   ScrollView,
 } from "react-native";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { LineChart } from "react-native-chart-kit";
 import { LinearGradient } from "expo-linear-gradient";

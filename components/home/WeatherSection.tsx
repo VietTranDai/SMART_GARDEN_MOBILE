@@ -7,10 +7,10 @@ import {
   Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
-import useSectionAnimation from "@/hooks/useSectionAnimation";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
+import useSectionAnimation from "@/hooks/ui/useSectionAnimation";
 import WeatherDisplay from "@/components/common/WeatherDisplay";
-import useWeatherDataDisplay from "@/hooks/useWeatherDataDisplay";
+import useWeatherDataDisplay from "@/hooks/weather/useWeatherDataDisplay";
 import { GardenDisplayDto } from "@/types/gardens/dtos";
 import {
   GardenWeatherData,

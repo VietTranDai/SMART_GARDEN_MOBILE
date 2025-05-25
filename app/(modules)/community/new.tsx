@@ -17,7 +17,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons, AntDesign, Entypo, MaterialIcons } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import * as ImagePicker from "expo-image-picker";
 import { communityService, gardenService } from "@/service/api";
 import { Garden, Tag, CreatePostDto } from "@/types";

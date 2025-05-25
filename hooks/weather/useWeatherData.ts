@@ -54,24 +54,12 @@ export default function useWeatherData() {
    * Sử dụng phương thức mới từ service
    */
   const fetchCompleteWeatherData = useCallback(async (gardenId: number) => {
-    // Prevent fetching if already loading
-    // if (weatherDetailLoading[gardenId]) {
-    //   console.log(
-    //     `fetchCompleteWeatherData: Already loading for garden ${gardenId}, skipping`
-    //   );
-    //   return null;
-    // }
-
     try {
       // Mark as loading
       setWeatherDetailLoading((prev) => ({
         ...prev,
         [gardenId]: true,
       }));
-
-      // console.log(
-      //   `fetchCompleteWeatherData: Fetching weather data for garden ${gardenId}`
-      // );
 
       // Sử dụng phương thức mới từ service
       const { weatherData, error, newLastFetchTime } =
@@ -81,30 +69,11 @@ export default function useWeatherData() {
           60000 // 1 minute debounce
         );
 
-      // // Log weather data structure
-      // console.log(`fetchCompleteWeatherData: Received weather data:`, {
-      //   isNull: weatherData === null,
-      //   hasHourly: weatherData?.hourly ? true : false,
-      //   hourlyType: weatherData?.hourly ? typeof weatherData.hourly : "N/A",
-      //   isHourlyArray: weatherData?.hourly
-      //     ? Array.isArray(weatherData.hourly)
-      //     : false,
-      //   hourlyLength:
-      //     weatherData?.hourly && Array.isArray(weatherData.hourly)
-      //       ? weatherData.hourly.length
-      //       : "N/A",
-      //   hasDaily: weatherData?.daily ? true : false,
-      //   isError: !!error,
-      // });
-
       // Cập nhật thời gian fetch cuối cùng
       lastWeatherFetchTime.current[gardenId] = newLastFetchTime;
 
       // Nếu dữ liệu bị trả về null do debounce, không cập nhật state
       if (weatherData === null) {
-        // console.log(
-        //   `fetchCompleteWeatherData: Data is null (debounced), not updating state`
-        // );
         return null;
       }
 
@@ -123,14 +92,6 @@ export default function useWeatherData() {
           ...prev,
           [gardenId]: safeWeatherData,
         };
-        // console.log(
-        //   `fetchCompleteWeatherData: Updated state, garden ${gardenId} has data:`,
-        //   {
-        //     hasCurrent: !!safeWeatherData.current,
-        //     hourlyCount: safeWeatherData.hourly.length,
-        //     dailyCount: safeWeatherData.daily.length,
-        //   }
-        // );
         return newState;
       });
 
@@ -140,9 +101,6 @@ export default function useWeatherData() {
         [gardenId]: error,
       }));
 
-      // console.log(
-      //   `fetchCompleteWeatherData: Successfully fetched for garden ${gardenId}`
-      // );
       return safeWeatherData;
     } catch (error) {
       console.error(
@@ -169,9 +127,6 @@ export default function useWeatherData() {
    */
   const fetchWeatherAdvice = useCallback(
     async (gardenId: number, gardenType?: GardenType) => {
-      // Skip if already loading
-      // if (weatherDetailLoading[gardenId]) return;
-
       try {
         // Mark as loading
         setWeatherDetailLoading((prev) => ({
@@ -222,7 +177,7 @@ export default function useWeatherData() {
         }));
       }
     },
-    []
+    [gardenWeatherData]
   );
 
   /**

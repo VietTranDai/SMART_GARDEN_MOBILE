@@ -11,7 +11,7 @@ import {
   Platform,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { Garden, GardenType } from "@/types/gardens/garden.types";
 import { UpdateGardenDto } from "@/types/gardens/dtos";
 import { gardenService } from "@/service/api";

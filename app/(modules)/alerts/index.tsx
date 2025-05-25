@@ -15,7 +15,7 @@ import {
   MaterialIcons,
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { router } from "expo-router";
 import { Alert, AlertStatus, AlertType } from "@/types/alerts/alert.types";
 import { alertService, gardenService, weatherService } from "@/service/api";

@@ -1,5 +1,5 @@
 import { Stack } from "expo-router";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 
 export default function AlertsLayout() {
   const theme = useAppTheme();

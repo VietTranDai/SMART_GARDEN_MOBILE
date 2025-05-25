@@ -18,7 +18,7 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useUser } from "@/contexts/UserContext";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { useTheme } from "@/contexts/ThemeContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");

@@ -13,7 +13,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { Image } from "expo-image";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { GardenPhoto } from "@/types/gardens/garden.types";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
