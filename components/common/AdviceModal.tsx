@@ -244,8 +244,8 @@ const AdviceModal = ({
         priorityValue >= 4
           ? theme.error
           : priorityValue >= 3
-          ? theme.warning
-          : theme.success;
+            ? theme.warning
+            : theme.success;
 
       return (
         <View style={styles.priorityContainer}>
@@ -538,7 +538,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalContent: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 0,
+    flexBasis: "0%",
   },
   adviceList: {
     padding: 16,

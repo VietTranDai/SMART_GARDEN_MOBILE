@@ -1,5 +1,11 @@
 import React, { useCallback, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+} from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
@@ -170,7 +176,25 @@ export default function GardenDetailScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      <Stack.Screen options={{ title: garden?.name, headerShown: false }} />
+      <Stack.Screen
+        options={{
+          title: garden?.name,
+          headerShown: true,
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => router.push(`/(modules)/gardens/edit/${id}`)}
+              style={{ marginRight: 15, padding: 5 }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Chỉnh sửa vườn"
+              accessibilityHint={`Nhấn để chỉnh sửa thông tin khu vườn ${garden?.name}`}
+            >
+              <Ionicons name="pencil" size={24} color={theme.primary} />
+            </TouchableOpacity>
+          ),
+        }}
+      />
 
       <GardenHeader profilePicture={garden.profilePicture} />
 

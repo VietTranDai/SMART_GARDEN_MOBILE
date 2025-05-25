@@ -29,6 +29,8 @@ export interface CreateGardenDto {
  */
 export interface UpdateGardenDto {
   name?: string;
+  profilePicture?: string;
+  description?: string;
   street?: string;
   ward?: string;
   district?: string;

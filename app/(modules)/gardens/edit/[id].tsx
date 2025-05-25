@@ -1,449 +1,541 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   TextInput,
-  TouchableOpacity,
+  StyleSheet,
   ScrollView,
-  Image,
-  Alert,
+  TouchableOpacity,
   ActivityIndicator,
+  Alert,
+  Platform,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { Picker } from "@react-native-picker/picker";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { Garden, GardenType } from "@/types/gardens/garden.types";
+import { UpdateGardenDto } from "@/types/gardens/dtos";
 import { gardenService } from "@/service/api";
-import { Garden } from "@/types";
-import * as ImagePicker from "expo-image-picker";
+import { Ionicons } from "@expo/vector-icons";
+// import ImagePicker from 'react-native-image-picker'; // We'll handle image picking later
+// For now, a placeholder for profile picture URL
+import { Image } from "expo-image";
+import env from "@/config/environment";
+
+interface CustomPickerProps {
+  label: string;
+  selectedValue: GardenType | undefined; // Or the specific type of your value
+  onValueChange: (value: GardenType) => void; // Or the specific type
+  items: Array<{ label: string; value: GardenType }>; // Or the specific type
+  theme: any; // You might have a more specific theme type
+}
+
+// Simple Picker component (can be replaced with a more sophisticated one later)
+const CustomPicker = ({
+  label,
+  selectedValue,
+  onValueChange,
+  items,
+  theme,
+}: CustomPickerProps) => (
+  <View style={styles.inputContainer}>
+    <Text style={[styles.label, { color: theme.textSecondary }]}>{label}</Text>
+    {/* Basic picker for now, can be improved with a modal or dropdown component */}
+    <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+      {items.map((item: any) => (
+        <TouchableOpacity
+          key={item.value}
+          style={[
+            styles.pickerItem,
+            {
+              backgroundColor:
+                selectedValue === item.value
+                  ? theme.primary
+                  : theme.borderLight,
+            },
+          ]}
+          onPress={() => onValueChange(item.value)}
+        >
+          <Text
+            style={{
+              color: selectedValue === item.value ? theme.card : theme.text,
+            }}
+          >
+            {item.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  </View>
+);
 
 export default function EditGardenScreen() {
-  const { id } = useLocalSearchParams();
-  const router = useRouter();
   const theme = useAppTheme();
-
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
 
   const [garden, setGarden] = useState<Garden | null>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    type: "vegetable",
-    description: "",
-  });
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState<Partial<UpdateGardenDto>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [image, setImage] = useState<string | null>(null);
-  const [imageUpdated, setImageUpdated] = useState(false);
 
-  useEffect(() => {
-    const fetchGarden = async () => {
-      if (!id) return;
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        const gardenData = await gardenService.getGardenById(id.toString());
-        setGarden(gardenData);
-
+  const fetchGardenDetails = useCallback(async () => {
+    if (!id) {
+      setError("Garden ID is missing.");
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const fetchedGarden = await gardenService.getGardenById(id);
+      if (fetchedGarden) {
+        setGarden(fetchedGarden);
         setFormData({
-          name: gardenData?.name || "",
-          type: gardenData?.type || "vegetable",
-          description: gardenData?.description || "",
+          name: fetchedGarden.name,
+          description: fetchedGarden.description,
+          street: fetchedGarden.street,
+          ward: fetchedGarden.ward,
+          district: fetchedGarden.district,
+          city: fetchedGarden.city,
+          type: fetchedGarden.type,
+          profilePicture: fetchedGarden.profilePicture, // Keep existing picture by default
         });
-
-        setImage( gardenData?.profilePicture || null);
-      } catch (err) {
-        console.error("Failed to fetch garden:", err);
-        setError("Không thể tải thông tin vườn. Vui lòng thử lại sau.");
-      } finally {
-        setLoading(false);
+      } else {
+        setError("Không thể tải thông tin khu vườn.");
       }
-    };
-
-    fetchGarden();
+    } catch (err) {
+      console.error("Error fetching garden details for edit:", err);
+      setError("Đã có lỗi xảy ra khi tải dữ liệu.");
+    } finally {
+      setIsLoading(false);
+    }
   }, [id]);
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+  useEffect(() => {
+    fetchGardenDetails();
+  }, [fetchGardenDetails]);
+
+  const handleInputChange = (field: keyof UpdateGardenDto, value: any) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleImagePick = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  // Placeholder for image picking functionality
+  const handleChoosePhoto = () => {
+    Alert.alert("Thông báo", "Chức năng chọn ảnh sẽ được triển khai sau.");
+    // Example:
+    // const options = {};
+    // ImagePicker.launchImageLibrary(options, response => {
+    //   if (response.uri) {
+    //     handleInputChange('profilePicture', response.uri);
+    //   }
+    // });
+  };
 
-    if (status !== "granted") {
-      Alert.alert(
-        "Permission Required",
-        "Please allow access to your photo library"
-      );
+  const handleSaveChanges = async () => {
+    if (!id || !garden) return;
+
+    // Client-side validation
+    if (!formData.name || formData.name.trim() === "") {
+      Alert.alert("Lỗi", "Tên khu vườn không được để trống.");
+      return;
+    }
+    if (!formData.type) {
+      Alert.alert("Lỗi", "Vui lòng chọn loại khu vườn.");
       return;
     }
 
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
+    setIsSaving(true);
+    setError(null);
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setImage(result.assets[0].uri);
-        setImageUpdated(true);
-      }
-    } catch (err) {
-      console.error("Error picking image:", err);
-      Alert.alert("Error", "Failed to select image. Please try again.");
-    }
-  };
-
-  const handleSave = async () => {
-    // Validate form
-    if (!formData.name.trim()) {
-      Alert.alert("Error", "Garden name is required");
-      return;
-    }
-
-    setSubmitting(true);
+    const updatePayload: UpdateGardenDto = {
+      name: formData.name || garden.name,
+      type: formData.type || garden.type,
+      description: formData.description,
+      street: formData.street,
+      ward: formData.ward,
+      district: formData.district,
+      city: formData.city,
+      profilePicture: formData.profilePicture, // This might need to be handled as FormData if uploading a new file
+    };
 
     try {
-      if (!id) throw new Error("Garden ID is missing");
-
-      const updateData = {
-        name: formData.name,
-        type: formData.type,
-        description: formData.description,
-      };
-
-      // If the image was updated, we need to create a form data
-      if (imageUpdated && image) {
-        const formData = new FormData();
-
-        // Add all update data
-        Object.entries(updateData).forEach(([key, value]) => {
-          formData.append(key, value.toString());
-        });
-
-        // Add the image
-        const filename = image.split("/").pop() || "garden_image.jpg";
-        const file = {
-          uri: image,
-          type: "image/jpeg",
-          name: filename,
-        };
-
-        // @ts-ignore - FormData type issues
-        formData.append("image", file);
-
-        // Call API with form data
-        await gardenService.updateGarden(id.toString(), formData as any);
+      const updatedGarden = await gardenService.updateGarden(id, updatePayload);
+      if (updatedGarden) {
+        Alert.alert("Thành công", "Thông tin khu vườn đã được cập nhật.");
+        // Potentially refresh the previous screen's data or rely on its own refresh mechanism
+        router.back();
       } else {
-        // Call API with JSON data
-        await gardenService.updateGarden(id.toString(), updateData as any);
+        setError("Không thể cập nhật khu vườn. Vui lòng thử lại.");
       }
-
-      Alert.alert("Success", "Garden updated successfully!", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
-    } catch (err) {
-      console.error("Failed to update garden:", err);
-      Alert.alert("Error", "Failed to update garden. Please try again.");
+    } catch (err: any) {
+      console.error("Error updating garden:", err);
+      setError(err.message || "Đã có lỗi xảy ra khi lưu thay đổi.");
+      Alert.alert("Lỗi", err.message || "Đã có lỗi xảy ra khi lưu thay đổi.");
     } finally {
-      setSubmitting(false);
+      setIsSaving(false);
     }
   };
 
-  const handleDelete = () => {
-    Alert.alert(
-      "Confirm Delete",
-      "Are you sure you want to delete this garden? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setSubmitting(true);
-              if (!id) throw new Error("Garden ID is missing");
+  const gardenTypeItems = Object.values(GardenType).map((type) => ({
+    label: gardenService.getGardenTypeText(type), // Use existing helper
+    value: type,
+  }));
 
-              await gardenService.deleteGarden(id.toString());
-
-              Alert.alert("Success", "Garden deleted successfully!", [
-                {
-                  text: "OK",
-                  onPress: () => router.replace("/(modules)/gardens"),
-                },
-              ]);
-            } catch (err) {
-              console.error("Failed to delete garden:", err);
-              Alert.alert(
-                "Error",
-                "Failed to delete garden. Please try again."
-              );
-              setSubmitting(false);
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <View style={[styles.container, styles.centeredContainer]}>
+      <View
+        style={[
+          styles.container,
+          styles.centered,
+          { backgroundColor: theme.background },
+        ]}
+      >
         <ActivityIndicator size="large" color={theme.primary} />
-        <Text style={styles.loadingText}>Loading garden details...</Text>
+        <Text style={{ marginTop: 10, color: theme.textSecondary }}>
+          Đang tải...
+        </Text>
       </View>
     );
   }
 
-  if (error) {
+  if (error && !garden) {
+    // Show full page error if garden couldn't be loaded
     return (
-      <View style={[styles.container, styles.centeredContainer]}>
-        <Ionicons name="alert-circle-outline" size={60} color={theme.error} />
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => router.replace(`/(modules)/gardens/edit/${id}`)}
-        >
-          <Text style={styles.retryButtonText}>Retry</Text>
+      <View
+        style={[
+          styles.container,
+          styles.centered,
+          { backgroundColor: theme.background },
+        ]}
+      >
+        <Ionicons name="alert-circle-outline" size={48} color={theme.error} />
+        <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
+        <TouchableOpacity style={styles.button} onPress={() => router.back()}>
+          <Text style={styles.buttonText}>Quay lại</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
+  const currentProfilePicture =
+    formData.profilePicture || garden?.profilePicture;
+
   return (
-    <>
-      <Stack.Screen
-        options={{
-          title: garden?.name ? `Edit - ${garden.name}` : "Edit Garden",
-        }}
-      />
-      <ScrollView style={styles.container}>
-        <View style={styles.formContainer}>
-          <View style={styles.imageContainer}>
-            <Image
-              source={{ uri: image || "https://via.placeholder.com/150" }}
-              style={styles.image}
-            />
-            <TouchableOpacity
-              style={styles.editImageButton}
-              onPress={handleImagePick}
-            >
-              <Ionicons name="camera" size={20} color="white" />
-              <Text style={styles.editImageText}>Change Photo</Text>
-            </TouchableOpacity>
-          </View>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      <Stack.Screen options={{ title: "Chỉnh sửa khu vườn" }} />
+      <ScrollView contentContainerStyle={[styles.container, { padding: 20 }]}>
+        <Text style={[styles.title, { color: theme.text }]}>
+          Chỉnh sửa thông tin
+        </Text>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Garden Name</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.name}
-              onChangeText={(text) => handleInputChange("name", text)}
-              placeholder="Enter garden name"
-              placeholderTextColor={theme.textTertiary}
-            />
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Garden Type</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={formData.type}
-                onValueChange={(value) => handleInputChange("type", value)}
-                style={styles.picker}
+        {/* Profile Picture */}
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>
+            Ảnh đại diện
+          </Text>
+          <TouchableOpacity
+            onPress={handleChoosePhoto}
+            style={styles.imagePicker}
+          >
+            {currentProfilePicture ? (
+              <Image
+                source={{
+                  uri: currentProfilePicture.startsWith("http")
+                    ? currentProfilePicture
+                    : `${env.apiUrl}${currentProfilePicture}`,
+                }}
+                style={styles.profileImage}
+                placeholder={require("@/assets/images/garden-placeholder.png")}
+                transition={300}
+                contentFit="cover"
+              />
+            ) : (
+              <View
+                style={[
+                  styles.profileImagePlaceholder,
+                  { backgroundColor: theme.borderLight },
+                ]}
               >
-                <Picker.Item label="Vegetable" value="vegetable" />
-                <Picker.Item label="Flower" value="flower" />
-                <Picker.Item label="Herb" value="herb" />
-                <Picker.Item label="Fruit" value="fruit" />
-                <Picker.Item label="Indoor" value="indoor" />
-                <Picker.Item label="Other" value="other" />
-              </Picker>
-            </View>
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Description</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={formData.description}
-              onChangeText={(text) => handleInputChange("description", text)}
-              placeholder="Enter garden description"
-              placeholderTextColor={theme.textTertiary}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
-          </View>
-
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={handleSave}
-              disabled={submitting}
-            >
-              {submitting ? (
-                <ActivityIndicator size="small" color="white" />
-              ) : (
-                <>
-                  <Ionicons name="save" size={20} color="white" />
-                  <Text style={styles.saveButtonText}>Save Changes</Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={handleDelete}
-              disabled={submitting}
-            >
-              <Ionicons name="trash" size={20} color="white" />
-              <Text style={styles.deleteButtonText}>Delete Garden</Text>
-            </TouchableOpacity>
-          </View>
+                <Ionicons name="camera" size={40} color={theme.textSecondary} />
+                <Text style={{ color: theme.textSecondary, marginTop: 5 }}>
+                  Chọn ảnh
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
+
+        {/* Garden Name */}
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>
+            Tên khu vườn *
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.card,
+                color: theme.text,
+                borderColor: theme.border,
+              },
+            ]}
+            value={formData.name}
+            onChangeText={(text) => handleInputChange("name", text)}
+            placeholder="Ví dụ: Vườn rau sân thượng"
+            placeholderTextColor={theme.textTertiary}
+          />
+        </View>
+
+        {/* Garden Type */}
+        <CustomPicker
+          label="Loại khu vườn *"
+          selectedValue={formData.type}
+          onValueChange={(value: GardenType) =>
+            handleInputChange("type", value)
+          }
+          items={gardenTypeItems}
+          theme={theme}
+        />
+
+        {/* Description */}
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>
+            Mô tả
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              styles.textArea,
+              {
+                backgroundColor: theme.card,
+                color: theme.text,
+                borderColor: theme.border,
+              },
+            ]}
+            value={formData.description}
+            onChangeText={(text) => handleInputChange("description", text)}
+            placeholder="Mô tả ngắn về khu vườn của bạn..."
+            placeholderTextColor={theme.textTertiary}
+            multiline
+            numberOfLines={3}
+          />
+        </View>
+
+        {/* Location Fields */}
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>
+          Địa chỉ
+        </Text>
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>
+            Đường/Số nhà
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.card,
+                color: theme.text,
+                borderColor: theme.border,
+              },
+            ]}
+            value={formData.street}
+            onChangeText={(text) => handleInputChange("street", text)}
+            placeholder="Ví dụ: 123 Đường ABC"
+            placeholderTextColor={theme.textTertiary}
+          />
+        </View>
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>
+            Phường/Xã
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.card,
+                color: theme.text,
+                borderColor: theme.border,
+              },
+            ]}
+            value={formData.ward}
+            onChangeText={(text) => handleInputChange("ward", text)}
+            placeholder="Ví dụ: Phường Bến Nghé"
+            placeholderTextColor={theme.textTertiary}
+          />
+        </View>
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>
+            Quận/Huyện
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.card,
+                color: theme.text,
+                borderColor: theme.border,
+              },
+            ]}
+            value={formData.district}
+            onChangeText={(text) => handleInputChange("district", text)}
+            placeholder="Ví dụ: Quận 1"
+            placeholderTextColor={theme.textTertiary}
+          />
+        </View>
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>
+            Tỉnh/Thành phố
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.card,
+                color: theme.text,
+                borderColor: theme.border,
+              },
+            ]}
+            value={formData.city}
+            onChangeText={(text) => handleInputChange("city", text)}
+            placeholder="Ví dụ: TP. Hồ Chí Minh"
+            placeholderTextColor={theme.textTertiary}
+          />
+        </View>
+
+        {error && (
+          <Text
+            style={[styles.errorText, { color: theme.error, marginTop: 10 }]}
+          >
+            {error}
+          </Text>
+        )}
+
+        <TouchableOpacity
+          style={[
+            styles.button,
+            { backgroundColor: theme.primary },
+            isSaving && styles.buttonDisabled,
+          ]}
+          onPress={handleSaveChanges}
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <ActivityIndicator size="small" color={theme.card} />
+          ) : (
+            <Text style={[styles.buttonText, { color: theme.card }]}>
+              Lưu thay đổi
+            </Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.button,
+            {
+              backgroundColor: theme.background,
+              marginTop: 10,
+              borderWidth: 1,
+              borderColor: theme.border,
+            },
+          ]}
+          onPress={() => router.back()}
+          disabled={isSaving}
+        >
+          <Text style={[styles.buttonText, { color: theme.text }]}>Hủy</Text>
+        </TouchableOpacity>
       </ScrollView>
-    </>
+    </View>
   );
 }
 
-const createStyles = (theme: any) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.background,
-    },
-    centeredContainer: {
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    loadingText: {
-      marginTop: 16,
-      fontSize: 16,
-      color: theme.textSecondary,
-      fontFamily: "Inter-Regular",
-    },
-    errorText: {
-      marginTop: 16,
-      fontSize: 16,
-      color: theme.text,
-      fontFamily: "Inter-Medium",
-      textAlign: "center",
-      marginHorizontal: 24,
-    },
-    retryButton: {
-      marginTop: 24,
-      paddingVertical: 10,
-      paddingHorizontal: 20,
-      backgroundColor: theme.primary,
-      borderRadius: 8,
-    },
-    retryButtonText: {
-      color: theme.card,
-      fontSize: 16,
-      fontFamily: "Inter-SemiBold",
-    },
-    formContainer: {
-      padding: 16,
-    },
-    imageContainer: {
-      alignItems: "center",
-      marginBottom: 24,
-      position: "relative",
-    },
-    image: {
-      width: 150,
-      height: 150,
-      borderRadius: 75,
-    },
-    editImageButton: {
-      position: "absolute",
-      bottom: 0,
-      right: "30%",
-      backgroundColor: theme.primary,
-      borderRadius: 20,
-      padding: 8,
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    editImageText: {
-      color: "white",
-      marginLeft: 4,
-      fontSize: 14,
-      fontFamily: "Inter-Medium",
-    },
-    formGroup: {
-      marginBottom: 16,
-    },
-    label: {
-      fontSize: 16,
-      marginBottom: 8,
-      color: theme.text,
-      fontFamily: "Inter-Medium",
-    },
-    input: {
-      backgroundColor: theme.card,
-      borderWidth: 1,
-      borderColor: theme.borderLight,
-      borderRadius: 8,
-      padding: 12,
-      fontSize: 16,
-      color: theme.text,
-      fontFamily: "Inter-Regular",
-    },
-    textArea: {
-      minHeight: 100,
-    },
-    pickerContainer: {
-      backgroundColor: theme.card,
-      borderWidth: 1,
-      borderColor: theme.borderLight,
-      borderRadius: 8,
-      overflow: "hidden",
-    },
-    picker: {
-      color: theme.text,
-      height: 50,
-    },
-    buttonContainer: {
-      marginTop: 24,
-      marginBottom: 40,
-    },
-    saveButton: {
-      backgroundColor: theme.success,
-      padding: 16,
-      borderRadius: 8,
-      flexDirection: "row",
-      justifyContent: "center",
-      alignItems: "center",
-      marginBottom: 16,
-    },
-    saveButtonText: {
-      color: "white",
-      fontSize: 16,
-      marginLeft: 8,
-      fontFamily: "Inter-SemiBold",
-    },
-    deleteButton: {
-      backgroundColor: theme.error,
-      padding: 16,
-      borderRadius: 8,
-      flexDirection: "row",
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    deleteButtonText: {
-      color: "white",
-      fontSize: 16,
-      marginLeft: 8,
-      fontFamily: "Inter-SemiBold",
-    },
-  });
+const styles = StyleSheet.create({
+  container: {
+    flexGrow: 1,
+  },
+  centered: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  title: {
+    fontSize: 22,
+    fontFamily: "Inter-SemiBold",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontFamily: "Inter-Medium",
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  inputContainer: {
+    marginBottom: 15,
+  },
+  label: {
+    fontSize: 14,
+    fontFamily: "Inter-Medium",
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === "ios" ? 12 : 10,
+    fontSize: 16,
+    fontFamily: "Inter-Regular",
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: "top",
+  },
+  button: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20,
+    elevation: 2,
+  },
+  buttonText: {
+    fontSize: 16,
+    fontFamily: "Inter-SemiBold",
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  errorText: {
+    fontSize: 14,
+    fontFamily: "Inter-Regular",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  // Image Picker Styles
+  imagePicker: {
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  profileImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: 10,
+  },
+  profileImagePlaceholder: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderStyle: "dashed",
+  },
+  // Custom Picker Styles
+  pickerItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginRight: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+});
