@@ -31,7 +31,7 @@ export const GARDEN_ENDPOINTS = {
   CREATE: "/gardens/me",
   UPDATE: (gardenId: string | number) => `/gardens/me/${gardenId}`,
   DELETE: (gardenId: string | number) => `/gardens/me/${gardenId}`,
-  ADVICE: (gardenId: string | number) => `/gardens/me/${gardenId}/advice`,
+  ADVICE: (gardenId: string | number) => `/advice/garden/${gardenId}`,
   PLANT_DETAILS: (gardenId: string | number) =>
     `/gardens/me/${gardenId}/plant-details`,
   PHOTOS: (gardenId: string | number) => `/gardens/me/${gardenId}/photos`,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useUser } from "@/contexts/UserContext";
 import { useGardenContext } from "@/contexts/GardenContext";
 import { SensorType } from "@/types/gardens/sensor.types";
@@ -24,201 +24,204 @@ export default function useHomeData() {
 
   // Specialized data hooks
   const gardenManagement = useGardenManagement();
-  const { markGardenVisited, updateGardenAlertCount, updateGardenSensorData } =
-    gardenManagement;
-  const gardenDetail = useGardenDetail({
+  const gardenDetailHook = useGardenDetail({
     gardenId: selectedGardenId ? String(selectedGardenId) : null,
   });
-  const sensorData = useSensorData();
-  const weatherData = useWeatherData();
-  const alertDataHook = useAlertData();
-  const activityData = useActivityData();
+  const sensorDataHook = useSensorData();
+  const weatherDataHook = useWeatherData();
+  const alertDataHookInstance = useAlertData();
+  const activityDataHook = useActivityData();
 
   // UI state
   const [refreshing, setRefreshing] = useState(false);
+  const staticDataFetchedRef = useRef(new Set<number>());
+
+  // ✅ NEW: Ref để track garden ID hiện tại cho sensor polling
+  const currentGardenIdRef = useRef<number | null>(null);
 
   // Destructure functions from sensorData for stable dependencies
-  const {
-    startWatchingGarden,
-    fetchSensorData: fetchSensorDataFromHook,
-    getLatestReadings: getLatestReadingsFromHook,
-  } = sensorData;
+  const { getSensorIconName } = sensorDataHook;
 
   // Destructure functions from other data hooks for stable dependencies
-  const { fetchCompleteWeatherData, fetchWeatherAdvice } = weatherData;
+  const { calculateOptimalTimes, getWeatherTip } = weatherDataHook;
   const {
-    fetchGardenAlerts,
-    fetchAllGardenAlerts,
-    getActiveAlertCount,
     alertsLoading,
     alertsError,
     gardenAlerts: gardenAlertsFromAlertHook,
     resolveAlert,
     ignoreAlert,
-  } = alertDataHook;
-  const { loadActivitiesAndSchedules } = activityData;
+  } = alertDataHookInstance;
+  const {
+    completeActivity,
+    completeWateringSchedule,
+    skipScheduledActivity,
+    activitiesLoading,
+    schedulesLoading,
+    recentActivities,
+    upcomingSchedules,
+  } = activityDataHook;
 
-  /**
-   * Load detailed data for a specific garden
-   */
-  const loadGardenDetailData = useCallback(
-    async (gardenId: number) => {
-      if (!gardenId) return;
-
-      try {
-        // Fetch sensor data
-        await fetchSensorDataFromHook(gardenId);
-        await fetchCompleteWeatherData(gardenId);
-        await fetchWeatherAdvice(gardenId);
-        await fetchGardenAlerts(gardenId);
-        await loadActivitiesAndSchedules(gardenId);
-
-        // Update garden alert count
-        const alertCount = getActiveAlertCount(gardenId);
-        updateGardenAlertCount(gardenId, alertCount);
-
-        // Update garden sensor data
-        const latestReadings = getLatestReadingsFromHook(gardenId);
-        const displaySensorData = {
-          temperature: latestReadings[SensorType.TEMPERATURE]?.value,
-          humidity: latestReadings[SensorType.HUMIDITY]?.value,
-          soilMoisture: latestReadings[SensorType.SOIL_MOISTURE]?.value,
-          light: latestReadings[SensorType.LIGHT]?.value,
-        };
-        updateGardenSensorData(gardenId, displaySensorData);
-      } catch (error) {
-        console.error(
-          `Error loading detail data for garden ${gardenId}:`,
-          error
-        );
-      }
-    },
-    [
-      fetchSensorDataFromHook,
-      fetchCompleteWeatherData,
-      fetchWeatherAdvice,
-      fetchGardenAlerts,
-      loadActivitiesAndSchedules,
-      updateGardenAlertCount,
-      updateGardenSensorData,
-      getLatestReadingsFromHook,
-      getActiveAlertCount,
-    ]
-  );
-
-  /**
-   * Initialize data on first load
-   */
+  // ✅ NEW: Sync ref với selectedGardenId
   useEffect(() => {
-    loadInitialData();
+    console.log(
+      `useHomeData: Updating currentGardenIdRef from ${currentGardenIdRef.current} to ${selectedGardenId}`
+    );
+    currentGardenIdRef.current = selectedGardenId;
+  }, [selectedGardenId]);
 
-    // Cleanup when component unmounts
-    return () => {
-      sensorData.stopPolling();
-    };
-  }, []);
-
-  /**
-   * Watch for changes in selected garden to load its details and start watching sensors
-   */
-  useEffect(() => {
-    if (selectedGardenId !== null) {
-      startWatchingGarden(selectedGardenId);
-      loadGardenDetailData(selectedGardenId);
-    }
-  }, [selectedGardenId, startWatchingGarden, loadGardenDetailData]);
-
-  /**
-   * Watch for changes in selected garden to mark it as visited
-   */
-  useEffect(() => {
-    if (selectedGardenId !== null) {
-      markGardenVisited(selectedGardenId);
-    }
-  }, [selectedGardenId, markGardenVisited]);
-
-  /**
-   * Load all initial data for the home screen
-   */
+  // Callback Functions
   const loadInitialData = useCallback(async () => {
+    console.log("useHomeData: Loading initial data...");
     try {
-      // Fetch gardens first
       const gardens = await gardenManagement.fetchGardens();
-
       if (gardens.length > 0) {
-        // Fetch alerts for all gardens
-        const gardenIds = gardens.map((garden) => garden.id);
-        await fetchAllGardenAlerts(gardenIds);
-
-        // Update alert counts for each garden
-        gardens.forEach((garden) => {
-          const alertCount = getActiveAlertCount(garden.id);
-          updateGardenAlertCount(garden.id, alertCount);
-        });
-
-        // Select first garden if none selected
-        if (selectedGardenId === null && gardens.length > 0) {
+        const gardenIds = gardens.map((g) => g.id);
+        if (gardenIds.length > 0) {
+          await alertDataHookInstance.fetchAllGardenAlerts(gardenIds);
+          gardens.forEach((garden) => {
+            const alertCount = alertDataHookInstance.getActiveAlertCount(
+              garden.id
+            );
+            gardenManagement.updateGardenAlertCount(garden.id, alertCount);
+          });
+        }
+        if (selectedGardenId === null && gardens[0]?.id) {
           setSelectedGardenId(gardens[0].id);
         }
       }
     } catch (error) {
-      console.error("Error loading initial data:", error);
+      console.error("useHomeData: Error loading initial data:", error);
     }
-  }, [
-    gardenManagement.fetchGardens,
-    selectedGardenId,
-    setSelectedGardenId,
-    updateGardenAlertCount,
-    fetchAllGardenAlerts,
-    getActiveAlertCount,
-  ]);
+  }, []);
 
-  /**
-   * Handle pull-to-refresh action
-   */
+  const fetchStaticDataForSelectedGarden = useCallback(
+    async (gardenId: number, force = false) => {
+      if (!force && staticDataFetchedRef.current.has(gardenId)) {
+        const currentSensorData = sensorDataHook.gardenSensorData[gardenId];
+        if (currentSensorData) {
+          const displaySensorData = {
+            temperature: currentSensorData[SensorType.TEMPERATURE]?.[0]?.value,
+            humidity: currentSensorData[SensorType.HUMIDITY]?.[0]?.value,
+            soilMoisture:
+              currentSensorData[SensorType.SOIL_MOISTURE]?.[0]?.value,
+            light: currentSensorData[SensorType.LIGHT]?.[0]?.value,
+          };
+          gardenManagement.updateGardenSensorData(gardenId, displaySensorData);
+        }
+        return;
+      }
+
+      console.log(`useHomeData: Fetching static data for garden ${gardenId}`);
+      try {
+        await Promise.all([
+          weatherDataHook.fetchCompleteWeatherData(gardenId),
+          weatherDataHook.fetchWeatherAdvice(gardenId),
+          alertDataHookInstance.fetchGardenAlerts(gardenId),
+          activityDataHook.loadActivitiesAndSchedules(gardenId),
+        ]);
+
+        const alertCount = alertDataHookInstance.getActiveAlertCount(gardenId);
+        gardenManagement.updateGardenAlertCount(gardenId, alertCount);
+
+        const currentSensorData = sensorDataHook.gardenSensorData[gardenId];
+        if (currentSensorData) {
+          const displaySensorData = {
+            temperature: currentSensorData[SensorType.TEMPERATURE]?.[0]?.value,
+            humidity: currentSensorData[SensorType.HUMIDITY]?.[0]?.value,
+            soilMoisture:
+              currentSensorData[SensorType.SOIL_MOISTURE]?.[0]?.value,
+            light: currentSensorData[SensorType.LIGHT]?.[0]?.value,
+          };
+          gardenManagement.updateGardenSensorData(gardenId, displaySensorData);
+        }
+        staticDataFetchedRef.current.add(gardenId);
+      } catch (error) {
+        console.error(
+          `useHomeData: Error fetching static data for garden ${gardenId}:`,
+          error
+        );
+      }
+    },
+    []
+  );
+
+  // ✅ UPDATED: handleRefresh sử dụng ref
   const handleRefresh = useCallback(async () => {
+    console.log("useHomeData: Refreshing data...");
     setRefreshing(true);
-
     try {
-      // Reload everything
       await loadInitialData();
-
-      // Reload detail data for selected garden
-      if (selectedGardenId !== null) {
-        await loadGardenDetailData(selectedGardenId);
+      const currentGardenId = currentGardenIdRef.current; // Use ref
+      if (currentGardenId !== null) {
+        staticDataFetchedRef.current.delete(currentGardenId);
+        await fetchStaticDataForSelectedGarden(currentGardenId, true);
       }
     } catch (error) {
-      console.error("Error refreshing data:", error);
+      console.error("useHomeData: Error refreshing data:", error);
     } finally {
       setRefreshing(false);
     }
-  }, [loadInitialData, loadGardenDetailData, selectedGardenId]);
+  }, []); // ✅ No dependencies
 
-  /**
-   * Select a garden
-   */
   const selectGarden = useCallback(
     (gardenId: number) => {
       setSelectedGardenId(gardenId);
+      gardenManagement.markGardenVisited(gardenId);
     },
-    [setSelectedGardenId]
+    [setSelectedGardenId, gardenManagement]
   );
 
-  /**
-   * Fetch garden advice for a specific garden
-   */
   const fetchGardenAdvice = useCallback(async (gardenId: number) => {
     try {
       return await gardenService.getGardenAdvice(gardenId);
     } catch (error) {
       console.error(
-        `Error fetching garden advice for garden ${gardenId}:`,
+        `useHomeData: Error fetching garden advice for garden ${gardenId}:`,
         error
       );
       return [];
     }
   }, []);
 
+  // Effect Hooks
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]); // loadInitialData is stable
+
+  // ✅ NEW: Single sensor polling interval với ref
+  useEffect(() => {
+    console.log("useHomeData: Setting up single sensor polling interval");
+
+    const pollSensorData = () => {
+      const currentId = currentGardenIdRef.current;
+      if (currentId !== null) {
+        console.log(`useHomeData: Polling sensor data for garden ${currentId}`);
+        sensorDataHook.fetchSensorData(currentId);
+      } else {
+        console.log("useHomeData: No garden selected, skipping sensor poll");
+      }
+    };
+
+    // Initial fetch for the current garden (if any)
+    pollSensorData();
+
+    // Setup interval - runs every 5 seconds
+    const intervalId = setInterval(pollSensorData, 5000);
+
+    // Cleanup function
+    return () => {
+      console.log("useHomeData: Cleaning up sensor polling interval");
+      clearInterval(intervalId);
+    };
+  }, []); // ✅ Empty dependencies - interval created only once
+
+  useEffect(() => {
+    if (selectedGardenId !== null) {
+      fetchStaticDataForSelectedGarden(selectedGardenId);
+    }
+  }, [selectedGardenId, fetchStaticDataForSelectedGarden]); // fetchStaticDataForSelectedGarden is stable
+
+  // Return Values
   return {
     // User and context data
     user,
@@ -233,58 +236,58 @@ export default function useHomeData() {
     gardens: gardenManagement.gardens,
 
     // Selected Garden Detail
-    selectedGardenDetail: gardenDetail.garden,
-    selectedGardenPlantDetails: gardenDetail.plantDetails,
-    selectedGardenLoading: gardenDetail.isLoading,
-    selectedGardenError: gardenDetail.error,
-    selectedGardenPhotos: gardenDetail.photos,
-    selectedGardenAlerts: gardenDetail.alerts,
-    selectedGardenActivities: gardenDetail.activities,
-    selectedGardenWateringSchedule: gardenDetail.wateringSchedule,
-    selectedGardenCurrentWeather: gardenDetail.currentWeather,
-    selectedGardenHourlyForecast: gardenDetail.hourlyForecast,
-    selectedGardenDailyForecast: gardenDetail.dailyForecast,
+    selectedGardenDetail: gardenDetailHook.garden,
+    selectedGardenPlantDetails: gardenDetailHook.plantDetails,
+    selectedGardenLoading: gardenDetailHook.isLoading,
+    selectedGardenError: gardenDetailHook.error,
+    selectedGardenPhotos: gardenDetailHook.photos,
+    selectedGardenAlerts: gardenDetailHook.alerts,
+    selectedGardenActivities: gardenDetailHook.activities,
+    selectedGardenWateringSchedule: gardenDetailHook.wateringSchedule,
+    selectedGardenCurrentWeather: gardenDetailHook.currentWeather,
+    selectedGardenHourlyForecast: gardenDetailHook.hourlyForecast,
+    selectedGardenDailyForecast: gardenDetailHook.dailyForecast,
 
     // Sensors
-    gardenSensorData: sensorData.gardenSensorData,
-    sensorDataLoading: sensorData.sensorDataLoading,
-    sensorDataError: sensorData.sensorDataError,
-    getSensorIconName: sensorData.getSensorIconName,
-    getSensorStatus,
+    gardenSensorData: sensorDataHook.gardenSensorData,
+    sensorDataLoading: sensorDataHook.sensorDataLoading,
+    sensorDataError: sensorDataHook.sensorDataError,
+    getSensorIconName, // Stable
+    getSensorStatus, // Stable import
 
     // Weather
-    weatherData: weatherData.weatherData,
-    gardenWeatherData: weatherData.gardenWeatherData,
-    weatherAdviceByGarden: weatherData.weatherAdviceByGarden,
-    optimalGardenTimes: weatherData.optimalGardenTimes,
-    weatherDetailLoading: weatherData.weatherDetailLoading,
-    weatherDetailError: weatherData.weatherDetailError,
-    getWeatherTip: weatherData.getWeatherTip,
+    weatherData: weatherDataHook.weatherData,
+    gardenWeatherData: weatherDataHook.gardenWeatherData,
+    weatherAdviceByGarden: weatherDataHook.weatherAdviceByGarden,
+    optimalGardenTimes: weatherDataHook.optimalGardenTimes,
+    weatherDetailLoading: weatherDataHook.weatherDetailLoading,
+    weatherDetailError: weatherDataHook.weatherDetailError,
+    getWeatherTip, // Stable
 
     // Alerts
-    alertsLoading,
-    alertsError,
+    alertsLoading, // State
+    alertsError, // State
 
     // Activities
-    recentActivities: activityData.recentActivities,
-    upcomingSchedules: activityData.upcomingSchedules,
-    activitiesLoading: activityData.activitiesLoading,
-    schedulesLoading: activityData.schedulesLoading,
+    recentActivities, // State
+    upcomingSchedules, // State
+    activitiesLoading, // State
+    schedulesLoading, // State
 
     // Alerts from alertData hook
-    gardenAlerts: gardenAlertsFromAlertHook,
+    gardenAlerts: gardenAlertsFromAlertHook, // State
 
     // Functions
-    selectGarden,
-    handleRefresh,
-    fetchCompleteWeatherData,
-    fetchWeatherAdvice,
-    fetchGardenAdvice,
-    calculateOptimalTimes: weatherData.calculateOptimalTimes,
-    resolveAlert,
-    ignoreAlert,
-    completeActivity: activityData.completeActivity,
-    completeWateringSchedule: activityData.completeWateringSchedule,
-    skipScheduledActivity: activityData.skipScheduledActivity,
+    selectGarden, // Stable
+    handleRefresh, // Now stable deps
+    fetchCompleteWeatherData: weatherDataHook.fetchCompleteWeatherData, // Expose direct stable ref
+    fetchWeatherAdvice: weatherDataHook.fetchWeatherAdvice, // Expose direct stable ref
+    fetchGardenAdvice, // Stable
+    calculateOptimalTimes, // Stable
+    resolveAlert, // Stable
+    ignoreAlert, // Stable
+    completeActivity, // Stable
+    completeWateringSchedule, // Stable
+    skipScheduledActivity, // Stable
   };
 }
