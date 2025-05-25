@@ -13,7 +13,6 @@ import {
 } from "@/types/weather/weather.types";
 import { SensorType } from "@/types/gardens/sensor.types";
 import { Alert, AlertStatus } from "@/types/alerts/alert.types";
-import { apiClient } from "@/service";
 import { UISensor } from "@/components/garden/GardenSensorSection";
 import {
   gardenService,
@@ -444,7 +443,7 @@ export function useGardenDetail({ gardenId }: { gardenId: string | null }) {
       if (!gardenId) return;
       try {
         // Assuming there's an API endpoint to ignore alerts - this matches useGardenAlerts
-        await apiClient.post(`/alerts/${alertId}/ignore`);
+        await alertService.ignoreAlert(alertId);
         await loadGardenData(gardenId); // Refresh data
         Toast.show({
           type: "success",

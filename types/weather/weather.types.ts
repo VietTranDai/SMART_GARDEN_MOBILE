@@ -90,7 +90,15 @@ export interface WeatherAdvice {
   id: number;
   title: string; // Short title for the advice
   description: string; // Detailed explanation
-  weatherCondition: WeatherMain; // Weather condition this advice applies to
+  detailedSteps?: string[]; // Optional: Detailed steps for the advice
+  reasons?: string[]; // Optional: Reasons behind the advice
+  tips?: string[]; // Optional: Additional tips
+  personalizedMessage?: string; // Optional: Personalized message for the user
+  urgencyLevel?: string; // Optional: Urgency level (e.g., HIGH, MEDIUM, LOW)
+  difficultyLevel?: string; // Optional: Difficulty level (e.g., EASY, MEDIUM, HARD)
+  duration?: string; // Optional: Estimated duration for the task
+  frequency?: string; // Optional: Recommended frequency for the task
+  weatherCondition: WeatherMain | string; // Weather condition this advice applies to (string for flexibility if backend sends new values)
   temperature?: {
     // Optional temperature range this advice applies to
     min?: number;
@@ -107,9 +115,10 @@ export interface WeatherAdvice {
     maxSpeed?: number;
   };
   icon: string; // Icon to represent this advice
-  priority: number; // 1-5, with 5 being highest priority
+  priority: number; // Priority level, higher means more important
   bestTimeOfDay?: string; // Recommended time to perform the activity
   applicableGardenTypes?: string[]; // Garden types this advice is most relevant for
+  plantTypes?: string[]; // Optional: Specific plant types this advice may apply to
   createdAt: string;
   updatedAt: string;
 }

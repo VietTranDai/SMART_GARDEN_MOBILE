@@ -44,6 +44,309 @@ interface WeatherDetailModalProps {
   theme: any;
 }
 
+// Helper functions for styling advice items (can be moved or kept here)
+const getUrgencyStyle = (
+  urgency: string | undefined,
+  priority: number | undefined,
+  theme: any
+) => {
+  let text = "Thông tin";
+  let color = theme.textSecondary;
+
+  switch (urgency?.toUpperCase()) {
+    case "HIGH":
+      text = "Rất gấp";
+      color = theme.danger || theme.warning;
+      break;
+    case "MEDIUM":
+      text = "Trung bình";
+      color = theme.warning || theme.primary;
+      break;
+    case "LOW":
+      text = "Không gấp";
+      color = theme.success || theme.info || theme.textSecondary;
+      break;
+    default:
+      if (typeof priority === "number") {
+        if (priority >= 8) {
+          text = "Rất Quan Trọng";
+          color = theme.danger || theme.warning;
+        } else if (priority >= 5) {
+          text = "Quan Trọng";
+          color = theme.warning || theme.primary;
+        } else {
+          text = "Gợi ý";
+          color = theme.success || theme.textSecondary;
+        }
+      }
+      break;
+  }
+  return { text, color };
+};
+
+const formatDifficulty = (difficulty?: string) => {
+  if (!difficulty) return "";
+  switch (difficulty.toUpperCase()) {
+    case "EASY":
+      return "Dễ";
+    case "MEDIUM":
+      return "Trung bình";
+    case "HARD":
+      return "Khó";
+    default:
+      return difficulty;
+  }
+};
+
+interface AdviceListItemProps {
+  item: WeatherAdvice;
+  theme: any;
+  // Pass pre-calculated styles/text to ensure stability for memo
+  urgencyInfo: { text: string; color: string };
+  difficultyText: string;
+}
+
+const AdviceListItem = React.memo<AdviceListItemProps>(
+  ({ item, theme, urgencyInfo, difficultyText }) => {
+    return (
+      <View
+        style={[
+          styles.adviceItem,
+          {
+            backgroundColor: theme.card,
+          },
+        ]}
+      >
+        <View style={styles.adviceHeader}>
+          <View
+            style={[
+              styles.adviceIconContainer,
+              { backgroundColor: `${theme.primary}20` },
+            ]}
+          >
+            <Ionicons
+              name={(item.icon as any) || "information-circle-outline"}
+              size={24}
+              color={theme.primary}
+            />
+          </View>
+          <View style={styles.adviceTitleContainer}>
+            <Text style={[styles.adviceTitle, { color: theme.text }]}>
+              {item.title}
+            </Text>
+            {difficultyText && (
+              <Text
+                style={[
+                  styles.adviceDifficulty,
+                  { color: theme.textSecondary },
+                ]}
+              >
+                Độ khó: {difficultyText}
+              </Text>
+            )}
+          </View>
+          <View
+            style={[
+              styles.urgencyBadge,
+              { backgroundColor: urgencyInfo.color },
+            ]}
+          >
+            <Text style={styles.urgencyBadgeText}>{urgencyInfo.text}</Text>
+          </View>
+        </View>
+
+        <Text
+          style={[styles.adviceDescription, { color: theme.textSecondary }]}
+        >
+          {item.description}
+        </Text>
+
+        {item.detailedSteps && item.detailedSteps.length > 0 && (
+          <View style={styles.adviceDetailSection}>
+            <Text style={[styles.adviceDetailTitle, { color: theme.text }]}>
+              Các bước thực hiện:
+            </Text>
+            {item.detailedSteps.map((step, index) => (
+              <Text
+                key={`step-${index}`}
+                style={[
+                  styles.adviceDetailText,
+                  { color: theme.textSecondary },
+                ]}
+              >
+                • {step}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {item.tips && item.tips.length > 0 && (
+          <View style={styles.adviceDetailSection}>
+            <Text style={[styles.adviceDetailTitle, { color: theme.text }]}>
+              Mẹo hữu ích:
+            </Text>
+            {item.tips.map((tip, index) => (
+              <Text
+                key={`tip-${index}`}
+                style={[
+                  styles.adviceDetailText,
+                  { color: theme.textSecondary },
+                ]}
+              >
+                • {tip}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {item.reasons && item.reasons.length > 0 && (
+          <View style={styles.adviceDetailSection}>
+            <Text style={[styles.adviceDetailTitle, { color: theme.text }]}>
+              Lý do:
+            </Text>
+            {item.reasons.map((reason, index) => (
+              <Text
+                key={`reason-${index}`}
+                style={[
+                  styles.adviceDetailText,
+                  { color: theme.textSecondary },
+                ]}
+              >
+                • {reason}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {item.personalizedMessage && (
+          <View
+            style={[
+              styles.personalizedMessageContainer,
+              { borderLeftColor: theme.primary },
+            ]}
+          >
+            <Ionicons
+              name="sparkles-outline"
+              size={18}
+              color={theme.primary}
+              style={styles.personalizedMessageIcon}
+            />
+            <Text
+              style={[styles.personalizedMessageText, { color: theme.text }]}
+            >
+              {item.personalizedMessage}
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  }
+);
+
+interface OptimalTimeListItemProps {
+  item: OptimalGardenTime;
+  theme: any;
+  weatherService: typeof weatherService; // Pass the service for its utility functions
+}
+
+const OptimalTimeListItem = React.memo<OptimalTimeListItemProps>(
+  ({ item, theme, weatherService }) => {
+    return (
+      <View
+        style={[
+          styles.optimalItem,
+          {
+            backgroundColor: theme.card,
+            borderLeftWidth: 4,
+            borderLeftColor:
+              item.score >= 70
+                ? theme.success
+                : item.score >= 50
+                  ? theme.primary
+                  : theme.textSecondary,
+          },
+        ]}
+      >
+        <View style={styles.optimalHeader}>
+          <View
+            style={[
+              styles.optimalScoreBadge,
+              {
+                backgroundColor:
+                  item.score >= 70
+                    ? theme.success
+                    : item.score >= 50
+                      ? theme.primary
+                      : theme.textSecondary,
+              },
+            ]}
+          >
+            <Text style={styles.optimalScoreText}>{item.score}%</Text>
+          </View>
+          <View style={styles.optimalTitleContainer}>
+            <Text style={[styles.optimalTitle, { color: theme.text }]}>
+              {item.activity}
+            </Text>
+            <Text
+              style={[styles.optimalTimeRange, { color: theme.textSecondary }]}
+            >
+              {weatherService.formatTime(item.startTime)} -{" "}
+              {weatherService.formatTime(item.endTime)}
+            </Text>
+          </View>
+          <Image
+            source={{
+              uri: weatherService.getWeatherIcon(
+                `${
+                  item.weatherCondition === "CLEAR"
+                    ? "01"
+                    : item.weatherCondition === "CLOUDS"
+                      ? "02"
+                      : item.weatherCondition === "RAIN"
+                        ? "10"
+                        : "50"
+                }d`
+              ),
+            }}
+            style={styles.optimalIcon}
+          />
+        </View>
+        <View style={styles.optimalDetails}>
+          <View style={styles.optimalDetailItem}>
+            <Ionicons
+              name="thermometer-outline"
+              size={16}
+              color={theme.textSecondary}
+            />
+            <Text
+              style={[styles.optimalDetailText, { color: theme.textSecondary }]}
+            >
+              {Math.round(item.temperature)}°C
+            </Text>
+          </View>
+          <View style={styles.optimalDetailItem}>
+            <Ionicons
+              name="calendar-outline"
+              size={16}
+              color={theme.textSecondary}
+            />
+            <Text
+              style={[styles.optimalDetailText, { color: theme.textSecondary }]}
+            >
+              {new Date(item.startTime).toLocaleDateString("vi-VN", {
+                weekday: "long",
+              })}
+            </Text>
+          </View>
+        </View>
+        <Text style={[styles.optimalReason, { color: theme.textSecondary }]}>
+          {item.reason}
+        </Text>
+      </View>
+    );
+  }
+);
+
 export default function WeatherDetailModal({
   isVisible,
   onClose,
@@ -220,8 +523,8 @@ export default function WeatherDetailModal({
         {activeTab === "forecast"
           ? "Không có dữ liệu dự báo"
           : activeTab === "advice"
-          ? "Không có lời khuyên"
-          : "Không tìm thấy thời gian tối ưu"}
+            ? "Không có lời khuyên"
+            : "Không tìm thấy thời gian tối ưu"}
       </Text>
     </View>
   );
@@ -411,8 +714,8 @@ export default function WeatherDetailModal({
         strokeDasharray: "5,5",
         stroke: `${theme.border}50`,
       },
-      formatYLabel: (value) => `${value}°C`,
-      formatXLabel: (value) => value || "",
+      formatYLabel: (value: string | number) => `${value}°C`,
+      formatXLabel: (value: string | number) => String(value || ""),
     };
 
     const rainChartConfig = {
@@ -423,7 +726,7 @@ export default function WeatherDetailModal({
         strokeWidth: "2",
         stroke: "#4da6ff",
       },
-      formatYLabel: (value) => `${value}%`,
+      formatYLabel: (value: string | number) => `${value}%`,
     };
 
     return (
@@ -537,79 +840,216 @@ export default function WeatherDetailModal({
         return renderEmptyState();
       }
 
+      const getUrgencyStyle = (urgency?: string, priority?: number) => {
+        let text = "Thông tin";
+        let color = theme.textSecondary;
+
+        switch (urgency?.toUpperCase()) {
+          case "HIGH":
+            text = "Rất gấp";
+            color = theme.danger || theme.warning; // Assuming theme.danger, fallback to warning
+            break;
+          case "MEDIUM":
+            text = "Trung bình";
+            color = theme.warning || theme.primary;
+            break;
+          case "LOW":
+            text = "Không gấp";
+            color = theme.success || theme.info || theme.textSecondary; // Assuming theme.success or theme.info
+            break;
+          default:
+            // Fallback to numeric priority if urgencyLevel is not specific
+            if (typeof priority === "number") {
+              if (priority >= 8) {
+                // High priority examples from API
+                text = "Rất Quan Trọng";
+                color = theme.danger || theme.warning;
+              } else if (priority >= 5) {
+                // Medium priority examples
+                text = "Quan Trọng";
+                color = theme.warning || theme.primary;
+              } else {
+                text = "Gợi ý";
+                color = theme.success || theme.textSecondary;
+              }
+            }
+            break;
+        }
+        return { text, color };
+      };
+
+      const formatDifficulty = (difficulty?: string) => {
+        if (!difficulty) return "";
+        switch (difficulty.toUpperCase()) {
+          case "EASY":
+            return "Dễ";
+          case "MEDIUM":
+            return "Trung bình";
+          case "HARD":
+            return "Khó";
+          default:
+            return difficulty;
+        }
+      };
+
       return (
         <FlatList
           data={validAdvice}
           keyExtractor={(item, index) => `advice-${item.id || index}`}
-          renderItem={({ item }) => (
-            <View
-              style={[
-                styles.adviceItem,
-                {
-                  backgroundColor: theme.card,
-                },
-              ]}
-            >
-              <View style={styles.adviceHeader}>
-                <View
-                  style={[
-                    styles.adviceIconContainer,
-                    { backgroundColor: `${theme.primary}20` },
-                  ]}
-                >
-                  <Ionicons
-                    name={item.icon as any}
-                    size={24}
-                    color={theme.primary}
-                  />
-                </View>
-                <View style={styles.adviceTitleContainer}>
-                  <Text style={[styles.adviceTitle, { color: theme.text }]}>
-                    {item.title}
-                  </Text>
-                  {item.bestTimeOfDay && (
-                    <Text
-                      style={[
-                        styles.adviceTime,
-                        { color: theme.textSecondary },
-                      ]}
-                    >
-                      Thời gian tốt nhất: {item.bestTimeOfDay}
-                    </Text>
-                  )}
-                </View>
-                <View
-                  style={[
-                    styles.priorityBadge,
-                    {
-                      backgroundColor:
-                        item.priority >= 4
-                          ? theme.warning
-                          : item.priority >= 3
-                          ? theme.primary
-                          : theme.textSecondary,
-                    },
-                  ]}
-                >
-                  <Text style={styles.priorityText}>
-                    {item.priority >= 4
-                      ? "Quan trọng"
-                      : item.priority >= 3
-                      ? "Đề xuất"
-                      : "Gợi ý"}
-                  </Text>
-                </View>
-              </View>
-              <Text
+          renderItem={({ item }) => {
+            const urgencyInfo = getUrgencyStyle(
+              item.urgencyLevel,
+              item.priority
+            );
+            const difficultyText = formatDifficulty(item.difficultyLevel);
+
+            return (
+              <View
                 style={[
-                  styles.adviceDescription,
-                  { color: theme.textSecondary },
+                  styles.adviceItem,
+                  {
+                    backgroundColor: theme.card,
+                  },
                 ]}
               >
-                {item.description}
-              </Text>
-            </View>
-          )}
+                <View style={styles.adviceHeader}>
+                  <View
+                    style={[
+                      styles.adviceIconContainer,
+                      { backgroundColor: `${theme.primary}20` },
+                    ]}
+                  >
+                    <Ionicons
+                      name={(item.icon as any) || "information-circle-outline"}
+                      size={24}
+                      color={theme.primary}
+                    />
+                  </View>
+                  <View style={styles.adviceTitleContainer}>
+                    <Text style={[styles.adviceTitle, { color: theme.text }]}>
+                      {item.title}
+                    </Text>
+                    {difficultyText && (
+                      <Text
+                        style={[
+                          styles.adviceDifficulty,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        Độ khó: {difficultyText}
+                      </Text>
+                    )}
+                  </View>
+                  <View
+                    style={[
+                      styles.urgencyBadge,
+                      { backgroundColor: urgencyInfo.color },
+                    ]}
+                  >
+                    <Text style={styles.urgencyBadgeText}>
+                      {urgencyInfo.text}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text
+                  style={[
+                    styles.adviceDescription,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  {item.description}
+                </Text>
+
+                {item.detailedSteps && item.detailedSteps.length > 0 && (
+                  <View style={styles.adviceDetailSection}>
+                    <Text
+                      style={[styles.adviceDetailTitle, { color: theme.text }]}
+                    >
+                      Các bước thực hiện:
+                    </Text>
+                    {item.detailedSteps.map((step, index) => (
+                      <Text
+                        key={`step-${index}`}
+                        style={[
+                          styles.adviceDetailText,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        • {step}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+
+                {item.tips && item.tips.length > 0 && (
+                  <View style={styles.adviceDetailSection}>
+                    <Text
+                      style={[styles.adviceDetailTitle, { color: theme.text }]}
+                    >
+                      Mẹo hữu ích:
+                    </Text>
+                    {item.tips.map((tip, index) => (
+                      <Text
+                        key={`tip-${index}`}
+                        style={[
+                          styles.adviceDetailText,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        • {tip}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+
+                {item.reasons && item.reasons.length > 0 && (
+                  <View style={styles.adviceDetailSection}>
+                    <Text
+                      style={[styles.adviceDetailTitle, { color: theme.text }]}
+                    >
+                      Lý do:
+                    </Text>
+                    {item.reasons.map((reason, index) => (
+                      <Text
+                        key={`reason-${index}`}
+                        style={[
+                          styles.adviceDetailText,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        • {reason}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+
+                {item.personalizedMessage && (
+                  <View
+                    style={[
+                      styles.personalizedMessageContainer,
+                      { borderLeftColor: theme.primary },
+                    ]}
+                  >
+                    <Ionicons
+                      name="sparkles-outline"
+                      size={18}
+                      color={theme.primary}
+                      style={styles.personalizedMessageIcon}
+                    />
+                    <Text
+                      style={[
+                        styles.personalizedMessageText,
+                        { color: theme.text },
+                      ]}
+                    >
+                      {item.personalizedMessage}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            );
+          }}
           contentContainerStyle={[
             styles.adviceContainer,
             styles.contentContainer,
@@ -646,108 +1086,11 @@ export default function WeatherDetailModal({
           data={validOptimalTimes}
           keyExtractor={(item, index) => `optimal-${index}`}
           renderItem={({ item }) => (
-            <View
-              style={[
-                styles.optimalItem,
-                {
-                  backgroundColor: theme.card,
-                  borderLeftWidth: 4,
-                  borderLeftColor:
-                    item.score >= 70
-                      ? theme.success
-                      : item.score >= 50
-                      ? theme.primary
-                      : theme.textSecondary,
-                },
-              ]}
-            >
-              <View style={styles.optimalHeader}>
-                <View
-                  style={[
-                    styles.optimalScoreBadge,
-                    {
-                      backgroundColor:
-                        item.score >= 70
-                          ? theme.success
-                          : item.score >= 50
-                          ? theme.primary
-                          : theme.textSecondary,
-                    },
-                  ]}
-                >
-                  <Text style={styles.optimalScoreText}>{item.score}%</Text>
-                </View>
-                <View style={styles.optimalTitleContainer}>
-                  <Text style={[styles.optimalTitle, { color: theme.text }]}>
-                    {item.activity}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.optimalTimeRange,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {weatherService.formatTime(item.startTime)} -{" "}
-                    {weatherService.formatTime(item.endTime)}
-                  </Text>
-                </View>
-                <Image
-                  source={{
-                    uri: weatherService.getWeatherIcon(
-                      `${
-                        item.weatherCondition === "CLEAR"
-                          ? "01"
-                          : item.weatherCondition === "CLOUDS"
-                          ? "02"
-                          : item.weatherCondition === "RAIN"
-                          ? "10"
-                          : "50"
-                      }d`
-                    ),
-                  }}
-                  style={styles.optimalIcon}
-                />
-              </View>
-              <View style={styles.optimalDetails}>
-                <View style={styles.optimalDetailItem}>
-                  <Ionicons
-                    name="thermometer-outline"
-                    size={16}
-                    color={theme.textSecondary}
-                  />
-                  <Text
-                    style={[
-                      styles.optimalDetailText,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {Math.round(item.temperature)}°C
-                  </Text>
-                </View>
-                <View style={styles.optimalDetailItem}>
-                  <Ionicons
-                    name="calendar-outline"
-                    size={16}
-                    color={theme.textSecondary}
-                  />
-                  <Text
-                    style={[
-                      styles.optimalDetailText,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {new Date(item.startTime).toLocaleDateString("vi-VN", {
-                      weekday: "long",
-                    })}
-                  </Text>
-                </View>
-              </View>
-              <Text
-                style={[styles.optimalReason, { color: theme.textSecondary }]}
-              >
-                {item.reason}
-              </Text>
-            </View>
+            <OptimalTimeListItem
+              item={item}
+              theme={theme}
+              weatherService={weatherService}
+            />
           )}
           contentContainerStyle={[
             styles.optimalContainer,
@@ -1283,6 +1626,58 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: "Inter-SemiBold",
   },
+  adviceDifficulty: {
+    fontSize: 12,
+    fontFamily: "Inter-Regular",
+    marginTop: 2,
+  },
+  urgencyBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    marginLeft: 8,
+    height: 30,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  urgencyBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontFamily: "Inter-Bold",
+  },
+  adviceDetailSection: {
+    marginTop: 12,
+  },
+  adviceDetailTitle: {
+    fontSize: 14,
+    fontFamily: "Inter-SemiBold",
+    marginBottom: 6,
+  },
+  adviceDetailText: {
+    fontSize: 13,
+    fontFamily: "Inter-Regular",
+    lineHeight: 19,
+    marginBottom: 3,
+  },
+  personalizedMessageContainer: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    backgroundColor: "rgba(0,0,0,0.03)",
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  personalizedMessageIcon: {
+    marginRight: 8,
+  },
+  personalizedMessageText: {
+    fontSize: 13,
+    fontFamily: "Inter-Italic",
+    lineHeight: 19,
+    flex: 1,
+  },
   optimalContainer: {
     paddingVertical: 16,
   },
@@ -1343,7 +1738,6 @@ const styles = StyleSheet.create({
   optimalDetailText: {
     fontSize: 12,
     fontFamily: "Inter-Regular",
-    marginLeft: 4,
   },
   optimalReason: {
     fontSize: 14,

@@ -67,6 +67,9 @@ interface HomeSectionsProps {
     value: number,
     type: SensorType
   ) => "normal" | "warning" | "critical";
+
+  // Added
+  onNavigateToDetail?: (gardenId: number) => void;
 }
 
 const HomeSections = memo(
@@ -88,6 +91,7 @@ const HomeSections = memo(
     adviceLoading,
     weatherDetailLoading,
     getSensorStatus,
+    onNavigateToDetail,
   }: HomeSectionsProps) => {
     // Find selected garden object
     const selectedGarden = useMemo(() => {
@@ -117,6 +121,7 @@ const HomeSections = memo(
           adviceLoading={adviceLoading}
           weatherDetailLoading={weatherDetailLoading}
           getSensorStatus={getSensorStatus}
+          onNavigateToDetail={onNavigateToDetail}
         />
 
         {/* Weather Section */}

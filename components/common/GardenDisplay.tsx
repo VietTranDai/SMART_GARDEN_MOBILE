@@ -17,7 +17,6 @@ import useSectionAnimation from "@/hooks/ui/useSectionAnimation";
 import { GardenType } from "@/types/gardens/garden.types";
 import { GardenDisplayDto } from "@/types/gardens/dtos";
 import { SensorType, SensorData } from "@/types/gardens/sensor.types";
-import { makeHomeStyles } from "../common/styles";
 import { LinearGradient } from "expo-linear-gradient";
 import { useGardenContext } from "@/contexts/GardenContext";
 import gardenService from "@/service/api/garden.service";
@@ -48,6 +47,7 @@ interface GardenCardProps {
   adviceLoading?: boolean;
   weatherLoading?: boolean;
   onShowAlertDetails?: (gardenId: number) => void;
+  onNavigateToDetail?: (gardenId: number) => void;
 }
 
 interface GardenDisplayProps {
@@ -71,6 +71,7 @@ interface GardenDisplayProps {
   adviceLoading?: Record<number, boolean>;
   weatherDetailLoading?: Record<number, boolean>;
   onShowAlertDetails?: (gardenId: number) => void;
+  onNavigateToDetail?: (gardenId: number) => void;
 }
 
 // Tối ưu component với memo
@@ -94,6 +95,7 @@ const GardenCard = memo(
     adviceLoading = false,
     weatherLoading = false,
     onShowAlertDetails,
+    onNavigateToDetail,
   }: GardenCardProps) => {
     const iconName = getGardenIcon(garden.type);
     const scaleValue = useRef(new Animated.Value(1)).current;
@@ -161,7 +163,7 @@ const GardenCard = memo(
 
     // Navigate to garden detail page
     const handleGoToDetail = useCallback(() => {
-      router.push(`/garden/${garden.id}`);
+      router.push(`/(modules)/gardens/${garden.id}`);
     }, [garden.id]);
 
     return (
@@ -192,7 +194,13 @@ const GardenCard = memo(
               }),
             },
           ]}
-          onPress={handlePress}
+          onPress={() => {
+            if (onNavigateToDetail) {
+              onNavigateToDetail(garden.id);
+            } else {
+              handleGoToDetail();
+            }
+          }}
           activeOpacity={0.9}
         >
           {/* Profile Picture với overlay gradient */}
@@ -540,6 +548,7 @@ const GardenDisplay = memo(function GardenDisplay({
   adviceLoading = {},
   weatherDetailLoading = {},
   onShowAlertDetails,
+  onNavigateToDetail,
 }: GardenDisplayProps) {
   const theme = useAppTheme();
   const { selectedGardenId, selectGarden } = useGardenContext();
@@ -700,6 +709,7 @@ const GardenDisplay = memo(function GardenDisplay({
             onShowAdvice={onShowAdvice}
             onShowWeatherDetail={onShowWeatherDetail}
             onShowAlertDetails={onShowAlertDetails}
+            onNavigateToDetail={onNavigateToDetail}
             gardenSensorData={sensorDataByGarden[garden.id] || {}}
             gardenWeather={weatherDataByGarden[garden.id] || null}
             getSensorStatus={getSensorStatus}

@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { Ionicons } from "@expo/vector-icons";
+import { NavigationProp, useNavigation } from "@react-navigation/native";
 
 // Import custom hooks
 import useHomeData from "@/hooks/useHomeData";
@@ -118,6 +119,7 @@ interface GardenSectionProps {
   ) => "normal" | "warning" | "critical";
   showLargeCards: boolean;
   onSelectGarden: (gardenId: number) => void;
+  onNavigateToDetail: (gardenId: number) => void;
 }
 
 interface WeatherSectionProps {
@@ -257,6 +259,7 @@ const GardenSection = memo((props: GardenSectionProps) => {
     getSensorStatus,
     showLargeCards,
     onSelectGarden,
+    onNavigateToDetail,
   } = props;
 
   const styles = useMemo(() => extendedHomeStyles(theme), [theme]);
@@ -340,6 +343,7 @@ const GardenSection = memo((props: GardenSectionProps) => {
         adviceLoading={adviceLoading}
         weatherDetailLoading={weatherDetailLoading}
         onSelectGarden={onSelectGarden}
+        onNavigateToDetail={onNavigateToDetail}
       />
     </Animated.View>
   );
@@ -684,10 +688,18 @@ const DynamicSections = memo((props: DynamicSectionsProps) => {
   }
 });
 
+// Define your RootStackParamList, ideally in a dedicated types file
+export type RootStackParamList = {
+  Home: undefined; // Or specific params for Home if any
+  GardenDetailScreen: { gardenId: number }; // Ensure 'GardenDetailScreen' is your actual route name
+  // ... other routes in your app
+};
+
 // Rename HomeScreen thành HomeScreenContent và giữ lại logic
 function HomeScreenContent() {
   const theme = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
   // Use ScrollView ref instead of FlatList
   const scrollViewRef = useRef<ScrollView>(null);
@@ -738,6 +750,17 @@ function HomeScreenContent() {
   const [selectedGardenForAlerts, setSelectedGardenForAlerts] = useState<
     number | null
   >(null);
+
+  // State for garden-specific advice data, loading, and error
+  const [gardenAdviceByGarden, setGardenAdviceByGarden] = useState<
+    Record<number, GardenAdvice[]>
+  >({});
+  const [gardenAdviceLoading, setGardenAdviceLoading] = useState<
+    Record<number, boolean>
+  >({});
+  const [gardenAdviceError, setGardenAdviceError] = useState<
+    Record<number, string | null>
+  >({});
 
   // Animation ref for refresh control
   const refreshAnimationRef = useRef(new Animated.Value(0));
@@ -924,48 +947,76 @@ function HomeScreenContent() {
       }
 
       setSelectedGardenForAdvice(gardenId);
+      setAdviceModalVisible(true); // Hiển thị modal ngay lập tức
 
-      // Set loading state
+      // Kiểm tra xem advice cho garden này đã được fetch trước đó (kể cả khi kết quả là [])
+      // hoặc có đang trong quá trình tải không.
+      if (
+        gardenAdviceByGarden.hasOwnProperty(gardenId) ||
+        gardenAdviceLoading[gardenId]
+      ) {
+        console.log(
+          `Advice for garden ${gardenId} already in state or loading. Modal will use existing data/state.`
+        );
+        // Nếu đang tải, modal sẽ hiển thị trạng thái loading.
+        // Nếu dữ liệu đã có (kể cả mảng rỗng), nó sẽ được hiển thị hoặc thông báo "không có lời khuyên".
+        return; // Không fetch lại
+      }
+
+      // Tiến hành fetch dữ liệu
       setGardenAdviceLoading((prev) => ({
         ...prev,
         [gardenId]: true,
       }));
+      setGardenAdviceError((prev) => ({
+        // Xóa lỗi trước đó cho garden này
+        ...prev,
+        [gardenId]: null,
+      }));
 
       try {
-        // Fetch garden advice (not weather advice)
-        const advice = await fetchGardenAdvice(gardenId);
+        // fetchGardenAdvice từ useHomeData được kỳ vọng trả về GardenAdvice[]
+        // và tự xử lý lỗi bằng cách trả về [] nếu gardenService.getGardenAdvice thất bại.
+        const adviceData = await fetchGardenAdvice(gardenId);
 
-        // Store advice in state
+        // Lưu trữ advice trong state
         setGardenAdviceByGarden((prev) => ({
           ...prev,
-          [gardenId]: advice,
-        }));
-
-        // Clear any errors
-        setGardenAdviceError((prev) => ({
-          ...prev,
-          [gardenId]: null,
+          [gardenId]: adviceData,
         }));
       } catch (error) {
+        // Khối catch này chủ yếu xử lý lỗi nếu bản thân fetchGardenAdvice (từ useHomeData) throw lỗi,
+        // thường không phải là lỗi từ lệnh gọi service bên dưới nếu useHomeData.fetchGardenAdvice
+        // đã bắt và xử lý chúng bằng cách trả về [].
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         console.error(
-          `Error fetching garden advice for garden ${gardenId}:`,
-          error
+          `Error in handleShowAdvice while fetching garden advice for garden ${gardenId}:`,
+          errorMessage
         );
         setGardenAdviceError((prev) => ({
           ...prev,
-          [gardenId]: `Không thể tải lời khuyên: ${error}`,
+          [gardenId]: `Không thể tải lời khuyên cho vườn này. Vui lòng thử lại.`,
         }));
+        // Tùy chọn: đảm bảo advice cho garden này là một mảng rỗng khi có lỗi
+        // setGardenAdviceByGarden((prev) => ({ ...prev, [gardenId]: [] }));
       } finally {
-        // Clear loading state
+        // Xóa trạng thái loading
         setGardenAdviceLoading((prev) => ({
           ...prev,
           [gardenId]: false,
         }));
       }
-
-      setAdviceModalVisible(true);
     },
-    [fetchGardenAdvice]
+    [fetchGardenAdvice, gardenAdviceByGarden, gardenAdviceLoading] // Cập nhật dependencies
+  );
+
+  // Handle navigation to Garden Detail screen
+  const handleNavigateToGardenDetail = useCallback(
+    (gardenId: number) => {
+      navigation.navigate("GardenDetailScreen", { gardenId });
+    },
+    [navigation]
   );
 
   // Handle showing weather detail modal
@@ -1106,17 +1157,6 @@ function HomeScreenContent() {
     return gardens.find((g) => g.id === selectedGardenForWeather);
   }, [selectedGardenForWeather, gardens]);
 
-  // After the existing state declarations, add:
-  const [gardenAdviceByGarden, setGardenAdviceByGarden] = useState<
-    Record<number, GardenAdvice[]>
-  >({});
-  const [gardenAdviceLoading, setGardenAdviceLoading] = useState<
-    Record<number, boolean>
-  >({});
-  const [gardenAdviceError, setGardenAdviceError] = useState<
-    Record<number, string | null>
-  >({});
-
   // If loading, show loading indicator
   if (loading && !refreshing) {
     return <LoadingView message="Đang tải dữ liệu..." />;
@@ -1173,6 +1213,7 @@ function HomeScreenContent() {
           adviceLoading={gardenAdviceLoading || {}}
           weatherDetailLoading={weatherDetailLoading || {}}
           getSensorStatus={getSensorStatus}
+          onNavigateToDetail={handleNavigateToGardenDetail}
         />
       </ScrollView>
 

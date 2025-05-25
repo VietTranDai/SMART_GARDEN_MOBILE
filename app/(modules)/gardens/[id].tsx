@@ -100,27 +100,14 @@ export default function GardenDetailScreen() {
   const SensorsTab = useCallback(
     () => (
       <GardenSensorsTab
-        sensors={sensors}
+        gardenId={id}
         sensorHistory={sensorHistory}
         lastSensorUpdate={lastSensorUpdate || undefined}
-        isSensorDataLoading={isSensorDataLoading}
-        isRefreshing={isRefreshing}
         currentGrowthStage={plantDetails?.currentGrowthStage}
-        onRefresh={() => id && refreshSensorData(id)}
         onSelectSensor={(sensor) => router.push(`/sensors/${sensor.id}`)}
       />
     ),
-    [
-      sensors,
-      sensorHistory,
-      lastSensorUpdate,
-      isSensorDataLoading,
-      isRefreshing,
-      plantDetails,
-      id,
-      refreshSensorData,
-      router,
-    ]
+    [id, sensorHistory, lastSensorUpdate, plantDetails, router]
   );
 
   const PlantTab = useCallback(

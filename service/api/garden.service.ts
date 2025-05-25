@@ -254,7 +254,6 @@ class GardenService {
         ? response.data.data
         : [];
 
-      console.log("adviceData", adviceData);
       return adviceData;
     } catch (error) {
       console.error(

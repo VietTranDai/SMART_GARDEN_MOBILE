@@ -1,49 +1,128 @@
 import React, { useMemo } from "react";
-import { StyleSheet, View, Text, ActivityIndicator } from "react-native";
+import {
+  StyleSheet,
+  View,
+  Text,
+  ActivityIndicator,
+  TouchableOpacity,
+} from "react-native";
 import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { UISensor } from "@/components/garden/GardenSensorSection";
 import SensorDetailView from "@/components/common/SensorDetailView";
-import SensorHistoryChart from "@/components/garden/SensorHistoryChart";
 import { SensorHistory } from "@/types";
-import { SensorType } from "@/types/gardens/sensor.types";
 import { GardenGrowthStage } from "@/types/gardens/garden.types";
 import EmptyStateView from "@/components/common/EmptyStateView";
+import { useGardenSensors } from "@/hooks/sensor/useGardenSensors";
 
 interface GardenSensorsTabProps {
-  sensors: UISensor[];
+  gardenId: string | number | undefined;
   sensorHistory: Record<string, SensorHistory>;
   lastSensorUpdate?: string;
-  isSensorDataLoading: boolean;
-  isRefreshing: boolean;
   currentGrowthStage?: GardenGrowthStage;
-  onRefresh: () => void;
   onSelectSensor: (sensor: UISensor) => void;
 }
 
+// Define createStyles function outside the component
+const createStyles = (theme: ReturnType<typeof useAppTheme>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      padding: 16,
+    },
+    centeredContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
+    },
+    loadingText: {
+      marginTop: 12,
+      fontSize: 16,
+      fontFamily: "Inter-Regular",
+      color: theme.textSecondary,
+    },
+    centeredContainerMini: {
+      alignItems: "center",
+      paddingVertical: 20,
+    },
+    loadingTextMini: {
+      marginTop: 8,
+      fontSize: 14,
+      fontFamily: "Inter-Regular",
+      color: theme.textSecondary,
+    },
+    sensorHistoryContainer: {
+      marginTop: 24,
+      borderTopWidth: 1,
+      paddingTop: 16,
+      borderTopColor: theme.borderLight,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontFamily: "Inter-SemiBold",
+      marginBottom: 16,
+      color: theme.text,
+    },
+    noDataText: {
+      fontSize: 14,
+      fontFamily: "Inter-Regular",
+      textAlign: "center",
+      marginTop: 10,
+      color: theme.textSecondary,
+    },
+    retryButton: {
+      marginTop: 15,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      backgroundColor: theme.primary,
+      borderRadius: 8,
+    },
+    retryButtonText: {
+      color: theme.background,
+      fontFamily: "Inter-SemiBold",
+      fontSize: 16,
+    },
+  });
+
 const GardenSensorsTab: React.FC<GardenSensorsTabProps> = ({
-  sensors,
+  gardenId,
   sensorHistory,
   lastSensorUpdate,
-  isSensorDataLoading,
-  isRefreshing,
   currentGrowthStage,
-  onRefresh,
   onSelectSensor,
 }) => {
   const theme = useAppTheme();
+  // Use useMemo to create styles with the theme
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
-  // Check if there's any actual history data
-  const hasHistoryData = useMemo(() => {
-    if (!sensorHistory) return false;
-    return Object.values(sensorHistory).some(
-      (history) => history && history.data && history.data.length > 0
+  const {
+    sensors: processedSensors,
+    isLoading: isSensorDataLoading,
+    error: sensorError,
+    refreshSensors,
+  } = useGardenSensors({ gardenId: gardenId ?? null });
+
+  if (sensorError) {
+    return (
+      <View
+        style={[
+          styles.centeredContainer,
+          { backgroundColor: theme.background },
+        ]}
+      >
+        <Text style={{ color: theme.error, textAlign: "center" }}>
+          Lỗi tải dữ liệu cảm biến: {sensorError.message}
+        </Text>
+        <TouchableOpacity onPress={refreshSensors} style={styles.retryButton}>
+          <Text style={styles.retryButtonText}>Thử lại</Text>
+        </TouchableOpacity>
+      </View>
     );
-  }, [sensorHistory]);
+  }
 
   if (
     isSensorDataLoading &&
-    !isRefreshing &&
-    (!sensors || sensors.length === 0)
+    (!processedSensors || processedSensors.length === 0)
   ) {
     // Initial loading state for the whole tab if sensors aren't loaded yet
     return (
@@ -54,14 +133,15 @@ const GardenSensorsTab: React.FC<GardenSensorsTabProps> = ({
         ]}
       >
         <ActivityIndicator size="large" color={theme.primary} />
-        <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
-          Đang tải dữ liệu cảm biến...
-        </Text>
+        <Text style={[styles.loadingText]}>Đang tải dữ liệu cảm biến...</Text>
       </View>
     );
   }
 
-  if (!isSensorDataLoading && (!sensors || sensors.length === 0)) {
+  if (
+    !isSensorDataLoading &&
+    (!processedSensors || processedSensors.length === 0)
+  ) {
     return (
       <EmptyStateView
         icon="hardware-chip-outline"
@@ -74,103 +154,15 @@ const GardenSensorsTab: React.FC<GardenSensorsTabProps> = ({
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <SensorDetailView
-        sensors={sensors}
-        sensorHistories={sensorHistory}
-        currentGrowthStage={currentGrowthStage}
+        sensors={processedSensors}
         isSensorDataLoading={isSensorDataLoading}
-        isRefreshing={isRefreshing}
-        lastSensorUpdate={lastSensorUpdate}
-        onRefresh={onRefresh}
+        isRefreshing={isSensorDataLoading}
+        onRefresh={refreshSensors}
         onSelectSensor={onSelectSensor}
         title="Thông tin cảm biến vườn"
       />
-
-      {/* History Section */}
-      <View
-        style={[
-          styles.sensorHistoryContainer,
-          { borderTopColor: theme.borderLight },
-        ]}
-      >
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>
-          Lịch sử dữ liệu cảm biến
-        </Text>
-
-        {isSensorDataLoading && !hasHistoryData ? (
-          // Show a loading indicator for history if data is loading and we don't have any history yet
-          <View style={styles.centeredContainerMini}>
-            <ActivityIndicator size="small" color={theme.primary} />
-            <Text
-              style={[styles.loadingTextMini, { color: theme.textSecondary }]}
-            >
-              Đang tải lịch sử...
-            </Text>
-          </View>
-        ) : hasHistoryData ? (
-          Object.entries(sensorHistory).map(([type, history]) => {
-            // Only render chart if there's data for this specific history type
-            if (history && history.data && history.data.length > 0) {
-              return (
-                <SensorHistoryChart
-                  key={`sensor-history-${type}`}
-                  sensorType={type as SensorType}
-                  sensorHistory={history}
-                />
-              );
-            }
-            return null;
-          })
-        ) : (
-          <Text style={[styles.noDataText, { color: theme.textSecondary }]}>
-            Chưa có dữ liệu lịch sử nào được ghi nhận.
-          </Text>
-        )}
-      </View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  centeredContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    fontFamily: "Inter-Regular",
-  },
-  centeredContainerMini: {
-    alignItems: "center",
-    paddingVertical: 20,
-  },
-  loadingTextMini: {
-    marginTop: 8,
-    fontSize: 14,
-    fontFamily: "Inter-Regular",
-  },
-  sensorHistoryContainer: {
-    marginTop: 24,
-    borderTopWidth: 1,
-    paddingTop: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: "Inter-SemiBold",
-    marginBottom: 16,
-  },
-  noDataText: {
-    fontSize: 14,
-    fontFamily: "Inter-Regular",
-    textAlign: "center",
-    marginTop: 10,
-  },
-});
 
 export default GardenSensorsTab;

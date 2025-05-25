@@ -324,8 +324,8 @@ const SensorItem = memo(
                   status === "normal"
                     ? `${theme.success}30`
                     : status === "warning"
-                    ? `${theme.warning}30`
-                    : `${theme.error}30`,
+                      ? `${theme.warning}30`
+                      : `${theme.error}30`,
               },
             ]}
           >
@@ -337,8 +337,8 @@ const SensorItem = memo(
                     status === "normal"
                       ? theme.success
                       : status === "warning"
-                      ? theme.warning
-                      : theme.error,
+                        ? theme.warning
+                        : theme.error,
                 },
               ]}
             >

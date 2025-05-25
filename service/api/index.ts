@@ -30,6 +30,3 @@ export {
   plantService,
   authService,
 };
-
-// Export types
-export type { GardenWeatherData } from "./weather.service";

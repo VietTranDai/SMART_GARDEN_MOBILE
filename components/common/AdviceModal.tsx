@@ -84,11 +84,8 @@ const AdviceModal = ({
     const hasCategory = "category" in item;
     const hasAction = "action" in item;
     const hasReason = "reason" in item;
-    const hasSuggestedTime = "suggestedTime" in item;
 
-    const isValid = hasCategory && hasAction && hasReason && hasSuggestedTime;
-
-    return isValid || adviceType === "garden"; // If adviceType is explicitly set to garden, accept it anyway
+    return hasCategory && hasAction && hasReason; // If adviceType is explicitly set to garden, accept it anyway
   };
 
   const isWeatherAdvice = (item: AdviceItem): item is WeatherAdvice => {
@@ -298,10 +295,7 @@ const AdviceModal = ({
             </View>
             <View style={styles.adviceTitle}>
               <Text
-                style={[
-                  styles.categoryLabel,
-                  { color: iconInfo.backgroundColor },
-                ]}
+                style={[styles.categoryLabel, { color: theme.textSecondary }]}
               >
                 {iconInfo.label}
               </Text>
@@ -332,26 +326,6 @@ const AdviceModal = ({
               </Text>
               <Text style={[styles.reasonText, { color: theme.textSecondary }]}>
                 {anyItem.reason}
-              </Text>
-            </View>
-          )}
-
-          {anyItem.suggestedTime && (
-            <View style={styles.timeContainer}>
-              <View
-                style={[
-                  styles.timeIconContainer,
-                  { backgroundColor: `${iconInfo.backgroundColor}2A` },
-                ]}
-              >
-                <Ionicons
-                  name="time-outline"
-                  size={14}
-                  color={iconInfo.backgroundColor} // Use color from iconInfo for icon
-                />
-              </View>
-              <Text style={[styles.timeText, { color: theme.textSecondary }]}>
-                Đề xuất thực hiện: {formatTimeOrDate(anyItem.suggestedTime)}
               </Text>
             </View>
           )}
@@ -528,7 +502,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter-Regular",
     color: "rgba(255,255,255,0.85)",
-    marginTop: 4,
+    marginTop: 2,
   },
   closeButton: {
     width: 40,
@@ -548,11 +522,12 @@ const styles = StyleSheet.create({
   },
   adviceItem: {
     borderRadius: 16,
-    borderLeftWidth: 5,
-    padding: 16,
+    borderLeftWidth: 4,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.07,
     shadowRadius: 6,
     elevation: 3,
     borderWidth: 1,
@@ -575,13 +550,13 @@ const styles = StyleSheet.create({
   },
   categoryLabel: {
     fontSize: 13,
-    fontFamily: "Inter-Medium",
+    fontFamily: "Inter-SemiBold",
     marginBottom: 4,
     textTransform: "uppercase",
     opacity: 0.9,
   },
   actionText: {
-    fontSize: 17,
+    fontSize: 18,
     fontFamily: "Inter-SemiBold",
     lineHeight: 22,
   },
@@ -590,11 +565,14 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Regular",
     lineHeight: 21,
     marginBottom: 14,
+    // color is set inline using theme.text
   },
   reasonContainer: {
     marginBottom: 14,
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 10,
+    // backgroundColor is set inline using theme.backgroundSecondary
   },
   reasonLabel: {
     fontSize: 13,
@@ -633,9 +611,10 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 14,
     borderWidth: 1,
+    // backgroundColor and borderColor are set inline based on priority and theme
   },
   priorityText: {
-    fontSize: 12, // Tăng nhẹ
+    fontSize: 12,
     fontFamily: "Inter-SemiBold",
     textTransform: "uppercase",
     // color is set inline based on priority and theme
@@ -644,34 +623,33 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 30, // Tăng padding
+    padding: 30,
   },
   loadingText: {
     fontSize: 15,
     fontFamily: "Inter-Regular",
-    marginTop: 16, // Tăng khoảng cách
+    marginTop: 16,
     // color is set inline using theme.textSecondary
   },
   errorImage: {
-    // Hoặc sử dụng Icon thay thế
-    width: 100, // Điều chỉnh kích thước
+    width: 100,
     height: 100,
-    borderRadius: 20, // Bo tròn nếu là ảnh
+    borderRadius: 20,
     marginBottom: 20,
     opacity: 0.7,
   },
   errorText: {
-    fontSize: 16, // Tăng kích thước
+    fontSize: 16,
     fontFamily: "Inter-Medium",
     textAlign: "center",
-    marginBottom: 20, // Tăng khoảng cách
+    marginBottom: 20,
     lineHeight: 22,
     // color is set inline using theme.error
   },
   retryButton: {
-    paddingVertical: 12, // Tăng padding
-    paddingHorizontal: 24, // Tăng padding
-    borderRadius: 10, // Bo tròn hơn
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
     marginTop: 8,
     // backgroundColor is set inline using theme.primary
   },
@@ -684,27 +662,26 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 30, // Tăng padding
+    padding: 30,
   },
   emptyImage: {
-    // Hoặc sử dụng Icon thay thế
-    width: 120, // Điều chỉnh kích thước
+    width: 120,
     height: 120,
-    borderRadius: 24, // Bo tròn nếu là ảnh
+    borderRadius: 24,
     marginBottom: 24,
     opacity: 0.8,
   },
   emptyTitle: {
-    fontSize: 20, // Tăng kích thước
+    fontSize: 20,
     fontFamily: "Inter-Bold",
-    marginBottom: 10, // Tăng khoảng cách
+    marginBottom: 10,
     // color is set inline using theme.primary
   },
   emptyText: {
     fontSize: 15,
     fontFamily: "Inter-Regular",
     textAlign: "center",
-    lineHeight: 22, // Tăng lineHeight
+    lineHeight: 22,
     // color is set inline using theme.textSecondary
   },
 });

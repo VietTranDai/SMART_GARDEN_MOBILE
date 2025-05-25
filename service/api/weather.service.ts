@@ -207,18 +207,35 @@ class WeatherService {
    */
   async getWeatherAdvice(
     gardenId: string | number,
-    weatherData: WeatherObservation,
-    gardenType?: GardenType
+    // weatherData parameter is no longer needed as advice is fetched from backend
+    // weatherData: WeatherObservation,
+    gardenType?: GardenType // gardenType might still be used by the backend, keep for now
   ): Promise<WeatherAdvice[]> {
     try {
-      // In a real implementation, this would call an API endpoint
-      // For now, we'll mock the data based on weather conditions
+      // The new endpoint path is /advice/weather/garden/:gardenId
+      // Assuming WEATHER_ENDPOINTS will be updated or constructing the path directly.
+      // For now, let's assume a structure like WEATHER_ENDPOINTS.ADVICE(gardenId)
+      // If not, we can construct it: `/advice/weather/garden/${gardenId}`
+      const response = await apiClient.get<any>(
+        // WEATHER_ENDPOINTS.ADVICE(gardenId) // Ideal if endpoint is added
+        `/advice/weather/garden/${gardenId}` // Direct construction as per user's path
+      );
 
-      // setTimeout to simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      // Generate advice based on current weather and garden type
-      return this.generateWeatherAdvice(weatherData, gardenType);
+      // According to the provided structure, advice is in response.data.data.advice
+      if (
+        response &&
+        response.data &&
+        response.data.data &&
+        Array.isArray(response.data.data.advice)
+      ) {
+        return response.data.data.advice;
+      } else {
+        console.warn(
+          "Invalid API response format for weather advice:",
+          response
+        );
+        return [];
+      }
     } catch (error) {
       console.error("Error fetching weather advice:", error);
       return [];
@@ -248,202 +265,6 @@ class WeatherService {
       console.error("Error calculating optimal gardening times:", error);
       return [];
     }
-  }
-
-  /**
-   * Generate advice based on weather conditions and garden type
-   * This is a helper method that would ideally be on the server
-   * @private
-   */
-  private generateWeatherAdvice(
-    weather: WeatherObservation,
-    gardenType?: GardenType
-  ): WeatherAdvice[] {
-    const advice: WeatherAdvice[] = [];
-    const now = new Date();
-
-    // Base advice on weather conditions
-    switch (weather.weatherMain) {
-      case WeatherMain.CLEAR:
-        if (weather.temp > 30) {
-          advice.push({
-            id: 1,
-            title: "Tưới nước buổi sáng sớm",
-            description:
-              "Nhiệt độ cao có thể gây mất nước cho cây. Hãy tưới nước vào buổi sáng sớm để giúp cây chống chọi với nhiệt.",
-            weatherCondition: WeatherMain.CLEAR,
-            temperature: { min: 30, max: 40 },
-            icon: "water-outline",
-            priority: 5,
-            bestTimeOfDay: "6:00 - 8:00",
-            applicableGardenTypes: ["OUTDOOR", "BALCONY", "ROOFTOP"],
-            createdAt: now.toISOString(),
-            updatedAt: now.toISOString(),
-          });
-
-          advice.push({
-            id: 2,
-            title: "Che phủ đất",
-            description:
-              "Sử dụng lớp phủ để giảm sự bốc hơi nước và giữ độ ẩm cho đất trong điều kiện nắng nóng.",
-            weatherCondition: WeatherMain.CLEAR,
-            temperature: { min: 30, max: 40 },
-            icon: "leaf-outline",
-            priority: 4,
-            applicableGardenTypes: ["OUTDOOR", "BALCONY", "ROOFTOP"],
-            createdAt: now.toISOString(),
-            updatedAt: now.toISOString(),
-          });
-        } else {
-          advice.push({
-            id: 3,
-            title: "Thời điểm lý tưởng để làm vườn",
-            description:
-              "Thời tiết đẹp là thời điểm lý tưởng để làm vườn, cắt tỉa và chăm sóc cây trồng.",
-            weatherCondition: WeatherMain.CLEAR,
-            icon: "sunny-outline",
-            priority: 3,
-            applicableGardenTypes: [
-              "INDOOR",
-              "OUTDOOR",
-              "BALCONY",
-              "ROOFTOP",
-              "WINDOW_SILL",
-            ],
-            createdAt: now.toISOString(),
-            updatedAt: now.toISOString(),
-          });
-        }
-        break;
-
-      case WeatherMain.CLOUDS:
-        advice.push({
-          id: 4,
-          title: "Thời điểm tốt để cấy ghép",
-          description:
-            "Thời tiết có mây là thời điểm tốt để cấy ghép cây con hoặc chuyển cây sang chậu mới vì sẽ giảm sốc nhiệt.",
-          weatherCondition: WeatherMain.CLOUDS,
-          icon: "cloud-outline",
-          priority: 3,
-          applicableGardenTypes: ["OUTDOOR", "BALCONY", "ROOFTOP"],
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString(),
-        });
-        break;
-
-      case WeatherMain.RAIN:
-      case WeatherMain.DRIZZLE:
-        advice.push({
-          id: 5,
-          title: "Kiểm tra thoát nước",
-          description:
-            "Mưa kéo dài có thể gây ngập úng cho cây. Kiểm tra hệ thống thoát nước và đảm bảo nước không đọng lại ở chậu cây.",
-          weatherCondition: WeatherMain.RAIN,
-          icon: "rainy-outline",
-          priority: 4,
-          applicableGardenTypes: [
-            "OUTDOOR",
-            "BALCONY",
-            "ROOFTOP",
-            "WINDOW_SILL",
-          ],
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString(),
-        });
-
-        advice.push({
-          id: 6,
-          title: "Tạm hoãn bón phân",
-          description:
-            "Trời mưa không phải thời điểm tốt để bón phân vì phân có thể bị rửa trôi trước khi cây hấp thụ.",
-          weatherCondition: WeatherMain.RAIN,
-          icon: "water-outline",
-          priority: 3,
-          applicableGardenTypes: ["OUTDOOR", "BALCONY", "ROOFTOP"],
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString(),
-        });
-        break;
-
-      case WeatherMain.THUNDERSTORM:
-        advice.push({
-          id: 7,
-          title: "Bảo vệ cây khỏi gió mạnh",
-          description:
-            "Di chuyển chậu cây vào trong hoặc nơi kín gió để tránh thiệt hại do bão.",
-          weatherCondition: WeatherMain.THUNDERSTORM,
-          icon: "thunderstorm-outline",
-          priority: 5,
-          applicableGardenTypes: ["BALCONY", "ROOFTOP", "WINDOW_SILL"],
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString(),
-        });
-        break;
-
-      default:
-        advice.push({
-          id: 8,
-          title: "Theo dõi điều kiện thời tiết",
-          description:
-            "Hãy theo dõi sát điều kiện thời tiết để điều chỉnh việc chăm sóc cây trồng phù hợp.",
-          weatherCondition: weather.weatherMain,
-          icon: "thermometer-outline",
-          priority: 2,
-          applicableGardenTypes: [
-            "INDOOR",
-            "OUTDOOR",
-            "BALCONY",
-            "ROOFTOP",
-            "WINDOW_SILL",
-          ],
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString(),
-        });
-    }
-
-    // Add garden type specific advice
-    if (gardenType) {
-      switch (gardenType) {
-        case "INDOOR":
-          advice.push({
-            id: 9,
-            title: "Điều chỉnh ánh sáng cho cây trong nhà",
-            description: `Với thời tiết ${weather.weatherDesc}, hãy đảm bảo cây nhận đủ ánh sáng bằng cách điều chỉnh vị trí đặt cây.`,
-            weatherCondition: weather.weatherMain,
-            icon: "home-outline",
-            priority: 3,
-            applicableGardenTypes: ["INDOOR"],
-            createdAt: now.toISOString(),
-            updatedAt: now.toISOString(),
-          });
-          break;
-
-        case "BALCONY":
-        case "ROOFTOP":
-          if (weather.windSpeed > 5) {
-            advice.push({
-              id: 10,
-              title: "Cẩn thận với gió lớn",
-              description:
-                "Tốc độ gió hiện tại có thể gây nguy hiểm cho cây ở ban công/sân thượng. Hãy di chuyển chậu cây vào vị trí an toàn.",
-              weatherCondition: weather.weatherMain,
-              wind: { minSpeed: 5 },
-              icon: "leaf-outline",
-              priority: 4,
-              applicableGardenTypes: ["BALCONY", "ROOFTOP"],
-              createdAt: now.toISOString(),
-              updatedAt: now.toISOString(),
-            });
-          }
-          break;
-
-        default:
-        // Default advice for all garden types
-      }
-    }
-
-    // Sort by priority (highest first)
-    return advice.sort((a, b) => b.priority - a.priority);
   }
 
   /**
@@ -894,11 +715,7 @@ class WeatherService {
       }
 
       // Lấy lời khuyên
-      const advice = await this.getWeatherAdvice(
-        gardenId,
-        currentWeather,
-        gardenType
-      );
+      const advice = await this.getWeatherAdvice(gardenId, gardenType);
 
       return {
         advice,
