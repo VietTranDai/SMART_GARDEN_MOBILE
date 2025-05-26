@@ -16,7 +16,6 @@ import { useGardenDetail } from "@/hooks/garden/useGardenDetail";
 
 // Import custom components
 import EmptyStateView from "@/components/common/EmptyStateView";
-import AdviceModal from "@/components/common/AdviceModal";
 import WeatherModal from "@/components/garden/WeatherModal";
 import GardenHeader from "@/components/garden/GardenHeader";
 import GardenOverviewTab from "@/components/garden/GardenOverviewTab";
@@ -43,28 +42,17 @@ export default function GardenDetailScreen() {
     sensors,
     isLoading,
     isRefreshing,
-    isSensorDataLoading,
     lastSensorUpdate,
-    adviceModalVisible,
-    gardenAdvice,
-    adviceLoading,
-    adviceError,
     plantDetails,
     sensorHistory,
     gardenPhotos,
-    refreshGarden,
-    refreshSensorData,
-    showAdviceModal,
-    closeAdviceModal,
     resolveAlert,
     ignoreAlert,
     handleUploadPhoto,
     plantStats,
     plantStatsLoading,
-    plantStatsError,
     plantDetailedAdvice,
     plantDetailedAdviceLoading,
-    plantDetailedAdviceError,
   } = useGardenDetail({ gardenId: id || null });
 
   // Modal visibility functions
@@ -82,7 +70,6 @@ export default function GardenDetailScreen() {
         plantDetails={safePlantDetails}
         alerts={alerts}
         activities={activities}
-        onShowAdvice={() => id && showAdviceModal(id)}
         onResolveAlert={(alertId: string) => resolveAlert(Number(alertId))}
         onIgnoreAlert={(alertId: string) => ignoreAlert(Number(alertId))}
         onShowWeather={openWeatherModal}
@@ -96,7 +83,6 @@ export default function GardenDetailScreen() {
       activities,
       id,
       currentWeather,
-      showAdviceModal,
       resolveAlert,
       ignoreAlert,
       openWeatherModal,
@@ -281,18 +267,6 @@ export default function GardenDetailScreen() {
         currentWeather={currentWeather}
         hourlyForecast={hourlyForecast || []}
         dailyForecast={dailyForecast || []}
-      />
-
-      {/* Advice modal */}
-      <AdviceModal
-        isVisible={adviceModalVisible}
-        onClose={closeAdviceModal}
-        advice={gardenAdvice ? [gardenAdvice] : []}
-        isLoading={adviceLoading}
-        error={adviceError}
-        gardenName={garden?.name || ""}
-        theme={theme}
-        adviceType="garden"
       />
     </View>
   );

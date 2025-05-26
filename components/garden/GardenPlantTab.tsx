@@ -21,6 +21,165 @@ import {
   PlantStatisticsData,
 } from "@/types/plants/plant-insights.types";
 
+// --- Localization Helpers ---
+const translateConditionKey = (key: string): string => {
+  const lowerKey = key.toLowerCase();
+  if (lowerKey.includes("temperature")) return "Nhiệt độ";
+  if (lowerKey.includes("humidity")) return "Độ ẩm";
+  if (lowerKey.includes("soil_moisture") || lowerKey.includes("soil moisture"))
+    return "Độ ẩm đất";
+  if (
+    lowerKey.includes("light_exposure") ||
+    lowerKey.includes("light exposure") ||
+    lowerKey.includes("light")
+  )
+    return "Ánh sáng";
+  if (lowerKey.includes("soil_ph") || lowerKey.includes("ph"))
+    return "Độ pH đất";
+  return key.charAt(0).toUpperCase() + key.slice(1); // Default fallback
+};
+
+const translateSensorNameIfNeeded = (name?: string): string => {
+  if (!name) return "Không có tên";
+  const lowerName = name.toLowerCase();
+
+  // Specific known sensor names
+  if (
+    lowerName.includes("temperature sensor") ||
+    lowerName.includes("nhiệt kế")
+  )
+    return "Cảm biến Nhiệt độ";
+  if (
+    lowerName.includes("humidity sensor") ||
+    lowerName.includes("cảm biến độ ẩm")
+  )
+    return "Cảm biến Độ ẩm";
+  if (
+    lowerName.includes("soil moisture sensor") ||
+    lowerName.includes("cảm biến độ ẩm đất")
+  )
+    return "Cảm biến Độ ẩm đất";
+  if (
+    lowerName.includes("light sensor") ||
+    lowerName.includes("cảm biến ánh sáng")
+  )
+    return "Cảm biến Ánh sáng";
+  if (lowerName.includes("ph sensor") || lowerName.includes("cảm biến ph"))
+    return "Cảm biến pH";
+
+  // General terms
+  let translatedName = name;
+  translatedName = translatedName.replace(/temperature/gi, "Nhiệt độ");
+  translatedName = translatedName.replace(/humidity/gi, "Độ ẩm");
+  translatedName = translatedName.replace(/soil moisture/gi, "Độ ẩm đất");
+  translatedName = translatedName.replace(
+    /light intensity/gi,
+    "Cường độ ánh sáng"
+  );
+  translatedName = translatedName.replace(/light/gi, "Ánh sáng");
+  translatedName = translatedName.replace(/sensor/gi, "Cảm biến");
+  translatedName = translatedName.replace(/ph/gi, "pH");
+
+  // Capitalize first letter of each word if not already.
+  return translatedName
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
+
+const translateUnitIfNeeded = (unit?: string): string => {
+  if (!unit) return "";
+  const lowerUnit = unit.toLowerCase();
+
+  // Common units and their symbols/Vietnamese equivalents from SensorUnit enum and general usage
+  if (
+    lowerUnit === "celsius" ||
+    lowerUnit === "degree celsius" ||
+    lowerUnit === "degrees celsius"
+  )
+    return "°C";
+  if (
+    lowerUnit === "fahrenheit" ||
+    lowerUnit === "degree fahrenheit" ||
+    lowerUnit === "degrees fahrenheit"
+  )
+    return "°F";
+  if (lowerUnit === "percent" || lowerUnit === "percentage") return "%";
+  if (lowerUnit === "lux") return "lux";
+  if (lowerUnit === "ph") return "pH"; // Handles "PH" from enum
+  if (lowerUnit === "liter" || lowerUnit === "litre") return "L"; // Handles LITER
+  if (lowerUnit === "meter" || lowerUnit === "metre") return "m"; // Handles METER
+  if (lowerUnit === "millimeter" || lowerUnit === "millimetre") return "mm"; // Handles MILLIMETER
+  if (lowerUnit === "hpa") return "hPa"; // hectopascal, standard
+
+  // Fallback for already symbolic units or less common ones not covered above
+  // This check might be redundant if the above covers all direct enum inputs as lowercase strings
+  // but can be useful if the direct input might already be a symbol.
+  if (
+    unit === "°C" ||
+    unit === "%" ||
+    unit === "pH" ||
+    unit === "L" ||
+    unit === "m" ||
+    unit === "mm" ||
+    unit === "lux" ||
+    unit === "hPa"
+  )
+    return unit;
+
+  return unit; // Default to returning the original unit if no specific translation matches
+};
+
+const translateStatus = (status?: string): string => {
+  if (!status) return "Không xác định";
+  const s = status.toLowerCase();
+  // General statuses
+  if (s === "optimal" || s === "good" || s === "healthy" || s === "tốt")
+    return "Tốt";
+  if (
+    s === "fair" ||
+    s === "average" ||
+    s === "moderate" ||
+    s === "medium" ||
+    s === "trung bình"
+  )
+    return "Trung bình";
+  if (s === "poor" || s === "bad" || s === "kém") return "Kém";
+  if (s === "critical" || s === "very bad") return "Rất xấu";
+  // Ensure API specific values like NEEDS_ATTENTION are caught
+  if (s === "attention needed" || s === "needs_attention" || s === "attention")
+    return "Cần chú ý";
+  if (s === "stable") return "Ổn định";
+  if (s === "rising") return "Đang tăng";
+  if (s === "falling") return "Đang giảm";
+  // Removed duplicate: if (s === "good") return "Tốt";
+
+  // Specific for advice/risk
+  if (s === "high") return "Cao";
+  // "medium" is already covered by general statuses, but explicit here is fine for clarity if needed.
+  if (s === "low") return "Thấp";
+
+  return status.charAt(0).toUpperCase() + status.slice(1); // Default fallback
+};
+
+const translatePriority = (priority?: string): string => {
+  if (!priority) return "Không xác định";
+  const p = priority.toLowerCase();
+  if (p === "high") return "Cao";
+  if (p === "medium") return "Trung bình";
+  if (p === "low") return "Thấp";
+  return priority;
+};
+
+const translateImpact = (impact?: string): string => {
+  if (!impact) return "Không xác định";
+  const i = impact.toLowerCase();
+  if (i === "high") return "Cao";
+  if (i === "medium") return "Trung bình";
+  if (i === "low") return "Thấp";
+  return impact;
+};
+
 // Helper component for styled list items or key-value pairs
 const InfoRow: React.FC<{
   label: string;
@@ -31,7 +190,7 @@ const InfoRow: React.FC<{
   valueStyle?: object;
 }> = ({ label, value, icon, iconColor, theme, valueStyle }) => {
   if (value === undefined || value === null || String(value).trim() === "") {
-    return null; // Don't render if value is not meaningful
+    return null;
   }
   return (
     <View style={styles.infoRow}>
@@ -48,7 +207,7 @@ const InfoRow: React.FC<{
       </Text>
       <Text
         style={[styles.infoRowValue, { color: theme.text }, valueStyle]}
-        numberOfLines={2}
+        numberOfLines={3} // Allow more lines for translated text
         ellipsizeMode="tail"
       >
         {String(value)}
@@ -85,33 +244,28 @@ const RiskFactorItem: React.FC<{
   risk: RiskFactor;
   theme: ReturnType<typeof useAppTheme>;
 }> = ({ risk, theme }) => {
-  let iconName: keyof typeof MaterialCommunityIcons.glyphMap =
-    "alert-circle-outline";
-  let iconColor = theme.warning;
-  if (risk.impact === "High") {
-    iconName = "alert-octagon-outline";
-    iconColor = theme.error;
-  } else if (risk.impact === "Low") {
-    iconName = "information-outline";
-    iconColor = theme.info;
-  }
+  const translatedImpact = translateImpact(risk.impact);
+  const statusStyle = getStatusStyle(risk.impact, theme); // Use impact for styling cues
 
   return (
     <View
       style={[
         styles.listItem,
-        { borderLeftColor: iconColor, backgroundColor: theme.background },
+        {
+          borderLeftColor: statusStyle.color,
+          backgroundColor: theme.background,
+        },
       ]}
     >
       <View style={styles.listItemHeader}>
         <MaterialCommunityIcons
-          name={iconName}
+          name={statusStyle.icon}
           size={20}
-          color={iconColor}
+          color={statusStyle.color}
           style={styles.listItemIcon}
         />
         <Text style={[styles.listItemTitle, { color: theme.text }]}>
-          {risk.type} - Tác động: {risk.impact}
+          {risk.type} - Tác động: {translatedImpact}
         </Text>
       </View>
       <Text
@@ -135,36 +289,28 @@ const ImmediateActionItem: React.FC<{
   action: ImmediateAction;
   theme: ReturnType<typeof useAppTheme>;
 }> = ({ action, theme }) => {
-  let iconName: keyof typeof MaterialCommunityIcons.glyphMap =
-    "play-circle-outline";
-  let borderColor = theme.info;
-  if (action.priority === "HIGH") {
-    iconName = "alert-box-outline";
-    borderColor = theme.error;
-  } else if (action.priority === "MEDIUM") {
-    iconName = "information-outline";
-    borderColor = theme.warning;
-  }
+  const translatedPriority = translatePriority(action.priority);
+  const statusStyle = getStatusStyle(action.priority, theme); // Use priority for styling
 
   return (
     <View
       style={[
         styles.listItem,
         {
-          borderLeftColor: borderColor,
+          borderLeftColor: statusStyle.color,
           backgroundColor: theme.background,
         },
       ]}
     >
       <View style={styles.listItemHeader}>
         <MaterialCommunityIcons
-          name={iconName}
+          name={statusStyle.icon}
           size={20}
-          color={borderColor}
+          color={statusStyle.color}
           style={styles.listItemIcon}
         />
         <Text style={[styles.listItemTitle, { color: theme.text }]}>
-          {action.title} (Ưu tiên: {action.priority})
+          {action.title} (Ưu tiên: {translatedPriority})
         </Text>
       </View>
       <Text
@@ -191,53 +337,53 @@ const ImmediateActionItem: React.FC<{
 const getStatusStyle = (
   status: string | undefined,
   theme: ReturnType<typeof useAppTheme>
-) => {
+): { color: string; icon: keyof typeof MaterialCommunityIcons.glyphMap } => {
+  // Explicit return type
   if (!status)
     return {
       color: theme.textSecondary,
-      icon: "information-outline" as keyof typeof MaterialCommunityIcons.glyphMap,
+      icon: "information-outline",
     };
   const s = status.toLowerCase();
-  if (s.includes("tốt") || s.includes("healthy") || s.includes("optimal")) {
-    return {
-      color: theme.success,
-      icon: "check-circle-outline" as keyof typeof MaterialCommunityIcons.glyphMap,
-    };
+  if (
+    s.includes("tốt") ||
+    s.includes("healthy") ||
+    s.includes("optimal") ||
+    s.includes("good")
+  ) {
+    return { color: theme.success, icon: "check-circle-outline" };
   }
   if (
     s.includes("trung bình") ||
     s.includes("fair") ||
+    s.includes("average") ||
     s.includes("attention") ||
     s.includes("moderate") ||
     s.includes("medium")
   ) {
-    return {
-      color: theme.warning,
-      icon: "alert-circle-outline" as keyof typeof MaterialCommunityIcons.glyphMap,
-    };
+    return { color: theme.warning, icon: "alert-circle-outline" };
   }
   if (
     s.includes("kém") ||
     s.includes("poor") ||
     s.includes("critical") ||
     s.includes("bad") ||
-    s.includes("high")
+    s.includes("high") ||
+    s.includes("very bad")
   ) {
-    return {
-      color: theme.error,
-      icon: "alert-octagon-outline" as keyof typeof MaterialCommunityIcons.glyphMap,
-    };
+    return { color: theme.error, icon: "alert-octagon-outline" };
   }
-  if (s.includes("low")) {
-    return {
-      color: theme.info,
-      icon: "information-outline" as keyof typeof MaterialCommunityIcons.glyphMap,
-    };
+  if (s.includes("low") || s.includes("thấp")) {
+    return { color: theme.info, icon: "information-outline" };
   }
-  return {
-    color: theme.textSecondary,
-    icon: "information-outline" as keyof typeof MaterialCommunityIcons.glyphMap,
-  };
+  if (s.includes("stable"))
+    return { color: theme.info, icon: "check-decagram-outline" }; // Specific for stable
+  if (s.includes("rising"))
+    return { color: theme.warning, icon: "trending-up" };
+  if (s.includes("falling"))
+    return { color: theme.warning, icon: "trending-down" };
+
+  return { color: theme.textSecondary, icon: "information-outline" };
 };
 
 interface GardenPlantTabProps {
@@ -299,6 +445,7 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
     <ScrollView
       style={[styles.container, { backgroundColor: theme.background }]}
       contentContainerStyle={styles.scrollContentContainer}
+      showsVerticalScrollIndicator={false}
     >
       {/* Section: Plant Overview from Stats */}
       {plantStats?.gardenInfo && (
@@ -381,6 +528,9 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
             theme={theme}
           />
           {(() => {
+            const translatedStatus = translateStatus(
+              plantStats.plantHealth.healthStatus
+            );
             const statusStyle = getStatusStyle(
               plantStats.plantHealth.healthStatus,
               theme
@@ -388,7 +538,7 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
             return (
               <InfoRow
                 label="Trạng thái"
-                value={plantStats.plantHealth.healthStatus}
+                value={translatedStatus}
                 icon={statusStyle.icon}
                 iconColor={statusStyle.color}
                 theme={theme}
@@ -401,9 +551,10 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
           })()}
           {Object.entries(plantStats.plantHealth.conditions).map(
             ([key, condition]: [string, ConditionDetailStats]) => {
+              const translatedCondStatus = translateStatus(condition.status);
               const statusStyle = getStatusStyle(condition.status, theme);
-              const unit = condition.unit || "";
-              const conditionKey = key.replace(/_/g, " "); // Replace underscores for display
+              const translatedUnit = translateUnitIfNeeded(condition.unit);
+              const conditionDisplayKey = translateConditionKey(key);
 
               return (
                 <View
@@ -418,24 +569,23 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
                   ]}
                 >
                   <Text style={[styles.conditionTitle, { color: theme.text }]}>
-                    {conditionKey.charAt(0).toUpperCase() +
-                      conditionKey.slice(1)}
+                    {conditionDisplayKey}
                   </Text>
                   <InfoRow
                     label="Hiện tại"
-                    value={`${condition.current}${unit}`}
-                    icon="current-ac" // Consider more specific icons based on 'key'
+                    value={`${condition.current}${translatedUnit}`}
+                    icon="current-ac"
                     theme={theme}
                   />
                   <InfoRow
                     label="Tối ưu"
-                    value={`${condition.optimal.min}${unit} - ${condition.optimal.max}${unit}`}
+                    value={`${condition.optimal.min}${translatedUnit} - ${condition.optimal.max}${translatedUnit}`}
                     icon="target"
                     theme={theme}
                   />
                   <InfoRow
                     label="Trạng thái"
-                    value={condition.status}
+                    value={translatedCondStatus}
                     icon={statusStyle.icon}
                     iconColor={statusStyle.color}
                     theme={theme}
@@ -475,33 +625,49 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
           </Text>
           {plantStats.currentConditions.sensors.map(
             (sensor: SensorConditionStats) => {
+              const translatedSensorStatus = translateStatus(sensor.status);
               const statusStyle = getStatusStyle(sensor.status, theme);
+              const translatedUnitDisplay = translateUnitIfNeeded(sensor.unit);
               let sensorIcon: keyof typeof MaterialCommunityIcons.glyphMap =
                 "gauge-empty";
-              if (sensor.name.toLowerCase().includes("temp"))
+
+              const sensorDisplayName = translateSensorNameIfNeeded(
+                sensor.name
+              );
+
+              // Icon selection based on translated or original name for broader matching
+              const lowerSensorName = sensor.name.toLowerCase();
+              if (
+                lowerSensorName.includes("temp") ||
+                lowerSensorName.includes("nhiệt")
+              )
                 sensorIcon = "thermometer";
               if (
-                sensor.name.toLowerCase().includes("ẩm") ||
-                sensor.name.toLowerCase().includes("moisture")
+                lowerSensorName.includes("ẩm") ||
+                lowerSensorName.includes("moisture") ||
+                lowerSensorName.includes("humid")
               )
                 sensorIcon = "water-percent";
-              if (sensor.name.toLowerCase().includes("ph"))
+              if (lowerSensorName.includes("ph"))
                 sensorIcon = "alpha-p-box-outline";
               if (
-                sensor.name.toLowerCase().includes("sáng") ||
-                sensor.name.toLowerCase().includes("light")
+                lowerSensorName.includes("sáng") ||
+                lowerSensorName.includes("light")
               )
                 sensorIcon = "brightness-5";
 
               return (
                 <InfoRow
                   key={sensor.id}
-                  label={sensor.name}
-                  value={`${sensor.currentValue} ${sensor.unit}`}
+                  label={sensorDisplayName}
+                  value={`${sensor.currentValue} ${translatedUnitDisplay} (${translatedSensorStatus})`}
                   icon={sensorIcon}
-                  iconColor={statusStyle.color} // Color icon by status
+                  iconColor={statusStyle.color}
                   theme={theme}
-                  valueStyle={{ color: statusStyle.color }}
+                  valueStyle={{
+                    color: statusStyle.color,
+                    fontFamily: "Inter-Regular",
+                  }}
                 />
               );
             }
@@ -522,19 +688,19 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
           </Text>
           <InfoRow
             label="Nhiệt độ"
-            value={`${plantStats.currentConditions.weather.current.temp}°C`}
+            value={`${plantStats.currentConditions.weather.current.temp}${translateUnitIfNeeded("Celsius")}`}
             icon="thermometer"
             theme={theme}
           />
           <InfoRow
             label="Độ ẩm"
-            value={`${plantStats.currentConditions.weather.current.humidity}%`}
+            value={`${plantStats.currentConditions.weather.current.humidity}${translateUnitIfNeeded("percent")}`}
             icon="water-percent"
             theme={theme}
           />
           <InfoRow
             label="Mô tả"
-            value={plantStats.currentConditions.weather.current.weatherDesc}
+            value={plantStats.currentConditions.weather.current.weatherDesc} // This should be localized if possible
             icon="weather-cloudy"
             theme={theme}
           />
@@ -565,7 +731,7 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
           />
           <InfoRow
             label="Sản lượng dự kiến"
-            value={plantStats.predictions.expectedYield}
+            value={plantStats.predictions.expectedYield} // This might need translation
             icon="basket-outline"
             theme={theme}
           />
@@ -585,7 +751,7 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
           </Text>
           {plantStats.predictions.riskFactors.length > 0 ? (
             plantStats.predictions.riskFactors
-              .slice(0, 3) // Show max 3 initially
+              .slice(0, 3)
               .map((risk: RiskFactor, index: number) => (
                 <RiskFactorItem key={index} risk={risk} theme={theme} />
               ))
@@ -608,7 +774,7 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
             {plantDetailedAdvice.immediateActions.map(
               (action: ImmediateAction, index: number) => (
                 <ImmediateActionItem
-                  key={index}
+                  key={action.id} // Use action.id if available and unique
                   action={action}
                   theme={theme}
                 />
@@ -625,6 +791,9 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
           icon="text-search"
         >
           {(() => {
+            const translatedOverallStatus = translateStatus(
+              plantDetailedAdvice.overallAssessment.status
+            );
             const statusStyle = getStatusStyle(
               plantDetailedAdvice.overallAssessment.status,
               theme
@@ -633,13 +802,13 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
               <>
                 <InfoRow
                   label="Điểm sức khỏe"
-                  value={plantDetailedAdvice.overallAssessment.healthScore}
+                  value={`${plantDetailedAdvice.overallAssessment.healthScore}/100`}
                   icon="star-circle-outline"
                   theme={theme}
                 />
                 <InfoRow
                   label="Trạng thái"
-                  value={plantDetailedAdvice.overallAssessment.status}
+                  value={translatedOverallStatus}
                   icon={statusStyle.icon}
                   iconColor={statusStyle.color}
                   theme={theme}
@@ -697,9 +866,9 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
             theme={theme}
           />
           {plantDetailedAdvice.careRecommendations.watering.tips
-            .slice(0, 2) // Show max 2 tips
+            .slice(0, 2)
             .map((tip: string, i: number) => (
-              <View key={i} style={styles.tipItem}>
+              <View key={`watering-tip-${i}`} style={styles.tipItem}>
                 <MaterialCommunityIcons
                   name="lightbulb-on-outline"
                   size={14}
@@ -752,9 +921,9 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
             />
           )}
           {plantDetailedAdvice.careRecommendations.fertilizing.tips
-            .slice(0, 2) // Show max 2 tips
+            .slice(0, 2)
             .map((tip: string, i: number) => (
-              <View key={i} style={styles.tipItem}>
+              <View key={`fertilizing-tip-${i}`} style={styles.tipItem}>
                 <MaterialCommunityIcons
                   name="lightbulb-on-outline"
                   size={14}
@@ -784,11 +953,12 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
           {(() => {
             const riskLevel =
               plantDetailedAdvice.careRecommendations.pest_control.riskLevel;
+            const translatedRiskLevel = translateStatus(riskLevel);
             const statusStyle = getStatusStyle(riskLevel, theme);
             return (
               <InfoRow
                 label="Mức độ rủi ro"
-                value={riskLevel}
+                value={translatedRiskLevel}
                 icon={statusStyle.icon}
                 iconColor={statusStyle.color}
                 theme={theme}
@@ -813,7 +983,7 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
             )}
           <Text
             style={[
-              styles.infoTextSmallLabel, // Changed style name for clarity
+              styles.infoTextSmallLabel,
               { color: theme.textSecondary, marginBottom: 5, marginTop: 10 },
             ]}
           >
@@ -826,9 +996,9 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
             Phòng ngừa:
           </Text>
           {plantDetailedAdvice.careRecommendations.pest_control.prevention
-            .slice(0, 2) // Show max 2
+            .slice(0, 2)
             .map((p: string, i: number) => (
-              <View key={i} style={styles.tipItem}>
+              <View key={`prevention-tip-${i}`} style={styles.tipItem}>
                 <MaterialCommunityIcons
                   name="check-circle-outline"
                   size={14}
@@ -844,7 +1014,7 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
               <>
                 <Text
                   style={[
-                    styles.infoTextSmallLabel, // Changed style name for clarity
+                    styles.infoTextSmallLabel,
                     {
                       color: theme.textSecondary,
                       marginBottom: 5,
@@ -861,9 +1031,9 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
                   Điều trị:
                 </Text>
                 {plantDetailedAdvice.careRecommendations.pest_control.treatment
-                  .slice(0, 2) // Show max 2
+                  .slice(0, 2)
                   .map((t: string, i: number) => (
-                    <View key={i} style={styles.tipItem}>
+                    <View key={`treatment-tip-${i}`} style={styles.tipItem}>
                       <MaterialCommunityIcons
                         name="spray-bottle"
                         size={14}
@@ -885,10 +1055,11 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
         <SectionCard title="Lời Khuyên Môi Trường" theme={theme} icon="earth">
           {Object.entries(plantDetailedAdvice.environmentalAdvice).map(
             ([key, advice]: [string, EnvironmentalAdviceItem]) => {
+              const translatedEnvStatus = translateStatus(advice.status);
               const statusStyle = getStatusStyle(advice.status, theme);
               let adviceIconName: keyof typeof MaterialCommunityIcons.glyphMap =
                 "help-circle-outline";
-              const adviceKey = key.replace(/_/g, " "); // Replace underscores for display
+              const adviceDisplayKey = translateConditionKey(key);
 
               if (key.toLowerCase().includes("temp"))
                 adviceIconName = "thermometer";
@@ -923,12 +1094,12 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
                     <Text
                       style={[styles.envAdviceTitle, { color: theme.text }]}
                     >
-                      {adviceKey.charAt(0).toUpperCase() + adviceKey.slice(1)}
+                      {adviceDisplayKey}
                     </Text>
                   </View>
                   <InfoRow
                     label="Trạng thái"
-                    value={advice.status}
+                    value={translatedEnvStatus}
                     icon={statusStyle.icon}
                     iconColor={statusStyle.color}
                     theme={theme}
@@ -951,22 +1122,21 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
                       theme={theme}
                     />
                   )}
-                  {advice.optimal &&
-                    !advice.optimalRange && ( // Show optimal only if optimalRange is not present
-                      <InfoRow
-                        label="Tối ưu"
-                        value={advice.optimal}
-                        icon="target"
-                        theme={theme}
-                      />
-                    )}
+                  {advice.optimal && !advice.optimalRange && (
+                    <InfoRow
+                      label="Tối ưu"
+                      value={advice.optimal}
+                      icon="target"
+                      theme={theme}
+                    />
+                  )}
                   <View
                     style={[
                       styles.adviceTextContainer,
                       {
                         backgroundColor:
                           theme.background === theme.card
-                            ? theme.background
+                            ? theme.background // Or a slightly different shade if available like theme.subtleBackground
                             : theme.card,
                       },
                     ]}
@@ -992,7 +1162,7 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
       {plantDetails && !plantStats && !plantDetailedAdvice && (
         <PlantDetailCard
           plantDetails={plantDetails}
-          onViewFullDetails={() => {}} // Add navigation if needed
+          onViewFullDetails={() => {}}
         />
       )}
     </ScrollView>
@@ -1004,8 +1174,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContentContainer: {
-    paddingVertical: 16, // Add vertical padding for scroll ends
-    paddingHorizontal: 12, // Adjust horizontal padding
+    paddingVertical: 16,
+    paddingHorizontal: 12,
   },
   loadingContainer: {
     flex: 1,
@@ -1042,32 +1212,32 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
-    shadowColor: "#000000", // Explicit black for shadow
+    shadowColor: "#000000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1, // Slightly more subtle shadow
-    shadowRadius: 4, // Slightly smaller shadow radius
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     elevation: 3,
-    borderWidth: 1, // Add a light border to cards
-    // borderColor: theme.borderLight, // Use theme color for border
+    borderWidth: 1,
+    borderColor: "#E0E0E0", // Using a light grey border for cards, replace with theme.borderLight if available
   },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16, // More space after header
+    marginBottom: 16,
   },
   sectionHeaderIcon: {
-    marginRight: 10, // More space for icon
+    marginRight: 10,
   },
   sectionTitle: {
-    fontSize: 20, // Larger section title
+    fontSize: 20,
     fontFamily: "Inter-Bold",
-    flexShrink: 1, // Allow title to wrap if very long
+    flexShrink: 1,
   },
   subSectionTitle: {
-    fontSize: 17, // Slightly larger sub-section title
+    fontSize: 17,
     fontFamily: "Inter-SemiBold",
     marginBottom: 10,
-    marginTop: 10, // Consistent margin
+    marginTop: 10,
     flexDirection: "row",
     alignItems: "center",
   },
@@ -1079,14 +1249,14 @@ const styles = StyleSheet.create({
   },
   infoRowIcon: {
     marginRight: 10,
-    marginTop: 3, // Fine-tune icon alignment
+    marginTop: 3,
   },
   infoRowLabel: {
     fontSize: 14,
     fontFamily: "Inter-Medium",
-    marginRight: 8, // More space for label
-    minWidth: 90, // Ensure label has enough space
-    color: "#666666", // Slightly muted label color (example)
+    marginRight: 8,
+    minWidth: 110, // Increased minWidth for Vietnamese labels
+    // color: "#666666", // Removed to use theme.textSecondary
   },
   infoRowValue: {
     fontSize: 14,
@@ -1097,8 +1267,8 @@ const styles = StyleSheet.create({
   progressLabel: {
     fontSize: 13,
     fontFamily: "Inter-Regular",
-    marginBottom: 6, // More space before bar
-    marginTop: 12, // More space after info rows
+    marginBottom: 6,
+    marginTop: 12,
   },
   progressBarContainer: {
     height: 10,
@@ -1120,31 +1290,30 @@ const styles = StyleSheet.create({
   listItemHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8, // Space between header and description
+    marginBottom: 8,
   },
   listItemIcon: {
-    marginRight: 10, // More space for icon
+    marginRight: 10,
   },
   listItemTitle: {
-    fontSize: 16, // Slightly larger title
+    fontSize: 16,
     fontFamily: "Inter-SemiBold",
-    flexShrink: 1, // Allow title to wrap
+    flexShrink: 1,
   },
   listItemDescription: {
-    fontSize: 14, // Slightly larger description
+    fontSize: 14,
     fontFamily: "Inter-Regular",
     marginBottom: 8,
-    lineHeight: 20, // Better line height for readability
-    marginLeft: 30, // Indent description further (icon size + margin)
+    lineHeight: 20,
+    marginLeft: 30,
   },
   infoTextSmallLabel: {
-    // New style for labels like "Phòng ngừa:"
     fontSize: 14,
     fontFamily: "Inter-Medium",
     lineHeight: 18,
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 8, // Add some top margin
+    marginTop: 8,
   },
   summaryText: {
     fontSize: 14,
@@ -1156,67 +1325,64 @@ const styles = StyleSheet.create({
   tipItem: {
     flexDirection: "row",
     alignItems: "flex-start",
-    marginVertical: 4, // More vertical space for tips
+    marginVertical: 4,
     marginLeft: 8,
   },
   tipIcon: {
-    marginRight: 8, // More space for icon
-    marginTop: 3, // Align icon with text
+    marginRight: 8,
+    marginTop: 3,
   },
   tipText: {
-    fontSize: 14, // Slightly larger tip text
+    fontSize: 14,
     fontFamily: "Inter-Regular",
-    lineHeight: 20, // Better line height
+    lineHeight: 20,
     flexShrink: 1,
   },
   conditionDetailItem: {
     paddingTop: 12,
     marginTop: 12,
-    paddingBottom: 8, // Adjusted padding
-    paddingLeft: 12, // Adjusted padding
+    paddingBottom: 8,
+    paddingLeft: 12,
     borderLeftWidth: 4,
-    borderRadius: 8, // Slightly more rounded
-    borderTopWidth: 1, // Keep top border if needed for separation
-    // borderColor already set inline by status
+    borderRadius: 8,
+    borderTopWidth: 1,
+    // borderColor already set inline by status or theme.borderLight
   },
   conditionTitle: {
     fontSize: 16,
     fontFamily: "Inter-SemiBold",
-    marginBottom: 10, // More space after title
+    marginBottom: 10,
   },
   envAdviceItem: {
     marginBottom: 16,
-    paddingVertical: 12, // More vertical padding
-    paddingHorizontal: 12, // More horizontal padding
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     borderLeftWidth: 4,
-    borderRadius: 8, // Slightly more rounded
-    // borderLeftColor already set by status
-    // backgroundColor already set by theme.background
+    borderRadius: 8,
   },
   envAdviceHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10, // More space after header
+    marginBottom: 10,
   },
   envAdviceIcon: {
-    marginRight: 10, // More space for icon
+    marginRight: 10,
   },
   envAdviceTitle: {
     fontSize: 16,
     fontFamily: "Inter-SemiBold",
-    flexShrink: 1, // Allow title to wrap
+    flexShrink: 1,
   },
   adviceTextContainer: {
     flexDirection: "row",
     alignItems: "flex-start",
-    marginTop: 8, // More space before advice text
-    padding: 10, // Add padding to container
+    marginTop: 8,
+    padding: 10,
     borderRadius: 6,
-    // backgroundColor will be set dynamically
   },
   adviceIcon: {
-    marginRight: 8, // More space for icon
-    marginTop: 3, // Align icon with text
+    marginRight: 8,
+    marginTop: 3,
   },
   noDataText: {
     fontSize: 14,

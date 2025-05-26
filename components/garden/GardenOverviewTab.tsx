@@ -14,13 +14,13 @@ import PlantDetailCard from "@/components/garden/PlantDetailCard";
 import AlertsList from "@/components/common/AlertsList";
 import ActivityList from "@/components/garden/ActivityList";
 import WeatherButton from "./WeatherButton";
+import { useNavigation } from "@react-navigation/native";
 
 interface GardenOverviewTabProps {
   garden: Garden;
   plantDetails?: GardenPlantDetails;
   alerts: Alert[];
   activities: ActivityDisplay[];
-  onShowAdvice: () => void;
   onResolveAlert: (alertId: string) => void;
   onIgnoreAlert: (alertId: string) => void;
   onShowWeather: () => void;
@@ -32,27 +32,20 @@ const GardenOverviewTab: React.FC<GardenOverviewTabProps> = ({
   plantDetails,
   alerts,
   activities,
-  onShowAdvice,
   onResolveAlert,
   onIgnoreAlert,
   onShowWeather,
   currentWeather,
 }) => {
   const theme = useAppTheme();
+  const navigation = useNavigation();
   const activeAlerts = alerts.filter(
     (a) => a.status !== AlertStatus.RESOLVED && a.status !== AlertStatus.IGNORED
   );
 
   const handleViewPlantDetails = () => {
-    console.log(
-      "View Plant Details pressed for garden:",
-      garden?.name,
-      "Plant:",
-      plantDetails?.name
-    );
-    // Placeholder: Implement navigation or modal display for plant details here
-    // Example: router.push(`/gardens/${garden.id}/plant/${plantDetails?.plantId}`);
-    // Or: showPlantDetailModal(plantDetails);
+    // @ts-expect-error navigation type
+    navigation.navigate("Plant");
   };
 
   return (
@@ -61,7 +54,6 @@ const GardenOverviewTab: React.FC<GardenOverviewTabProps> = ({
         <GardenStatusCard
           garden={garden}
           onViewPlantDetails={handleViewPlantDetails}
-          onShowAdvice={onShowAdvice}
           topRightComponent={
             <WeatherButton
               currentWeather={currentWeather}

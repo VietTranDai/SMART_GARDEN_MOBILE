@@ -16,14 +16,12 @@ import { gardenService } from "@/service/api";
 interface GardenStatusCardProps {
   garden: Garden;
   onViewPlantDetails?: () => void;
-  onShowAdvice?: () => void;
   topRightComponent?: React.ReactNode;
 }
 
 export default function GardenStatusCard({
   garden,
   onViewPlantDetails,
-  onShowAdvice,
   topRightComponent,
 }: GardenStatusCardProps) {
   const theme = useAppTheme();
@@ -255,42 +253,12 @@ export default function GardenStatusCard({
               Thông tin cây trồng
             </Text>
             <View style={styles.buttonsContainer}>
-              {onShowAdvice && (
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.actionButton,
-                    {
-                      backgroundColor: pressed
-                        ? theme.backgroundSecondary
-                        : theme.primaryLight,
-                    },
-                  ]}
-                  onPress={onShowAdvice}
-                  accessible={true}
-                  accessibilityLabel="Xem lời khuyên cho vườn"
-                  accessibilityHint="Hiển thị các lời khuyên cho vườn này"
-                  accessibilityRole="button"
-                >
-                  <View style={styles.iconWrapperLờiKhuyên}>
-                    <FontAwesome5
-                      name="lightbulb"
-                      size={12}
-                      color={theme.primary}
-                    />
-                  </View>
-                  <View style={styles.textWrapper}>
-                    <Text style={styles.actionButtonText}>Lời khuyên</Text>
-                  </View>
-                </Pressable>
-              )}
               {onViewPlantDetails && (
                 <Pressable
                   style={({ pressed }) => [
                     styles.detailsButton,
                     {
-                      backgroundColor: pressed
-                        ? theme.backgroundSecondary
-                        : "transparent",
+                      opacity: pressed ? 0.6 : 1.0,
                     },
                   ]}
                   onPress={onViewPlantDetails}
