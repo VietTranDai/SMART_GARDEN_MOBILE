@@ -71,6 +71,10 @@ export const SENSOR_ENDPOINTS = {
     `/sensors/gardens/${gardenId}/data`,
   LATEST_READINGS_BY_GARDEN: (gardenId: string | number) =>
     `/sensors/gardens/${gardenId}/latest`,
+  STATISTICS: (sensorId: string | number) =>
+    `/sensor-statistics/${sensorId}/statistics`,
+  ANALYTICS: (sensorId: string | number) =>
+    `/sensor-statistics/${sensorId}/analytics`,
   list: "/api/sensors",
   gardenData: (gardenId: number) => `/api/gardens/${gardenId}/sensors/data`,
   readings: (sensorId: number) => `/api/sensors/${sensorId}/readings`,

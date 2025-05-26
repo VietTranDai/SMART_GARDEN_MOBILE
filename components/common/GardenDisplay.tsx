@@ -194,13 +194,7 @@ const GardenCard = memo(
               }),
             },
           ]}
-          onPress={() => {
-            if (onNavigateToDetail) {
-              onNavigateToDetail(garden.id);
-            } else {
-              handleGoToDetail();
-            }
-          }}
+          onPress={handlePress}
           activeOpacity={0.9}
         >
           {/* Profile Picture với overlay gradient */}

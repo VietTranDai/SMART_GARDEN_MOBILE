@@ -6,12 +6,17 @@
 
 // Export user and auth-related types
 export * from "./users";
+export * from "./users/user.types";
 
 // Export garden-related types
 export * from "./gardens";
+export * from "./gardens/sensor.types";
+export * from "./gardens/sensor-dtos";
+export * from "./gardens/sensor-statistics.types";
 
 // Export weather-related types
 export * from "./weather";
+export * from "./weather/weather.types";
 
 // Export-plant-related types
 export * from "./plants";

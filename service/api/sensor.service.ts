@@ -11,6 +11,10 @@ import {
   UpdateSensorDto,
   SensorDataQueryParams,
 } from "@/types/gardens/sensor-dtos";
+import {
+  SensorStatisticsDto,
+  SensorAnalyticsDto,
+} from "@/types/gardens/sensor-statistics.types";
 import { SENSOR_ENDPOINTS } from "../endpoints";
 import { Platform } from "react-native";
 
@@ -98,11 +102,9 @@ class SensorService {
     sensorId: number | string,
     params?: SensorDataQueryParams
   ): Promise<SensorData[]> {
-    // Fetch from API with retry mechanism
     const response = await this.retryApiCall(() =>
       apiClient.get(SENSOR_ENDPOINTS.SENSOR_DATA(sensorId), { params })
     );
-
     return response.data.data;
   }
 
@@ -452,6 +454,44 @@ class SensorService {
     });
 
     return result;
+  }
+
+  /**
+   * Get statistics for a sensor within a date range
+   * @param sensorId Sensor ID
+   * @param startDate Start date for statistics (ISO format string)
+   * @param endDate End date for statistics (ISO format string)
+   * @returns Sensor statistics
+   */
+  async getSensorStatistics(
+    sensorId: number | string,
+    startDate: string,
+    endDate: string
+  ): Promise<SensorStatisticsDto> {
+    const params = { startDate, endDate };
+    const response = await this.retryApiCall(() =>
+      apiClient.get(SENSOR_ENDPOINTS.STATISTICS(sensorId), { params })
+    );
+    return response.data.data; // Assuming the backend returns SensorStatisticsDto directly in response.data
+  }
+
+  /**
+   * Get daily analytics for a sensor within a date range
+   * @param sensorId Sensor ID
+   * @param startDate Start date for analytics (YYYY-MM-DD format string)
+   * @param endDate End date for analytics (YYYY-MM-DD format string)
+   * @returns Sensor analytics
+   */
+  async getSensorAnalytics(
+    sensorId: number | string,
+    startDate: string,
+    endDate: string
+  ): Promise<SensorAnalyticsDto> {
+    const params = { startDate, endDate };
+    const response = await this.retryApiCall(() =>
+      apiClient.get(SENSOR_ENDPOINTS.ANALYTICS(sensorId), { params })
+    );
+    return response.data.data; // Ensuring it returns response.data.data
   }
 }
 

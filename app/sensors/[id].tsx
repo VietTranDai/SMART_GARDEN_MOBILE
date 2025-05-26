@@ -34,6 +34,11 @@ import {
   SensorUnit,
 } from "@/types/gardens/sensor.types";
 import { SensorDataQueryParams } from "@/types/gardens/sensor-dtos";
+import {
+  SensorStatisticsDto,
+  SensorAnalyticsDto,
+  DailyAggregateDto,
+} from "@/types/gardens/sensor-statistics.types";
 import sensorService from "@/service/api/sensor.service";
 
 // Define time range options
@@ -569,21 +574,29 @@ const ChartCard = ({
   );
 };
 
-// Stats Card
+// Stats Card (Modified)
 const StatsCard = ({
   stats,
   unit,
   timeRange,
-  sensor,
   theme,
 }: {
-  stats: { min: number; max: number; avg: number };
+  stats: SensorStatisticsDto | null;
   unit: string;
   timeRange: TimeRange;
-  sensor: Sensor;
   theme: ReturnType<typeof getEnhancedTheme>;
 }) => {
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  if (!stats) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Thống kê ({timeRange})</Text>
+        <EmptyDataCard theme={theme} message="Không có dữ liệu thống kê." />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Thống kê ({timeRange})</Text>
@@ -591,25 +604,111 @@ const StatsCard = ({
         <View style={styles.statItem}>
           <Text style={styles.statLabel}>Thấp nhất</Text>
           <Text style={styles.statValue}>
-            {stats.min.toFixed(1)}
+            {stats.minValue.toFixed(1)}
             {unit}
           </Text>
         </View>
         <View style={styles.statItem}>
           <Text style={styles.statLabel}>Trung bình</Text>
           <Text style={styles.statValue}>
-            {stats.avg.toFixed(1)}
+            {stats.averageValue.toFixed(1)}
             {unit}
           </Text>
         </View>
         <View style={styles.statItem}>
           <Text style={styles.statLabel}>Cao nhất</Text>
           <Text style={styles.statValue}>
-            {stats.max.toFixed(1)}
+            {stats.maxValue.toFixed(1)}
             {unit}
           </Text>
         </View>
       </View>
+      <View style={[styles.statsRow, { marginTop: 15 }]}>
+        <View style={styles.statItem}>
+          <Text style={styles.statLabel}>Tổng số đọc</Text>
+          <Text style={styles.statValue}>{stats.totalReadings}</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statLabel}>Độ lệch chuẩn</Text>
+          <Text style={styles.statValue}>{stats.stdDeviation.toFixed(2)}</Text>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+// Analytics Card (Corrected)
+const AnalyticsCard = ({
+  sensorAnalytics,
+  theme,
+}: {
+  sensorAnalytics: SensorAnalyticsDto | null;
+  theme: ReturnType<typeof getEnhancedTheme>;
+}) => {
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  if (
+    !sensorAnalytics ||
+    !sensorAnalytics.dailyData ||
+    sensorAnalytics.dailyData.length === 0
+  ) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Phân tích hàng ngày</Text>
+        <EmptyDataCard
+          theme={theme}
+          message="Không có dữ liệu phân tích hàng ngày."
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Phân tích hàng ngày</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.dailyDataScrollView}
+      >
+        {sensorAnalytics.dailyData.map((dailyEntry, index) => (
+          <View key={index} style={styles.dailyDataItemCard}>
+            <Text style={styles.dailyDateText}>
+              {new Date(dailyEntry.date).toLocaleDateString("vi-VN", {
+                day: "2-digit",
+                month: "2-digit",
+              })}
+            </Text>
+            <View style={styles.dailyStatRow}>
+              <Text style={styles.dailyStatLabel}>TB:</Text>
+              <Text style={styles.dailyStatValue}>
+                {dailyEntry.averageValue.toFixed(1)}
+                {sensorAnalytics.unit}
+              </Text>
+            </View>
+            <View style={styles.dailyStatRow}>
+              <Text style={styles.dailyStatLabel}>Min:</Text>
+              <Text style={styles.dailyStatValue}>
+                {dailyEntry.minValue.toFixed(1)}
+                {sensorAnalytics.unit}
+              </Text>
+            </View>
+            <View style={styles.dailyStatRow}>
+              <Text style={styles.dailyStatLabel}>Max:</Text>
+              <Text style={styles.dailyStatValue}>
+                {dailyEntry.maxValue.toFixed(1)}
+                {sensorAnalytics.unit}
+              </Text>
+            </View>
+            <View style={styles.dailyStatRow}>
+              <Text style={styles.dailyStatLabel}>Đọc:</Text>
+              <Text style={styles.dailyStatValue}>
+                {dailyEntry.readingsCount}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
     </View>
   );
 };
@@ -618,25 +717,24 @@ const StatsCard = ({
 export default function SensorDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const baseTheme = useAppTheme(); // Renamed to baseTheme to avoid conflict
-  const theme = getEnhancedTheme(baseTheme); // Enhance the theme
+  const baseTheme = useAppTheme();
+  const theme = getEnhancedTheme(baseTheme);
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [sensor, setSensor] = useState<Sensor | null>(null);
   const [sensorData, setSensorData] = useState<SensorData[]>([]);
+  const [detailedStats, setDetailedStats] =
+    useState<SensorStatisticsDto | null>(null);
+  const [sensorAnalytics, setSensorAnalytics] =
+    useState<SensorAnalyticsDto | null>(null);
   const [loading, setLoading] = useState(true);
-  const [dataLoading, setDataLoading] = useState(false); // Specific loading for data/chart
+  const [dataLoading, setDataLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dataError, setDataError] = useState<string | null>(null); // Specific error for data
+  const [dataError, setDataError] = useState<string | null>(null);
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(
     TimeRange.DAY
   );
-  const [stats, setStats] = useState<{
-    min: number;
-    max: number;
-    avg: number;
-  } | null>(null);
 
   const parsedId = useMemo(() => {
     if (!id) return null;
@@ -644,41 +742,47 @@ export default function SensorDetailScreen() {
     return isNaN(cleanId) ? null : cleanId;
   }, [id]);
 
-  // Fetch sensor data based on time range
-  const fetchSensorData = useCallback(
+  const fetchChartDataAndStatistics = useCallback(
     async (sensorId: number, timeRange: TimeRange) => {
       setDataLoading(true);
       setDataError(null);
+      setDetailedStats(null);
+      setSensorAnalytics(null);
+
       try {
         const now = new Date();
-        let startDate: Date;
-        let limit: number;
+        let RangedStartDate: Date;
+        let RangedEndDate: Date = now;
+        let chartLimit: number;
 
         switch (timeRange) {
           case TimeRange.DAY:
-            startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-            limit = 24 * 4; // More data points for 24h
+            RangedStartDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            chartLimit = 24 * 4;
             break;
           case TimeRange.WEEK:
-            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            limit = 7 * 24;
+            RangedStartDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            chartLimit = 7 * 24;
             break;
           case TimeRange.MONTH:
-            startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            limit = 30 * 12;
+            RangedStartDate = new Date(
+              now.getTime() - 30 * 24 * 60 * 60 * 1000
+            );
+            chartLimit = 30 * 12;
             break;
           default:
-            startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-            limit = 24 * 4;
+            RangedStartDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            chartLimit = 24 * 4;
         }
 
-        const params: SensorDataQueryParams = {
-          limit,
-          startDate: startDate.toISOString(),
+        const chartParams: SensorDataQueryParams = {
+          limit: chartLimit,
+          startDate: RangedStartDate.toISOString(),
         };
+
         const sensorReadings = await sensorService.getSensorData(
           sensorId,
-          params
+          chartParams
         );
         const sortedData = sensorReadings.sort(
           (a, b) =>
@@ -686,21 +790,42 @@ export default function SensorDetailScreen() {
         );
         setSensorData(sortedData);
 
-        if (sortedData.length > 0) {
-          const values = sortedData.map((reading) => reading.value);
-          setStats({
-            min: Math.min(...values),
-            max: Math.max(...values),
-            avg: values.reduce((sum, val) => sum + val, 0) / values.length,
-          });
-        } else {
-          setStats(null);
-        }
+        const statsStartDateISO = RangedStartDate.toISOString();
+        const statsEndDateISO = RangedEndDate.toISOString();
+
+        const newDetailedStats = await sensorService.getSensorStatistics(
+          sensorId,
+          statsStartDateISO,
+          statsEndDateISO
+        );
+        setDetailedStats(newDetailedStats);
+
+        // Helper function to format Date to YYYY-MM-DD
+        const formatDateToYYYYMMDD = (date: Date) => {
+          const year = date.getFullYear();
+          const month = (date.getMonth() + 1).toString().padStart(2, "0");
+          const day = date.getDate().toString().padStart(2, "0");
+          return `${year}-${month}-${day}`;
+        };
+
+        const analyticsStartDate = formatDateToYYYYMMDD(RangedStartDate);
+        const analyticsEndDate = formatDateToYYYYMMDD(RangedEndDate);
+
+        const newSensorAnalytics = await sensorService.getSensorAnalytics(
+          sensorId,
+          analyticsStartDate,
+          analyticsEndDate
+        );
+        setSensorAnalytics(newSensorAnalytics);
       } catch (err) {
-        console.error("Error fetching sensor data:", err);
-        setDataError("Không thể tải dữ liệu lịch sử.");
-        setSensorData([]); // Clear data on error
-        setStats(null);
+        console.error(
+          "Error fetching sensor data, statistics, or analytics:",
+          err
+        );
+        setDataError("Không thể tải dữ liệu lịch sử, thống kê hoặc phân tích.");
+        setSensorData([]);
+        setDetailedStats(null);
+        setSensorAnalytics(null);
       } finally {
         setDataLoading(false);
       }
@@ -708,7 +833,6 @@ export default function SensorDetailScreen() {
     []
   );
 
-  // Fetch initial details and data
   const fetchAll = useCallback(
     async (isRefresh = false) => {
       if (!parsedId) {
@@ -718,12 +842,11 @@ export default function SensorDetailScreen() {
       }
       if (!isRefresh) setLoading(true);
       setError(null);
-      setDataError(null);
 
       try {
         const sensorDetails = await sensorService.getSensorById(parsedId);
         setSensor(sensorDetails);
-        await fetchSensorData(parsedId, selectedTimeRange); // Fetch data with the current range
+        await fetchChartDataAndStatistics(parsedId, selectedTimeRange);
       } catch (err) {
         console.error("Error fetching sensor details:", err);
         setError("Không thể tải thông tin cảm biến.");
@@ -732,35 +855,29 @@ export default function SensorDetailScreen() {
         if (!isRefresh) setLoading(false);
       }
     },
-    [parsedId, selectedTimeRange, fetchSensorData]
+    [parsedId, selectedTimeRange, fetchChartDataAndStatistics]
   );
 
   useEffect(() => {
     fetchAll();
-    // Set up an interval if needed (consider battery life and API limits)
-    // const interval = setInterval(() => fetchAll(true), 5 * 60 * 1000);
-    // return () => clearInterval(interval);
-  }, [fetchAll]); // Only run on initial mount/id change
+  }, [fetchAll]);
 
-  // Handle time range change
   const handleTimeRangeChange = useCallback(
     (range: TimeRange) => {
       setSelectedTimeRange(range);
       if (parsedId) {
-        fetchSensorData(parsedId, range);
+        fetchChartDataAndStatistics(parsedId, range);
       }
     },
-    [parsedId, fetchSensorData]
+    [parsedId, fetchChartDataAndStatistics]
   );
 
-  // Handle manual refresh
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchAll(true);
     setRefreshing(false);
   }, [fetchAll]);
 
-  // Export data
   const exportData = useCallback(async () => {
     if (!sensor || sensorData.length === 0) {
       showToast("Không có dữ liệu để xuất");
@@ -789,7 +906,6 @@ export default function SensorDetailScreen() {
     }
   };
 
-  // Prepare chart labels (filtered)
   const chartLabelsFiltered = useMemo(() => {
     if (sensorData.length === 0) return [];
     const labels = sensorData.map((reading) => {
@@ -807,12 +923,10 @@ export default function SensorDetailScreen() {
         });
       }
     });
-    const maxLabels = 6; // Show a max of 6 labels for clarity
+    const maxLabels = 6;
     const step = Math.max(1, Math.ceil(labels.length / maxLabels));
     return labels.filter((_, index) => index % step === 0);
   }, [sensorData, selectedTimeRange]);
-
-  // --- Render ---
 
   if (loading && !sensor) {
     return (
@@ -885,44 +999,47 @@ export default function SensorDetailScreen() {
           />
         }
       >
-        {/* Current Reading */}
         <CurrentReadingCard sensor={sensor} theme={theme} />
 
-        {/* Time Range Selector */}
         <TimeRangeSelector
           selected={selectedTimeRange}
           onChange={handleTimeRangeChange}
           theme={theme}
         />
 
-        {/* Chart Section */}
-        <ChartCard
-          sensorData={sensorData}
-          sensor={sensor}
-          selectedTimeRange={selectedTimeRange}
-          error={dataError}
-          loading={dataLoading}
-          onRetry={() => fetchSensorData(parsedId!, selectedTimeRange)}
-          theme={theme}
-          chartLabelsFiltered={chartLabelsFiltered}
-        />
+        {sensor && (
+          <ChartCard
+            sensorData={sensorData}
+            sensor={sensor}
+            selectedTimeRange={selectedTimeRange}
+            error={dataError}
+            loading={dataLoading}
+            onRetry={() =>
+              parsedId &&
+              fetchChartDataAndStatistics(parsedId, selectedTimeRange)
+            }
+            theme={theme}
+            chartLabelsFiltered={chartLabelsFiltered}
+          />
+        )}
 
-        {/* Stats Section (Moved After Chart) */}
-        {stats && sensor && (
+        {sensor && (
           <StatsCard
-            stats={stats}
+            stats={detailedStats}
             unit={UNIT_DISPLAY[sensor.unit] || ""}
             timeRange={selectedTimeRange}
-            sensor={sensor}
             theme={theme}
           />
+        )}
+
+        {sensorAnalytics && (
+          <AnalyticsCard sensorAnalytics={sensorAnalytics} theme={theme} />
         )}
       </ScrollView>
     </View>
   );
 }
 
-// --- Styles ---
 const createStyles = (theme: ReturnType<typeof getEnhancedTheme>) =>
   StyleSheet.create({
     container: {
@@ -970,7 +1087,6 @@ const createStyles = (theme: ReturnType<typeof getEnhancedTheme>) =>
       fontSize: 15,
       fontFamily: "Inter-SemiBold",
     },
-    // --- Card Style (Improved as per Phase 1) ---
     card: {
       backgroundColor: theme.card,
       borderRadius: 16,
@@ -996,7 +1112,6 @@ const createStyles = (theme: ReturnType<typeof getEnhancedTheme>) =>
       marginBottom: 0,
       marginLeft: 26,
     },
-    // --- Current Reading (Styles will be merged/added in Phase 2) ---
     currentReadingCard: {
       alignItems: "center",
     },
@@ -1067,7 +1182,6 @@ const createStyles = (theme: ReturnType<typeof getEnhancedTheme>) =>
       color: theme.textTertiary,
       fontFamily: "Inter-Regular",
     },
-    // --- Time Range Selector (Improved - Phase 4) ---
     timeRangeSelectorContainer: {
       marginBottom: 24,
     },
@@ -1109,7 +1223,6 @@ const createStyles = (theme: ReturnType<typeof getEnhancedTheme>) =>
       color: theme.buttonText,
       fontFamily: "Inter-Bold",
     },
-    // --- Chart (Styles will be merged/added in Phase 6) ---
     chartHeader: {
       flexDirection: "row",
       justifyContent: "space-between",
@@ -1119,9 +1232,7 @@ const createStyles = (theme: ReturnType<typeof getEnhancedTheme>) =>
     refreshButton: {
       padding: 8,
     },
-    chartContainer: {
-      // This container can be used for additional chart elements if needed
-    },
+    chartContainer: {},
     chartStyle: {
       borderRadius: 8,
     },
@@ -1153,7 +1264,6 @@ const createStyles = (theme: ReturnType<typeof getEnhancedTheme>) =>
       color: theme.textSecondary,
       fontFamily: "Inter-Regular",
     },
-    // --- Stats (Styles will be merged/added in Phase 3) ---
     statsRow: {
       flexDirection: "row",
       justifyContent: "space-around",
@@ -1175,7 +1285,6 @@ const createStyles = (theme: ReturnType<typeof getEnhancedTheme>) =>
       fontFamily: "Inter-SemiBold",
       color: theme.text,
     },
-    // Improved spacing system (as per Phase 1)
     sectionSpacing: {
       marginBottom: 32,
     },
@@ -1217,5 +1326,42 @@ const createStyles = (theme: ReturnType<typeof getEnhancedTheme>) =>
     },
     chartSectionContainer: {
       marginBottom: 20,
+    },
+    dailyDataScrollView: {
+      paddingVertical: 10,
+    },
+    dailyDataItemCard: {
+      backgroundColor: theme.surface.secondary,
+      borderRadius: 12,
+      padding: 12,
+      marginRight: 12,
+      minWidth: 130,
+      elevation: 2,
+      shadowColor: theme.shadows.light,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    },
+    dailyDateText: {
+      fontSize: 14,
+      fontFamily: "Inter-SemiBold",
+      color: theme.text,
+      marginBottom: 8,
+      textAlign: "center",
+    },
+    dailyStatRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 4,
+    },
+    dailyStatLabel: {
+      fontSize: 12,
+      fontFamily: "Inter-Regular",
+      color: theme.textSecondary,
+    },
+    dailyStatValue: {
+      fontSize: 13,
+      fontFamily: "Inter-Medium",
+      color: theme.text,
     },
   });
