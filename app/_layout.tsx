@@ -174,7 +174,7 @@ export default function RootLayout() {
                       />
                       <Stack.Screen
                         name="sensors/[id]"
-                        options={{ headerShown: false }}
+                        options={{ headerShown: true }}
                       />
                     </Stack>
                     <AppNavigator />
