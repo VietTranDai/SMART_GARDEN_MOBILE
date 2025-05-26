@@ -63,15 +63,11 @@ export default function useHomeData() {
 
   // ✅ NEW: Sync ref với selectedGardenId
   useEffect(() => {
-    console.log(
-      `useHomeData: Updating currentGardenIdRef from ${currentGardenIdRef.current} to ${selectedGardenId}`
-    );
     currentGardenIdRef.current = selectedGardenId;
   }, [selectedGardenId]);
 
   // Callback Functions
   const loadInitialData = useCallback(async () => {
-    console.log("useHomeData: Loading initial data...");
     try {
       const gardens = await gardenManagement.fetchGardens();
       if (gardens.length > 0) {
@@ -111,7 +107,6 @@ export default function useHomeData() {
         return;
       }
 
-      console.log(`useHomeData: Fetching static data for garden ${gardenId}`);
       try {
         await Promise.all([
           weatherDataHook.fetchCompleteWeatherData(gardenId),
@@ -147,7 +142,6 @@ export default function useHomeData() {
 
   // ✅ UPDATED: handleRefresh sử dụng ref
   const handleRefresh = useCallback(async () => {
-    console.log("useHomeData: Refreshing data...");
     setRefreshing(true);
     try {
       await loadInitialData();
@@ -190,15 +184,11 @@ export default function useHomeData() {
 
   // ✅ NEW: Single sensor polling interval với ref
   useEffect(() => {
-    console.log("useHomeData: Setting up single sensor polling interval");
-
     const pollSensorData = () => {
       const currentId = currentGardenIdRef.current;
       if (currentId !== null) {
-        console.log(`useHomeData: Polling sensor data for garden ${currentId}`);
         sensorDataHook.fetchSensorData(currentId);
       } else {
-        console.log("useHomeData: No garden selected, skipping sensor poll");
       }
     };
 
@@ -210,7 +200,6 @@ export default function useHomeData() {
 
     // Cleanup function
     return () => {
-      console.log("useHomeData: Cleaning up sensor polling interval");
       clearInterval(intervalId);
     };
   }, []); // ✅ Empty dependencies - interval created only once

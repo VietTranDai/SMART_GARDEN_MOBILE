@@ -279,11 +279,8 @@ const GardenSection = memo((props: GardenSectionProps) => {
   // Xác thực dữ liệu sensor để đảm bảo hiển thị đúng trong garden card
   const validatedSensorData = useMemo(() => {
     if (!sensorDataByGarden || typeof sensorDataByGarden !== "object") {
-      console.log("sensorDataByGarden is invalid:", sensorDataByGarden);
       return {};
     }
-
-    console.log("sensorDataByGarden", sensorDataByGarden);
 
     // Tạo một đối tượng mới để tránh thay đổi object gốc
     const result: Record<number, Record<string, any[]>> = {};
@@ -812,7 +809,6 @@ function HomeScreenContent() {
     const now = Date.now();
     if (now - lastFetchTime.current < 10000) {
       // 10s debounce
-      console.log("Debouncing refresh - too frequent");
       return;
     }
 
@@ -886,7 +882,6 @@ function HomeScreenContent() {
       try {
         // Kiểm tra gardenId có hợp lệ không
         if (gardenId === null || gardenId === undefined || isNaN(gardenId)) {
-          console.log("Invalid garden ID, skipping weather fetch");
           return;
         }
 
@@ -955,12 +950,7 @@ function HomeScreenContent() {
         gardenAdviceByGarden.hasOwnProperty(gardenId) ||
         gardenAdviceLoading[gardenId]
       ) {
-        console.log(
-          `Advice for garden ${gardenId} already in state or loading. Modal will use existing data/state.`
-        );
-        // Nếu đang tải, modal sẽ hiển thị trạng thái loading.
-        // Nếu dữ liệu đã có (kể cả mảng rỗng), nó sẽ được hiển thị hoặc thông báo "không có lời khuyên".
-        return; // Không fetch lại
+        return;
       }
 
       // Tiến hành fetch dữ liệu

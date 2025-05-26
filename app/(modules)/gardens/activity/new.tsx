@@ -77,12 +77,6 @@ export default function CreateActivityScreen() {
       return;
     }
 
-    console.log("Creating activity for garden:", gardenId, {
-      activityType: selectedActivityType,
-      notes,
-      timestamp: timestamp.toISOString(),
-    });
-
     Alert.alert("Thành công", "Đã thêm hoạt động mới (giả lập).", [
       { text: "OK", onPress: () => router.back() },
     ]);

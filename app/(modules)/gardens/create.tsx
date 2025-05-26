@@ -42,15 +42,6 @@ export default function CreateGardenScreen() {
       return;
     }
 
-    // Log the data for now - replace with API call later
-    console.log("Creating garden:", {
-      name: gardenName,
-      description,
-      location,
-      plantName,
-      type: gardenType,
-    });
-
     Alert.alert("Thành công", "Đã tạo vườn mới (giả lập).", [
       { text: "OK", onPress: () => router.back() },
     ]);

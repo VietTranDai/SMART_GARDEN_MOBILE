@@ -15,13 +15,13 @@ export enum SensorType {
 }
 
 export enum SensorUnit {
-  CELSIUS = "°C",
-  PERCENT = "%",
-  LUX = "lux",
-  PH = "pH",
-  LITER = "L",
-  METER = "m",
-  MILLIMETER = "mm",
+  CELSIUS = "CELSIUS",
+  PERCENT = "PERCENT",
+  LUX = "LUX",
+  PH = "PH",
+  LITER = "LITER",
+  METER = "METER",
+  MILLIMETER = "MILLIMETER",
 }
 
 export interface Sensor {

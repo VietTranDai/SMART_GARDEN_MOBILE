@@ -53,7 +53,7 @@ const OPTIMAL_RANGES = {
   [SensorType.TEMPERATURE]: { min: 15, max: 32 },
   [SensorType.HUMIDITY]: { min: 30, max: 80 },
   [SensorType.SOIL_MOISTURE]: { min: 20, max: 80 },
-  [SensorType.LIGHT]: { min: 5000, max: 80000 },
+  [SensorType.LIGHT]: { min: 5000, max: 12000 },
   [SensorType.SOIL_PH]: { min: 5.5, max: 7.5 },
   [SensorType.RAINFALL]: { min: 0, max: 50 },
   [SensorType.WATER_LEVEL]: { min: 10, max: 80 },
@@ -534,7 +534,7 @@ const ChartCard = ({
             }}
             width={screenWidth - 40}
             height={280}
-            yAxisSuffix={` ${unitDisplay}`}
+            yAxisSuffix={``}
             yAxisInterval={1}
             chartConfig={chartConfig}
             bezier
@@ -544,10 +544,7 @@ const ChartCard = ({
             fromZero={false}
             formatYLabel={(value) => `${parseFloat(value).toFixed(1)}`}
             onDataPointClick={(data) => {
-              console.log("Chart point clicked:", data);
               const clickedLabel = chartLabelsFiltered[data.index] || "";
-              const message = `Giá trị: ${data.value}${unitDisplay} lúc ${clickedLabel}`;
-              console.log(message);
             }}
           />
           <View style={styles.chartLegend}>
@@ -663,15 +660,16 @@ const AnalyticsCard = ({
     );
   }
 
+  const unitDisplay =
+    UNIT_DISPLAY[sensorAnalytics.unit as SensorUnit] || sensorAnalytics.unit;
+
+  const displayedDailyData = sensorAnalytics.dailyData.slice(0, 4);
+
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Phân tích hàng ngày</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.dailyDataScrollView}
-      >
-        {sensorAnalytics.dailyData.map((dailyEntry, index) => (
+      <View style={styles.dailyDataGridContainer}>
+        {displayedDailyData.map((dailyEntry, index) => (
           <View key={index} style={styles.dailyDataItemCard}>
             <Text style={styles.dailyDateText}>
               {new Date(dailyEntry.date).toLocaleDateString("vi-VN", {
@@ -683,21 +681,21 @@ const AnalyticsCard = ({
               <Text style={styles.dailyStatLabel}>TB:</Text>
               <Text style={styles.dailyStatValue}>
                 {dailyEntry.averageValue.toFixed(1)}
-                {sensorAnalytics.unit}
+                {unitDisplay}
               </Text>
             </View>
             <View style={styles.dailyStatRow}>
               <Text style={styles.dailyStatLabel}>Min:</Text>
               <Text style={styles.dailyStatValue}>
                 {dailyEntry.minValue.toFixed(1)}
-                {sensorAnalytics.unit}
+                {unitDisplay}
               </Text>
             </View>
             <View style={styles.dailyStatRow}>
               <Text style={styles.dailyStatLabel}>Max:</Text>
               <Text style={styles.dailyStatValue}>
                 {dailyEntry.maxValue.toFixed(1)}
-                {sensorAnalytics.unit}
+                {unitDisplay}
               </Text>
             </View>
             <View style={styles.dailyStatRow}>
@@ -708,7 +706,7 @@ const AnalyticsCard = ({
             </View>
           </View>
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 };
@@ -800,7 +798,6 @@ export default function SensorDetailScreen() {
         );
         setDetailedStats(newDetailedStats);
 
-        // Helper function to format Date to YYYY-MM-DD
         const formatDateToYYYYMMDD = (date: Date) => {
           const year = date.getFullYear();
           const month = (date.getMonth() + 1).toString().padStart(2, "0");
@@ -808,13 +805,18 @@ export default function SensorDetailScreen() {
           return `${year}-${month}-${day}`;
         };
 
-        const analyticsStartDate = formatDateToYYYYMMDD(RangedStartDate);
-        const analyticsEndDate = formatDateToYYYYMMDD(RangedEndDate);
+        // Calculate specific dates for 4-day analytics
+        const todayForAnalytics = new Date();
+        const fourDaysAgo = new Date();
+        fourDaysAgo.setDate(todayForAnalytics.getDate() - 3);
+
+        const analyticsStartDate = formatDateToYYYYMMDD(fourDaysAgo);
+        const analyticsEndDate = formatDateToYYYYMMDD(todayForAnalytics);
 
         const newSensorAnalytics = await sensorService.getSensorAnalytics(
           sensorId,
-          analyticsStartDate,
-          analyticsEndDate
+          analyticsStartDate, // Use the new 4-day start date
+          analyticsEndDate // Use the new 4-day end date
         );
         setSensorAnalytics(newSensorAnalytics);
       } catch (err) {
@@ -1327,15 +1329,19 @@ const createStyles = (theme: ReturnType<typeof getEnhancedTheme>) =>
     chartSectionContainer: {
       marginBottom: 20,
     },
-    dailyDataScrollView: {
+    dailyDataGridContainer: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "center",
+      alignItems: "flex-start",
       paddingVertical: 10,
     },
     dailyDataItemCard: {
       backgroundColor: theme.surface.secondary,
       borderRadius: 12,
       padding: 12,
-      marginRight: 12,
-      minWidth: 130,
+      width: "47%",
+      margin: "1.5%",
       elevation: 2,
       shadowColor: theme.shadows.light,
       shadowOffset: { width: 0, height: 2 },

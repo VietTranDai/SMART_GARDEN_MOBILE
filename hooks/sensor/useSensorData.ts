@@ -105,8 +105,6 @@ export default function useSensorData() {
       pollSensorData,
       SENSOR_POLLING_INTERVAL
     );
-
-    // console.log("Sensor polling started");
   }, []);
 
   /**
@@ -116,7 +114,6 @@ export default function useSensorData() {
     if (pollingTimerRef.current !== null) {
       clearInterval(pollingTimerRef.current);
       pollingTimerRef.current = null;
-      console.log("Sensor polling stopped");
     }
   }, []);
 
@@ -374,7 +371,7 @@ export default function useSensorData() {
    * Lấy tên icon cho loại cảm biến
    */
   const getSensorIconName = useCallback((type: SensorType): string => {
-    return sensorService.getSensorIconName(type);
+    return sensorService.getSensorIcon(type);
   }, []);
 
   /**

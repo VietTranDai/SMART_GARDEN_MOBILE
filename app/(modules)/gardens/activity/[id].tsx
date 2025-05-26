@@ -31,7 +31,6 @@ export default function GardenActivityHistoryScreen() {
 
   const loadActivities = useCallback(async () => {
     if (!gardenId) return;
-    console.log("Loading activities for garden:", gardenId);
     setIsLoading(true);
     setError(null);
 
