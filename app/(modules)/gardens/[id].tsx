@@ -59,6 +59,12 @@ export default function GardenDetailScreen() {
     resolveAlert,
     ignoreAlert,
     handleUploadPhoto,
+    plantStats,
+    plantStatsLoading,
+    plantStatsError,
+    plantDetailedAdvice,
+    plantDetailedAdviceLoading,
+    plantDetailedAdviceError,
   } = useGardenDetail({ gardenId: id || null });
 
   // Modal visibility functions
@@ -111,8 +117,22 @@ export default function GardenDetailScreen() {
   );
 
   const PlantTab = useCallback(
-    () => <GardenPlantTab plantDetails={safePlantDetails} />,
-    [safePlantDetails]
+    () => (
+      <GardenPlantTab
+        plantDetails={safePlantDetails}
+        plantStats={plantStats}
+        plantDetailedAdvice={plantDetailedAdvice}
+        plantStatsLoading={plantStatsLoading}
+        plantDetailedAdviceLoading={plantDetailedAdviceLoading}
+      />
+    ),
+    [
+      safePlantDetails,
+      plantStats,
+      plantDetailedAdvice,
+      plantStatsLoading,
+      plantDetailedAdviceLoading,
+    ]
   );
 
   const PhotosTab = useCallback(

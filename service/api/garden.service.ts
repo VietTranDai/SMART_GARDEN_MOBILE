@@ -14,6 +14,10 @@ import {
   GardenPhoto,
   SensorHistory,
 } from "@/types/gardens/garden.types";
+import {
+  PlantStatisticsData,
+  PlantAdviceData,
+} from "@/types/gardens/plant-insights.types";
 
 /**
  * Garden Service
@@ -456,6 +460,50 @@ class GardenService {
     } catch (error) {
       console.error(`Error uploading photo for garden ${gardenId}:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Get plant statistics for a garden
+   * @param gardenId Garden ID
+   * @returns Plant statistics data
+   */
+  async getPlantStatistics(
+    gardenId: number | string
+  ): Promise<PlantStatisticsData | null> {
+    try {
+      const response = await apiClient.get(
+        GARDEN_ENDPOINTS.PLANT_STATISTICS(gardenId)
+      );
+      return response.data.data || null;
+    } catch (error) {
+      console.error(
+        `Error fetching plant statistics for garden ${gardenId}:`,
+        error
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Get detailed plant advice for a garden (new comprehensive endpoint)
+   * @param gardenId Garden ID
+   * @returns Detailed plant advice data
+   */
+  async getPlantDetailedAdvice(
+    gardenId: number | string
+  ): Promise<PlantAdviceData | null> {
+    try {
+      const response = await apiClient.get(
+        GARDEN_ENDPOINTS.PLANT_ADVICE(gardenId)
+      );
+      return response.data.data || null;
+    } catch (error) {
+      console.error(
+        `Error fetching detailed plant advice for garden ${gardenId}:`,
+        error
+      );
+      return null;
     }
   }
 }

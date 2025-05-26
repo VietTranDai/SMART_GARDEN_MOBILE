@@ -25,6 +25,10 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import Toast from "react-native-toast-message";
 import { WateringSchedule } from "@/types";
+import {
+  PlantStatisticsData,
+  PlantAdviceData,
+} from "@/types/plants/plant-insights.types";
 
 /**
  * Custom hook for managing garden details and related data
@@ -74,6 +78,21 @@ export function useGardenDetail({ gardenId }: { gardenId: string | null }) {
   const [weatherModalVisible, setWeatherModalVisible] =
     useState<boolean>(false);
 
+  // New states for Plant Statistics and Detailed Advice
+  const [plantStats, setPlantStats] = useState<PlantStatisticsData | null>(
+    null
+  );
+  const [plantStatsLoading, setPlantStatsLoading] = useState<boolean>(false);
+  const [plantStatsError, setPlantStatsError] = useState<string | null>(null);
+
+  const [plantDetailedAdvice, setPlantDetailedAdvice] =
+    useState<PlantAdviceData | null>(null);
+  const [plantDetailedAdviceLoading, setPlantDetailedAdviceLoading] =
+    useState<boolean>(false);
+  const [plantDetailedAdviceError, setPlantDetailedAdviceError] = useState<
+    string | null
+  >(null);
+
   /**
    * Load all garden data
    */
@@ -94,6 +113,9 @@ export function useGardenDetail({ gardenId }: { gardenId: string | null }) {
         alertsData,
         activitiesData,
         weatherData,
+        // Fetch new plant insights data
+        fetchedPlantStats,
+        fetchedPlantDetailedAdvice,
       ] = await Promise.all([
         gardenService.getGardenPlantDetails(id),
         gardenService.getGardenSensorHistory(id),
@@ -101,6 +123,21 @@ export function useGardenDetail({ gardenId }: { gardenId: string | null }) {
         alertService.getAlertsByGarden(id),
         activityService.getActivities(), // Get all activities and filter by garden ID later
         weatherService.getCurrentAndForecast(id),
+        gardenService.getPlantStatistics(id).catch((err) => {
+          console.error("Error fetching plant statistics in Promise.all:", err);
+          setPlantStatsError("Không thể tải thống kê cây trồng.");
+          return null;
+        }),
+        gardenService.getPlantDetailedAdvice(id).catch((err) => {
+          console.error(
+            "Error fetching plant detailed advice in Promise.all:",
+            err
+          );
+          setPlantDetailedAdviceError(
+            "Không thể tải lời khuyên chi tiết cho cây trồng."
+          );
+          return null;
+        }),
       ]);
 
       // Fetch watering schedules separately as it's already processed by the service
@@ -110,6 +147,10 @@ export function useGardenDetail({ gardenId }: { gardenId: string | null }) {
       setSensorHistory(sensorHistoryData);
       setGardenPhotos(photosData);
       setAlerts(alertsData as any);
+
+      // Set new plant insights data
+      setPlantStats(fetchedPlantStats);
+      setPlantDetailedAdvice(fetchedPlantDetailedAdvice);
 
       // Filter activities by garden ID
       const gardenActivities = activitiesData.filter(
@@ -511,5 +552,11 @@ export function useGardenDetail({ gardenId }: { gardenId: string | null }) {
     getTimeSinceUpdate,
     resolveAlert,
     ignoreAlert,
+    plantStats,
+    plantStatsLoading,
+    plantStatsError,
+    plantDetailedAdvice,
+    plantDetailedAdviceLoading,
+    plantDetailedAdviceError,
   };
 }

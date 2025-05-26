@@ -37,6 +37,10 @@ export const GARDEN_ENDPOINTS = {
   PHOTOS: (gardenId: string | number) => `/gardens/me/${gardenId}/photos`,
   SENSOR_HISTORY: (gardenId: string | number, days: number = 7) =>
     `/gardens/me/${gardenId}/sensor-history?days=${days}`,
+  PLANT_STATISTICS: (gardenId: string | number) =>
+    `/gardens/${gardenId}/plant-statistics`,
+  PLANT_ADVICE: (gardenId: string | number) =>
+    `/gardens/${gardenId}/plant-advice`,
 };
 
 // Plant endpoints
