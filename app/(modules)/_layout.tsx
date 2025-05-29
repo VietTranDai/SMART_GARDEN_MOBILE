@@ -105,6 +105,25 @@ const ProfileHeaderTitle = () => {
   );
 };
 
+// Header component for Journal tab
+const JournalHeaderTitle = () => {
+  const theme = useAppTheme();
+
+  return (
+    <View style={styles.headerTitleContainer}>
+      <MaterialCommunityIcons
+        name="notebook-outline"
+        size={24}
+        color={theme.primary}
+        style={styles.headerIcon}
+      />
+      <Text style={[styles.headerTitleText, { color: theme.text }]}>
+        Nhật ký vườn
+      </Text>
+    </View>
+  );
+};
+
 // Custom header component for Home tab
 const CustomHeaderTitle = () => {
   const theme = useAppTheme();
@@ -353,20 +372,6 @@ export default function ModuleLayout() {
           }}
         />
         <Tabs.Screen
-          name="gardens/activity/[id]"
-          options={{
-            href: null,
-            headerTitle: "Lịch sử hoạt động",
-          }}
-        />
-        <Tabs.Screen
-          name="gardens/activity/new"
-          options={{
-            href: null,
-            headerTitle: "Thêm hoạt động",
-          }}
-        />
-        <Tabs.Screen
           name="gardens/schedule/[id]"
           options={{
             href: null,
@@ -421,7 +426,34 @@ export default function ModuleLayout() {
           }}
         />
 
-        {/* 5. Profile Tab - User profile and settings */}
+        {/* Hidden screen for task details */}
+        <Tabs.Screen 
+          name="tasks/[id]" 
+          options={{
+            href: null, 
+            headerTitle: "Chi tiết công việc",
+          }}
+        />
+
+        {/* 5. Journal Tab - Garden activity journal */}
+        <Tabs.Screen
+          name="journal/index"
+          options={{
+            title: "Nhật ký",
+            tabBarIcon: ({ color, size }) => (
+              <MaterialCommunityIcons name="notebook" size={size} color={color} />
+            ),
+            headerTitle: (props) => <JournalHeaderTitle />,
+            headerRight: () => <CustomHeaderRight />,
+            headerTitleAlign: "left",
+            headerStyle: {
+              backgroundColor: theme.background,
+              elevation: 1,
+            },
+          }}
+        />
+
+        {/* 6. Profile Tab - User profile and settings */}
         <Tabs.Screen
           name="profile/index"
           options={{

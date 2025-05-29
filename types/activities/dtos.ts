@@ -83,8 +83,50 @@ export interface GetTasksQueryDto {
 }
 
 /**
+ * Represents a Task object for responses.
+ * Corresponds to TaskDto in the backend.
+ */
+export interface TaskDto {
+  /** ID của công việc */
+  id: number;
+
+  /** ID của gardener */
+  gardenerId: number;
+
+  /** ID của garden */
+  gardenId: number;
+
+  /** Tên loại cây */
+  plantTypeName?: string;
+
+  /** Tên giai đoạn cây */
+  plantStageName?: string;
+
+  /** Loại công việc */
+  type: string;
+
+  /** Mô tả công việc */
+  description: string;
+
+  /** Ngày đến hạn (ISO 8601 string) */
+  dueDate: string;
+
+  /** Trạng thái công việc */
+  status: TaskStatus;
+
+  /** Thời gian tạo (ISO 8601 string) */
+  createdAt: string;
+
+  /** Thời gian cập nhật (ISO 8601 string) */
+  updatedAt: string;
+
+  /** Thời gian hoàn thành nếu đã hoàn thành (ISO 8601 string) */
+  completedAt?: string;
+}
+
+/**
  * Interface for pagination metadata in responses
- * Corresponds to PaginationMetaDto in the backend (renamed from PaginationMeta)
+ * Corresponds to PaginationMeta in the backend
  */
 export interface PaginationMeta {
   /** Tổng số mục tìm thấy */
@@ -106,10 +148,10 @@ export interface PaginationMeta {
  */
 export interface PaginatedTaskResult {
   /** Danh sách công việc cho trang hiện tại */
-  items: Task[];
+  items: TaskDto[]; // Changed from Task[] to TaskDto[]
   
   /** Thông tin phân trang */
-  meta: PaginationMeta; // Updated to PaginationMeta
+  meta: PaginationMeta;
 }
 
 // --- Garden Activity DTOs ---

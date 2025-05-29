@@ -24,7 +24,7 @@ class TaskService {
   async getTasks(query?: GetTasksQueryDto): Promise<PaginatedTaskResult> {
     try {
       const response = await apiClient.get(TASK_ENDPOINTS.TASKS_BASE, { params: query });
-      return response.data;
+      return response.data.data;
     } catch (error) {
       console.error('[TaskService] Error fetching tasks:', error);
       throw error;
@@ -40,7 +40,7 @@ class TaskService {
   async getTaskById(taskId: number | string): Promise<Task> {
     try {
       const response = await apiClient.get(TASK_ENDPOINTS.TASK_BY_ID(taskId));
-      return response.data;
+      return response.data.data;
     } catch (error) {
       console.error(`[TaskService] Error fetching task ${taskId}:`, error);
       throw error;
@@ -56,7 +56,7 @@ class TaskService {
   async createTask(createTaskDto: CreateTaskDto): Promise<Task> {
     try {
       const response = await apiClient.post(TASK_ENDPOINTS.CREATE, createTaskDto);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       console.error('[TaskService] Error creating task:', error);
       throw error;
@@ -76,7 +76,7 @@ class TaskService {
   ): Promise<Task> {
     try {
       const response = await apiClient.put(TASK_ENDPOINTS.TASK_BY_ID(taskId), updateTaskDto);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       console.error(`[TaskService] Error updating task ${taskId}:`, error);
       throw error;
