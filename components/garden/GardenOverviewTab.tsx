@@ -5,14 +5,12 @@ import {
   Garden,
   GardenPlantDetails,
   Alert,
-  ActivityDisplay,
   WeatherObservation,
 } from "@/types";
 import { AlertStatus } from "@/types";
 import GardenStatusCard from "@/components/common/GardenStatusCard";
 import PlantDetailCard from "@/components/garden/PlantDetailCard";
 import AlertsList from "@/components/common/AlertsList";
-import ActivityList from "@/components/garden/ActivityList";
 import WeatherButton from "./WeatherButton";
 import { useNavigation } from "@react-navigation/native";
 
@@ -20,7 +18,6 @@ interface GardenOverviewTabProps {
   garden: Garden;
   plantDetails?: GardenPlantDetails;
   alerts: Alert[];
-  activities: ActivityDisplay[];
   onResolveAlert: (alertId: string) => void;
   onIgnoreAlert: (alertId: string) => void;
   onShowWeather: () => void;
@@ -31,7 +28,6 @@ const GardenOverviewTab: React.FC<GardenOverviewTabProps> = ({
   garden,
   plantDetails,
   alerts,
-  activities,
   onResolveAlert,
   onIgnoreAlert,
   onShowWeather,
@@ -79,12 +75,6 @@ const GardenOverviewTab: React.FC<GardenOverviewTabProps> = ({
             onResolveAlert={onResolveAlert}
             onIgnoreAlert={onIgnoreAlert}
           />
-        </View>
-      )}
-
-      {activities.length > 0 && (
-        <View style={styles.cardContainer}>
-          <ActivityList activities={activities.slice(0, 5)} />
         </View>
       )}
     </View>

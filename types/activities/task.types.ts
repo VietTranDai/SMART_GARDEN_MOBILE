@@ -24,22 +24,13 @@ export interface Task {
   // Task details
   type: string;
   description: string;
-  dueDate: string;
+  dueDate: string; // ISO 8601 string (corresponds to Date on backend)
   status: TaskStatus;
-  completedAt?: string;
-
-  // Optional relation
-  wateringScheduleId?: number;
-
-  // Metadata
-  notes?: string;
-
-  // Photo evaluation count
-  photoEvaluationsCount?: number;
+  completedAt?: string; // ISO 8601 string (corresponds to Date on backend)
 
   // Timestamps
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string; // ISO 8601 string (corresponds to Date on backend)
+  updatedAt: string; // ISO 8601 string (corresponds to Date on backend)
 }
 
 export interface WateringSchedule {

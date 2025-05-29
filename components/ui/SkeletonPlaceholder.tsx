@@ -6,7 +6,9 @@ import Animated, {
   withRepeat,
   withTiming,
   withSequence,
+  SharedValue,
 } from "react-native-reanimated";
+import PropTypes from 'prop-types';
 
 interface SkeletonPlaceholderProps {
   children?: React.ReactNode;
@@ -52,6 +54,15 @@ interface ItemProps {
   children?: React.ReactNode;
 }
 
+// Define the context type properly
+interface SkeletonContextType {
+  backgroundColor: string;
+  highlightColor: string;
+  animatedStyle: {
+    opacity?: SharedValue<number> | number;
+  };
+}
+
 const SkeletonItem: React.FC<ItemProps> = ({ children, ...restProps }) => {
   // Create a context to get the parent's background and highlight colors
   const context = React.useContext(SkeletonContext);
@@ -75,10 +86,10 @@ const SkeletonItem: React.FC<ItemProps> = ({ children, ...restProps }) => {
 };
 
 // Create a context to share animation and colors
-const SkeletonContext = React.createContext({
+const SkeletonContext = React.createContext<SkeletonContextType>({
   backgroundColor: "#E1E9EE",
   highlightColor: "#F2F8FC",
-  animatedStyle: {} as any,
+  animatedStyle: {},
 });
 
 const SkeletonPlaceholder: React.FC<SkeletonPlaceholderProps> & {
@@ -124,6 +135,14 @@ const SkeletonPlaceholder: React.FC<SkeletonPlaceholderProps> & {
       {children}
     </SkeletonContext.Provider>
   );
+};
+
+// Add PropTypes validation
+SkeletonPlaceholder.propTypes = {
+  children: PropTypes.node,
+  backgroundColor: PropTypes.string,
+  highlightColor: PropTypes.string,
+  speed: PropTypes.number,
 };
 
 // Attach Item component to SkeletonPlaceholder

@@ -1,12 +1,16 @@
 import apiClient from "../apiClient";
 import { ACTIVITY_ENDPOINTS } from "../endpoints";
 import {
-  GardenActivity,
-  CreateActivityDto,
-  CreateEvaluationDto,
-  ActivityEvaluation,
   ActivityType,
-} from "@/types";
+} from "@/types/activities/activity.types";
+import {
+  CreateActivityDto,
+  GardenActivityDto,
+  PaginatedGardenActivitiesResultDto,
+  GardenActivityAnalyticsDto,
+  ActivityStatsResponseDto,
+  PaginationMeta,
+} from "@/types/activities/dtos";
 
 /**
  * Activity Service
@@ -15,66 +19,26 @@ import {
  */
 class ActivityService {
   /**
-   * Get garden activities
-   * @param params Query parameters
-   * @returns List of activities
+   * Get garden activities (paginated and filtered)
+   * @param params Query parameters including pagination and filters
+   * @returns Paginated list of activities
    */
   async getActivities(params?: {
+    gardenId?: number;
     type?: ActivityType;
-    startDate?: string;
-    endDate?: string;
-  }): Promise<GardenActivity[]> {
+    startDate?: string; // ISO 8601
+    endDate?: string; // ISO 8601
+    page?: number;
+    limit?: number;
+  }): Promise<PaginatedGardenActivitiesResultDto> {
     try {
-      const response = await apiClient.get(ACTIVITY_ENDPOINTS.LIST, { params });
-      return response.data?.data || [];
+      const response = await apiClient.get(ACTIVITY_ENDPOINTS.LIST_CREATE, { params });
+      // Assuming the backend returns data in the shape of PaginatedGardenActivitiesResultDto directly
+      console.log("response.data.data", response.data.data);
+      return response.data.data || { items: [], meta: { totalItems: 0, itemsPerPage: params?.limit || 10, currentPage: params?.page || 1, totalPages: 0 } };
     } catch (error) {
       console.error("Error fetching activities:", error);
-      return [];
-    }
-  }
-
-  /**
-   * Get activities for a specific garden
-   * @param gardenId Garden ID
-   * @param params Query parameters
-   * @returns List of activities for the garden
-   */
-  async getActivitiesByGarden(
-    gardenId: number | string,
-    params?: {
-      type?: ActivityType;
-      startDate?: string;
-      endDate?: string;
-    }
-  ): Promise<GardenActivity[]> {
-    try {
-      const response = await apiClient.get(
-        ACTIVITY_ENDPOINTS.LIST_BY_GARDEN(gardenId),
-        { params }
-      );
-      return response.data?.data || [];
-    } catch (error) {
-      console.error(`Error fetching activities for garden ${gardenId}:`, error);
-      return [];
-    }
-  }
-
-  /**
-   * Get activity by ID
-   * @param activityId Activity ID
-   * @returns Activity details
-   */
-  async getActivityById(
-    activityId: number | string
-  ): Promise<GardenActivity | null> {
-    try {
-      const response = await apiClient.get(
-        ACTIVITY_ENDPOINTS.DETAIL(activityId)
-      );
-      return response.data?.data || null;
-    } catch (error) {
-      console.error(`Error fetching activity ${activityId}:`, error);
-      return null;
+      return { items: [], meta: { totalItems: 0, itemsPerPage: params?.limit || 10, currentPage: params?.page || 1, totalPages: 0 } };
     }
   }
 
@@ -85,13 +49,13 @@ class ActivityService {
    */
   async createActivity(
     activityData: CreateActivityDto
-  ): Promise<GardenActivity | null> {
+  ): Promise<GardenActivityDto | null> {
     try {
       const response = await apiClient.post(
-        ACTIVITY_ENDPOINTS.CREATE,
+        ACTIVITY_ENDPOINTS.LIST_CREATE,
         activityData
       );
-      return response.data?.data || null;
+      return response.data.data || null; // Assuming backend returns the created activity object directly
     } catch (error) {
       console.error("Error creating activity:", error);
       return null;
@@ -99,115 +63,60 @@ class ActivityService {
   }
 
   /**
-   * Evaluate an activity
+   * Get activity by ID
    * @param activityId Activity ID
-   * @param evaluationData Evaluation data
-   * @returns Activity evaluation
+   * @returns Activity details
    */
-  async evaluateActivity(
-    activityId: number | string,
-    evaluationData: CreateEvaluationDto
-  ): Promise<ActivityEvaluation | null> {
+  async getActivityById(
+    activityId: number | string
+  ): Promise<GardenActivityDto | null> {
     try {
-      const response = await apiClient.post(
-        ACTIVITY_ENDPOINTS.EVALUATE(activityId),
-        evaluationData
+      const response = await apiClient.get(
+        ACTIVITY_ENDPOINTS.DETAIL(activityId)
       );
-      return response.data?.data || null;
+      return response.data.data || null; // Assuming backend returns the activity object directly
     } catch (error) {
-      console.error(`Error evaluating activity ${activityId}:`, error);
+      console.error(`Error fetching activity ${activityId}:`, error);
       return null;
     }
   }
 
   /**
-   * Get recent activities for a garden
-   * @param gardenId Garden ID
-   * @param limit Maximum number of activities to return
-   * @returns List of recent activities
-   */
-  async getRecentActivities(
-    gardenId: number | string,
-    limit: number = 5
-  ): Promise<any[]> {
-    try {
-      const activities = await this.getActivitiesByGarden(gardenId, {
-        endDate: new Date().toISOString(),
-      });
-
-      // Sort by date (newest first) and limit results
-      return activities
-        .sort((a, b) => {
-          const dateA = new Date(a.timestamp).getTime();
-          const dateB = new Date(b.timestamp).getTime();
-          return dateB - dateA;
-        })
-        .slice(0, limit)
-        .map((activity) => ({
-          ...activity,
-          completed: true, // Recent activities are already completed
-        }));
-    } catch (error) {
-      console.error(
-        `Error fetching recent activities for garden ${gardenId}:`,
-        error
-      );
-      return [];
-    }
-  }
-
-  /**
-   * Get upcoming scheduled activities for a garden
-   * @param gardenId Garden ID
-   * @param limit Maximum number of activities to return
-   * @returns List of upcoming scheduled activities
-   */
-  async getUpcomingSchedules(
-    gardenId: number | string,
-    limit: number = 5
-  ): Promise<any[]> {
-    try {
-      // This would typically come from a different endpoint in production
-      // For now, we'll return mock data
-      return [];
-    } catch (error) {
-      console.error(
-        `Error fetching upcoming schedules for garden ${gardenId}:`,
-        error
-      );
-      return [];
-    }
-  }
-
-  /**
-   * Complete an activity
+   * Get activity analysis by ID
    * @param activityId Activity ID
-   * @returns Whether the operation was successful
+   * @returns Activity analysis details
    */
-  async completeActivity(activityId: number | string): Promise<boolean> {
+  async getActivityAnalysis(
+    activityId: number | string
+  ): Promise<GardenActivityAnalyticsDto | null> {
     try {
-      // In a real implementation, this would call an API endpoint
-      // For now, we'll simulate success
-      return true;
+      const response = await apiClient.get(
+        ACTIVITY_ENDPOINTS.ANALYSIS(activityId)
+      );
+      return response.data.data || null;
     } catch (error) {
-      console.error(`Error completing activity ${activityId}:`, error);
-      return false;
+      console.error(`Error fetching activity analysis for ${activityId}:`, error);
+      return null;
     }
   }
 
   /**
-   * Skip a scheduled activity
-   * @param scheduleId Schedule ID
-   * @returns Whether the operation was successful
+   * Get activity statistics
+   * @param params Query parameters for statistics
+   * @returns Activity statistics
    */
-  async skipScheduledActivity(scheduleId: number | string): Promise<boolean> {
+  async getActivityStats(params: {
+    gardenId?: number;
+    activityType?: ActivityType;
+    startDate: string; // ISO 8601 Required
+    endDate: string; // ISO 8601 Required
+  }): Promise<ActivityStatsResponseDto | null> {
     try {
-      // In a real implementation, this would call an API endpoint
-      // For now, we'll simulate success
-      return true;
+      const response = await apiClient.get(ACTIVITY_ENDPOINTS.STATS, { params });
+      return response.data.data || null;
     } catch (error) {
-      console.error(`Error skipping scheduled activity ${scheduleId}:`, error);
-      return false;
+      console.error("Error fetching activity statistics:", error);
+      return null;
     }
   }
 }

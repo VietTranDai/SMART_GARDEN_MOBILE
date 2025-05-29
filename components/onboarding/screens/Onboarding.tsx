@@ -114,7 +114,8 @@ export default function OnboardingScreen() {
           return placeholderImages.welcome;
       }
     } catch (error) {
-      // Fallback to default image if there's an error
+      console.error("Failed to get image source:", error);
+
       return {
         uri: "https://images.unsplash.com/photo-1416879595882-3373a0480b5b",
       };

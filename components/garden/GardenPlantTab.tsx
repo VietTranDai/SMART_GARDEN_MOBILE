@@ -8,9 +8,6 @@ import {
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/ui/useAppTheme";
-import { GardenPlantDetails } from "@/types";
-
-import PlantDetailCard from "@/components/garden/PlantDetailCard";
 import {
   ConditionDetailStats,
   EnvironmentalAdviceItem,
@@ -387,7 +384,6 @@ const getStatusStyle = (
 };
 
 interface GardenPlantTabProps {
-  plantDetails?: GardenPlantDetails;
   plantStats: PlantStatisticsData | null;
   plantDetailedAdvice: PlantAdviceData | null;
   plantStatsLoading: boolean;
@@ -395,7 +391,6 @@ interface GardenPlantTabProps {
 }
 
 const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
-  plantDetails,
   plantStats,
   plantDetailedAdvice,
   plantStatsLoading,
@@ -416,7 +411,7 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
     );
   }
 
-  if (!plantDetails && !plantStats && !plantDetailedAdvice) {
+  if (!plantStats && !plantDetailedAdvice) {
     return (
       <View
         style={[
@@ -1156,14 +1151,6 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
             }
           )}
         </SectionCard>
-      )}
-
-      {/* Fallback for basic plantDetails if new data is missing */}
-      {plantDetails && !plantStats && !plantDetailedAdvice && (
-        <PlantDetailCard
-          plantDetails={plantDetails}
-          onViewFullDetails={() => {}}
-        />
       )}
     </ScrollView>
   );

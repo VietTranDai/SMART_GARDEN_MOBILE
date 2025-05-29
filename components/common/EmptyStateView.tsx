@@ -24,7 +24,7 @@ const EmptyStateView: React.FC<EmptyStateViewProps> = ({
   return (
     <View style={styles.container}>
       <MaterialCommunityIcons
-        name={icon}
+        name={icon as any}
         size={64}
         color={theme.textSecondary}
       />

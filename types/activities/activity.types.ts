@@ -38,7 +38,6 @@ export interface GardenActivity {
   plantGrowStage?: string;
 
   // Weather and sensor data
-  weatherObservationId?: number;
   humidity?: number;
   temperature?: number;
   lightIntensity?: number;
@@ -52,30 +51,9 @@ export interface GardenActivity {
   reason?: string;
   notes?: string;
 
-  // Relation counts
-  evaluationsCount?: number;
-
   // Timestamps
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-/**
- * Extended GardenActivity with UI-specific properties
- */
-export interface ActivityDisplay extends GardenActivity {
-  completed: boolean;
-}
-
-/**
- * Display interface for scheduled activities
- */
-export interface ScheduleDisplay {
-  id: number;
-  activityType: ActivityType;
-  name: string;
-  scheduledTime: string;
-  gardenId: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ActivityEvaluation {

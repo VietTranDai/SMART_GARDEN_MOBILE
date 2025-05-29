@@ -36,8 +36,7 @@ const WeatherSection = memo(
     const theme = useAppTheme();
     const { getAnimatedStyle } = useSectionAnimation("weather", 50);
 
-    // Get formatted weather data
-    const { current, hourly, daily, tip, getWeatherTip } =
+    const { current, hourly, daily, getWeatherTip } =
       useWeatherDataDisplay(
         gardenId,
         gardenWeatherData,

@@ -8,7 +8,6 @@ import { useGardenDetail } from "./garden/useGardenDetail";
 import useSensorData, { getSensorStatus } from "./sensor/useSensorData";
 import useWeatherData from "./weather/useWeatherData";
 import useAlertData from "./alert/useAlertData";
-import useActivityData from "./activity/useActivityData";
 import gardenService from "@/service/api/garden.service";
 import useGardenManagement from "./garden/useGardenManagement";
 
@@ -30,7 +29,6 @@ export default function useHomeData() {
   const sensorDataHook = useSensorData();
   const weatherDataHook = useWeatherData();
   const alertDataHookInstance = useAlertData();
-  const activityDataHook = useActivityData();
 
   // UI state
   const [refreshing, setRefreshing] = useState(false);
@@ -44,24 +42,9 @@ export default function useHomeData() {
 
   // Destructure functions from other data hooks for stable dependencies
   const { calculateOptimalTimes, getWeatherTip } = weatherDataHook;
-  const {
-    alertsLoading,
-    alertsError,
-    gardenAlerts: gardenAlertsFromAlertHook,
-    resolveAlert,
-    ignoreAlert,
-  } = alertDataHookInstance;
-  const {
-    completeActivity,
-    completeWateringSchedule,
-    skipScheduledActivity,
-    activitiesLoading,
-    schedulesLoading,
-    recentActivities,
-    upcomingSchedules,
-  } = activityDataHook;
+  const { alertsLoading, alertsError, gardenAlerts: gardenAlertsFromAlertHook } =
+    alertDataHookInstance;
 
-  // ✅ NEW: Sync ref với selectedGardenId
   useEffect(() => {
     currentGardenIdRef.current = selectedGardenId;
   }, [selectedGardenId]);
@@ -112,7 +95,6 @@ export default function useHomeData() {
           weatherDataHook.fetchCompleteWeatherData(gardenId),
           weatherDataHook.fetchWeatherAdvice(gardenId),
           alertDataHookInstance.fetchGardenAlerts(gardenId),
-          activityDataHook.loadActivitiesAndSchedules(gardenId),
         ]);
 
         const alertCount = alertDataHookInstance.getActiveAlertCount(gardenId);
@@ -231,7 +213,6 @@ export default function useHomeData() {
     selectedGardenError: gardenDetailHook.error,
     selectedGardenPhotos: gardenDetailHook.photos,
     selectedGardenAlerts: gardenDetailHook.alerts,
-    selectedGardenActivities: gardenDetailHook.activities,
     selectedGardenWateringSchedule: gardenDetailHook.wateringSchedule,
     selectedGardenCurrentWeather: gardenDetailHook.currentWeather,
     selectedGardenHourlyForecast: gardenDetailHook.hourlyForecast,
@@ -257,12 +238,6 @@ export default function useHomeData() {
     alertsLoading, // State
     alertsError, // State
 
-    // Activities
-    recentActivities, // State
-    upcomingSchedules, // State
-    activitiesLoading, // State
-    schedulesLoading, // State
-
     // Alerts from alertData hook
     gardenAlerts: gardenAlertsFromAlertHook, // State
 
@@ -273,10 +248,5 @@ export default function useHomeData() {
     fetchWeatherAdvice: weatherDataHook.fetchWeatherAdvice, // Expose direct stable ref
     fetchGardenAdvice, // Stable
     calculateOptimalTimes, // Stable
-    resolveAlert, // Stable
-    ignoreAlert, // Stable
-    completeActivity, // Stable
-    completeWateringSchedule, // Stable
-    skipScheduledActivity, // Stable
   };
 }

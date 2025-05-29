@@ -21,23 +21,6 @@ import { Alert, AlertType, Severity } from "@/types";
 
 const { width } = Dimensions.get("window");
 
-// Define alert interface based on the application's data structure
-// interface GardenAlert {
-//   id: string | number;
-//   type: string;
-//   title: string;
-//   message: string;
-//   severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-//   timestamp: string;
-//   sensorType?: SensorType;
-//   sensorId?: string | number;
-//   sensorValue?: number;
-//   sensorUnit?: string;
-//   isRead?: boolean;
-//   isResolved?: boolean;
-//   gardenId?: number;
-// }
-
 interface AlertDetailsModalProps {
   isVisible: boolean;
   onClose: () => void;

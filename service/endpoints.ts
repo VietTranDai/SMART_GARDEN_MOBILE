@@ -87,29 +87,18 @@ export const SENSOR_ENDPOINTS = {
 
 // Task endpoints
 export const TASK_ENDPOINTS = {
-  LIST: "/tasks/me",
-  LIST_BY_GARDEN: (gardenId: string | number) =>
-    `/tasks/me/gardens/${gardenId}`,
-  DETAIL: (taskId: string | number) => `/tasks/me/${taskId}`,
-  CREATE: "/tasks/me",
-  CREATE_FOR_GARDEN: (gardenId: string | number) =>
-    `/tasks/me/gardens/${gardenId}`,
-  UPDATE: (taskId: string | number) => `/tasks/me/${taskId}`,
-  DELETE: (taskId: string | number) => `/tasks/me/${taskId}`,
-  COMPLETE: (taskId: string | number) => `/tasks/me/${taskId}/complete`,
-  SKIP: (taskId: string | number) => `/tasks/me/${taskId}/skip`,
-  UPLOAD_PHOTO: (taskId: string | number) => `/tasks/me/${taskId}/photo`,
+  TASKS_BASE: "/tasks", // GET all tasks (with query params for filtering)
+  TASK_BY_ID: (taskId: string | number) => `/tasks/${taskId}`, // GET, PUT, DELETE specific task
+  CREATE: "/tasks", // POST new task
 };
 
 // Activity endpoints
 export const ACTIVITY_ENDPOINTS = {
-  LIST: "/activities/me",
-  LIST_BY_GARDEN: (gardenId: string | number) =>
-    `/activities/me/gardens/${gardenId}`,
-  DETAIL: (activityId: string | number) => `/activities/me/${activityId}`,
-  CREATE: "/activities/me",
-  EVALUATE: (activityId: string | number) =>
-    `/activities/me/${activityId}/evaluate`,
+  LIST_CREATE: "/activities", // GET for list (with query params), POST for create
+  DETAIL: (activityId: string | number) => `/activities/${activityId}`, // GET for details
+  ANALYSIS: (activityId: string | number) => `/activities/${activityId}/analysis`, // GET for analysis
+  STATS: "/activities/stats", // GET for statistics
+  // Removed old endpoints like LIST, LIST_BY_GARDEN, CREATE (as it's combined), EVALUATE
 };
 
 // Watering schedule endpoints

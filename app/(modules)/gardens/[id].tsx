@@ -38,7 +38,6 @@ export default function GardenDetailScreen() {
     hourlyForecast,
     dailyForecast,
     alerts,
-    activities,
     sensors,
     isLoading,
     isRefreshing,
@@ -59,17 +58,13 @@ export default function GardenDetailScreen() {
   const openWeatherModal = () => setWeatherModalVisible(true);
   const closeWeatherModalLocal = () => setWeatherModalVisible(false);
 
-  // Safe plant details - convert null to undefined
-  const safePlantDetails = plantDetails || undefined;
-
   // Tab components
   const OverviewTab = useCallback(
     () => (
       <GardenOverviewTab
         garden={garden}
-        plantDetails={safePlantDetails}
+        plantDetails={plantDetails || undefined}
         alerts={alerts}
-        activities={activities}
         onResolveAlert={(alertId: string) => resolveAlert(Number(alertId))}
         onIgnoreAlert={(alertId: string) => ignoreAlert(Number(alertId))}
         onShowWeather={openWeatherModal}
@@ -78,9 +73,8 @@ export default function GardenDetailScreen() {
     ),
     [
       garden,
-      safePlantDetails,
+      plantDetails,
       alerts,
-      activities,
       id,
       currentWeather,
       resolveAlert,
@@ -105,7 +99,6 @@ export default function GardenDetailScreen() {
   const PlantTab = useCallback(
     () => (
       <GardenPlantTab
-        plantDetails={safePlantDetails}
         plantStats={plantStats}
         plantDetailedAdvice={plantDetailedAdvice}
         plantStatsLoading={plantStatsLoading}
@@ -113,7 +106,6 @@ export default function GardenDetailScreen() {
       />
     ),
     [
-      safePlantDetails,
       plantStats,
       plantDetailedAdvice,
       plantStatsLoading,

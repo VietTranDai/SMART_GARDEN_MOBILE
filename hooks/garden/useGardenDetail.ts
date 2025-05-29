@@ -63,7 +63,6 @@ export function useGardenDetail({ gardenId }: { gardenId: string | null }) {
   // Photos, alerts, activities and schedules
   const [gardenPhotos, setGardenPhotos] = useState<GardenPhoto[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [activities, setActivities] = useState<any[]>([]);
   const [wateringSchedule, setWateringSchedule] = useState<WateringSchedule[]>(
     []
   );
@@ -116,7 +115,6 @@ export function useGardenDetail({ gardenId }: { gardenId: string | null }) {
         sensorHistoryData,
         photosData,
         alertsData,
-        activitiesData,
         weatherData,
         fetchedPlantStats,
         fetchedPlantDetailedAdvice,
@@ -125,7 +123,6 @@ export function useGardenDetail({ gardenId }: { gardenId: string | null }) {
         gardenService.getGardenSensorHistory(id),
         gardenService.getGardenPhotos(id),
         alertService.getAlertsByGarden(id),
-        activityService.getActivities(),
         weatherService.getCurrentAndForecast(id),
         gardenService.getPlantStatistics(id).catch((err) => {
           console.error("Lỗi tải thống kê cây trồng:", err);
@@ -150,11 +147,6 @@ export function useGardenDetail({ gardenId }: { gardenId: string | null }) {
 
       setPlantStats(fetchedPlantStats);
       setPlantDetailedAdvice(fetchedPlantDetailedAdvice);
-
-      const gardenActivities = activitiesData.filter(
-        (activity: any) => String(activity.gardenId) === String(id)
-      );
-      setActivities(gardenActivities);
 
       setWateringSchedule(scheduleData);
 
@@ -291,38 +283,6 @@ export function useGardenDetail({ gardenId }: { gardenId: string | null }) {
       setIsSensorDataLoading(false);
     }
   }, []);
-
-  /**
-   * Fetch garden advice
-   */
-  const fetchGardenAdvice = useCallback(async (id: string) => {
-    try {
-      setAdviceLoading(true);
-      setAdviceError(null);
-      const advice = await gardenService.getGardenAdvice(id);
-      if (advice && advice.length > 0) {
-        setGardenAdvice(advice[0]);
-      } else {
-        setGardenAdvice(null);
-      }
-    } catch (err) {
-      console.error("Error fetching garden advice:", err);
-      setAdviceError("Không thể tải lời khuyên cho vườn.");
-    } finally {
-      setAdviceLoading(false);
-    }
-  }, []);
-
-  /**
-   * Modal control functions
-   */
-  const showGenericAdviceModal = useCallback(
-    (id: string) => {
-      setAdviceModalVisible(true);
-      fetchGardenAdvice(id);
-    },
-    [fetchGardenAdvice]
-  );
 
   const closeGenericAdviceModal = useCallback(() => {
     setAdviceModalVisible(false);
@@ -528,7 +488,6 @@ export function useGardenDetail({ gardenId }: { gardenId: string | null }) {
     gardenPhotos,
     photos: gardenPhotos,
     alerts,
-    activities,
     wateringSchedule,
     currentWeather,
     hourlyForecast,
@@ -540,7 +499,6 @@ export function useGardenDetail({ gardenId }: { gardenId: string | null }) {
     genericGardenAdvice,
     genericAdviceLoading,
     genericAdviceError,
-    showGenericAdviceModal,
     closeGenericAdviceModal,
     weatherModalVisible,
     sensors,

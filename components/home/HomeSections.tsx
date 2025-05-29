@@ -2,12 +2,7 @@ import React, { memo, useMemo } from "react";
 import { View, StyleSheet } from "react-native";
 import GardenSection from "./GardenSection";
 import WeatherSection from "./WeatherSection";
-import ActivitySection from "./ActivitySection";
 import { GardenDisplayDto } from "@/types/gardens/dtos";
-import {
-  ActivityDisplay,
-  ScheduleDisplay,
-} from "@/types/activities/activity.types";
 import {
   GardenWeatherData,
   WeatherObservation,
@@ -20,7 +15,6 @@ export enum SectionType {
   GARDENS = "GARDENS",
   WEATHER = "WEATHER",
   ALERTS = "ALERTS",
-  ACTIVITY = "ACTIVITY",
 }
 
 // Structure for section data
@@ -48,10 +42,6 @@ interface HomeSectionsProps {
   // Alert data
   gardenAlerts: Record<number, Alert[]>;
 
-  // Activity data
-  recentActivities: ActivityDisplay[];
-  upcomingSchedules: ScheduleDisplay[];
-
   // Actions and handlers
   onShowAdvice: (gardenId: number) => void;
   onShowWeatherDetail: (gardenId: number) => void;
@@ -67,9 +57,6 @@ interface HomeSectionsProps {
     value: number,
     type: SensorType
   ) => "normal" | "warning" | "critical";
-
-  // Added
-  onNavigateToDetail?: (gardenId: number) => void;
 }
 
 const HomeSections = memo(
@@ -82,8 +69,6 @@ const HomeSections = memo(
     weatherData,
     gardenWeatherData,
     gardenAlerts,
-    recentActivities,
-    upcomingSchedules,
     onShowAdvice,
     onShowWeatherDetail,
     onScrollToWeatherSection,
@@ -91,7 +76,6 @@ const HomeSections = memo(
     adviceLoading,
     weatherDetailLoading,
     getSensorStatus,
-    onNavigateToDetail,
   }: HomeSectionsProps) => {
     // Find selected garden object
     const selectedGarden = useMemo(() => {
@@ -121,7 +105,6 @@ const HomeSections = memo(
           adviceLoading={adviceLoading}
           weatherDetailLoading={weatherDetailLoading}
           getSensorStatus={getSensorStatus}
-          onNavigateToDetail={onNavigateToDetail}
         />
 
         {/* Weather Section */}
@@ -132,15 +115,6 @@ const HomeSections = memo(
             gardenWeatherData={gardenWeatherData}
             weatherData={weatherData}
             onShowDetail={onShowWeatherDetail}
-          />
-        )}
-
-        {/* Activity Section */}
-        {isSectionVisible(SectionType.ACTIVITY) && (
-          <ActivitySection
-            gardenId={selectedGardenId}
-            recentActivities={recentActivities}
-            upcomingSchedules={upcomingSchedules}
           />
         )}
       </View>

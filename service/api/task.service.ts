@@ -1,154 +1,100 @@
 import apiClient from "../apiClient";
-
 import { TASK_ENDPOINTS } from "../endpoints";
 import {
+  Task,
   CreateTaskDto,
   UpdateTaskDto,
-  PhotoEvaluation,
-  Task,
-  TaskStatus,
+  GetTasksQueryDto,
+  PaginatedTaskResult,
 } from "@/types";
 
 /**
  * Task Service
  *
- * Handles all task-related API calls
+ * Handles all task-related API calls aligned with the new backend structure.
+ * Uses the updated API endpoints defined in the TaskController.
  */
 class TaskService {
   /**
-   * Get tasks for the current user
-   * @param params Query parameters
-   * @returns List of tasks
+   * Retrieves a paginated list of tasks with optional filters.
+   * 
+   * @param query Optional filtering and pagination parameters (gardenerId, gardenId, status, etc.)
+   * @returns A paginated list of tasks with metadata
    */
-  async getTasks(params?: {
-    status?: TaskStatus;
-    dueDate?: string;
-  }): Promise<Task[]> {
-    const response = await apiClient.get(TASK_ENDPOINTS.LIST, { params });
-    return response.data.data;
+  async getTasks(query?: GetTasksQueryDto): Promise<PaginatedTaskResult> {
+    try {
+      const response = await apiClient.get(TASK_ENDPOINTS.TASKS_BASE, { params: query });
+      return response.data;
+    } catch (error) {
+      console.error('[TaskService] Error fetching tasks:', error);
+      throw error;
+    }
   }
 
   /**
-   * Get tasks for a specific garden
-   * @param gardenId Garden ID
-   * @param params Query parameters
-   * @returns List of tasks for the garden
-   */
-  async getTasksByGarden(
-    gardenId: number | string,
-    params?: { status?: TaskStatus; dueDate?: string }
-  ): Promise<Task[]> {
-    const response = await apiClient.get(
-      TASK_ENDPOINTS.LIST_BY_GARDEN(gardenId),
-      {
-        params,
-      }
-    );
-    return response.data.data;
-  }
-
-  /**
-   * Get task by ID
-   * @param taskId Task ID
-   * @returns Task details
+   * Retrieves a specific task by its ID.
+   * 
+   * @param taskId The ID of the task to retrieve
+   * @returns The requested task data
    */
   async getTaskById(taskId: number | string): Promise<Task> {
-    const response = await apiClient.get(TASK_ENDPOINTS.DETAIL(taskId));
-    return response.data.data;
+    try {
+      const response = await apiClient.get(TASK_ENDPOINTS.TASK_BY_ID(taskId));
+      return response.data;
+    } catch (error) {
+      console.error(`[TaskService] Error fetching task ${taskId}:`, error);
+      throw error;
+    }
   }
 
   /**
-   * Create a new task
-   * @param taskData Task creation data
-   * @returns Created task
+   * Creates a new task.
+   * 
+   * @param createTaskDto Data for creating a new task (gardenerId, gardenId, type, description, etc.)
+   * @returns The newly created task
    */
-  async createTask(taskData: CreateTaskDto): Promise<Task> {
-    const response = await apiClient.post(TASK_ENDPOINTS.CREATE, taskData);
-    return response.data.data;
+  async createTask(createTaskDto: CreateTaskDto): Promise<Task> {
+    try {
+      const response = await apiClient.post(TASK_ENDPOINTS.CREATE, createTaskDto);
+      return response.data;
+    } catch (error) {
+      console.error('[TaskService] Error creating task:', error);
+      throw error;
+    }
   }
 
   /**
-   * Create a task for a specific garden
-   * @param gardenId Garden ID
-   * @param taskData Task creation data
-   * @returns Created task
-   */
-  async createTaskForGarden(
-    gardenId: number | string,
-    taskData: CreateTaskDto
-  ): Promise<Task> {
-    const response = await apiClient.post(
-      TASK_ENDPOINTS.CREATE_FOR_GARDEN(gardenId),
-      taskData
-    );
-    return response.data.data;
-  }
-
-  /**
-   * Update a task
-   * @param taskId Task ID
-   * @param taskData Task update data
-   * @returns Updated task
+   * Updates an existing task.
+   * 
+   * @param taskId The ID of the task to update
+   * @param updateTaskDto Data to update (can include status, description, dueDate, etc.)
+   * @returns The updated task
    */
   async updateTask(
     taskId: number | string,
-    taskData: UpdateTaskDto
+    updateTaskDto: UpdateTaskDto
   ): Promise<Task> {
-    const response = await apiClient.patch(
-      TASK_ENDPOINTS.DETAIL(taskId),
-      taskData
-    );
-    return response.data.data;
+    try {
+      const response = await apiClient.put(TASK_ENDPOINTS.TASK_BY_ID(taskId), updateTaskDto);
+      return response.data;
+    } catch (error) {
+      console.error(`[TaskService] Error updating task ${taskId}:`, error);
+      throw error;
+    }
   }
 
   /**
-   * Delete a task
-   * @param taskId Task ID
+   * Deletes a task.
+   * 
+   * @param taskId The ID of the task to delete
    */
   async deleteTask(taskId: number | string): Promise<void> {
-    await apiClient.delete(TASK_ENDPOINTS.DELETE(taskId));
-  }
-
-  /**
-   * Mark a task as completed
-   * @param taskId Task ID
-   * @returns Updated task
-   */
-  async completeTask(taskId: number | string): Promise<Task> {
-    const response = await apiClient.post(TASK_ENDPOINTS.COMPLETE(taskId));
-    return response.data.data;
-  }
-
-  /**
-   * Mark a task as skipped
-   * @param taskId Task ID
-   * @returns Updated task
-   */
-  async skipTask(taskId: number | string): Promise<Task> {
-    const response = await apiClient.post(TASK_ENDPOINTS.SKIP(taskId));
-    return response.data.data;
-  }
-
-  /**
-   * Upload a photo for a task (photo evaluation)
-   * @param taskId Task ID
-   * @param photoData Form data with photo
-   * @returns Photo evaluation
-   */
-  async uploadTaskPhoto(
-    taskId: number | string,
-    photoData: FormData
-  ): Promise<PhotoEvaluation> {
-    const response = await apiClient.post(
-      TASK_ENDPOINTS.UPLOAD_PHOTO(taskId),
-      photoData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      }
-    );
-    return response.data.data;
+    try {
+      await apiClient.delete(TASK_ENDPOINTS.TASK_BY_ID(taskId));
+    } catch (error) {
+      console.error(`[TaskService] Error deleting task ${taskId}:`, error);
+      throw error;
+    }
   }
 }
 

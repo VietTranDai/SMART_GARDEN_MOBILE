@@ -14,10 +14,7 @@ import {
   GardenPhoto,
   SensorHistory,
 } from "@/types/gardens/garden.types";
-import {
-  PlantStatisticsData,
-  PlantAdviceData,
-} from "@/types/gardens/plant-insights.types";
+import { PlantAdviceData, PlantStatisticsData } from "@/types/plants/plant-insights.types";
 
 /**
  * Garden Service

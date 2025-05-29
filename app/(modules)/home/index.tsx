@@ -55,10 +55,6 @@ import {
   GardenWeatherData,
 } from "@/types/weather/weather.types";
 import { Alert } from "@/types/alerts/alert.types";
-import {
-  ActivityDisplay,
-  ScheduleDisplay,
-} from "@/types/activities/activity.types";
 
 // Import getSensorStatus from the useSensorData hook
 // import { getSensorStatus } from "@/hooks/useSensorData"; // This is not used directly here, passed from useHomeData
@@ -141,13 +137,6 @@ interface AlertSectionProps {
   theme: any;
 }
 
-interface ActivitySectionProps {
-  recentActivities: ActivityDisplay[];
-  upcomingSchedules: ScheduleDisplay[];
-  selectedGardenId: number | null;
-  animationValue: Animated.Value;
-  theme: any;
-}
 
 // Define the props for DynamicSections
 interface DynamicSectionsProps {
@@ -160,8 +149,6 @@ interface DynamicSectionsProps {
     activity: Animated.Value;
   };
   gardenAlerts: Record<number, Alert[]>;
-  recentActivities: ActivityDisplay[];
-  upcomingSchedules: ScheduleDisplay[];
   gardenWeatherData: Record<number, GardenWeatherData>;
   theme: any;
   handleShowWeatherDetail: (gardenId: number | null) => void;
@@ -459,52 +446,7 @@ const AlertSection = memo((props: AlertSectionProps) => {
   );
 });
 
-const ActivitySection = memo((props: ActivitySectionProps) => {
-  const {
-    recentActivities,
-    upcomingSchedules,
-    selectedGardenId,
-    animationValue,
-    theme,
-  } = props;
 
-  const styles = useMemo(() => extendedHomeStyles(theme), [theme]);
-
-  const animatedStyle = {
-    opacity: animationValue,
-    transform: [
-      {
-        translateY: animationValue.interpolate({
-          inputRange: [0, 1],
-          outputRange: [20, 0],
-        }),
-      },
-    ],
-  };
-
-  const safeRecentActivities = useMemo(() => {
-    return Array.isArray(recentActivities) ? recentActivities : [];
-  }, [recentActivities]);
-
-  const safeUpcomingSchedules = useMemo(() => {
-    return Array.isArray(upcomingSchedules) ? upcomingSchedules : [];
-  }, [upcomingSchedules]);
-
-  return (
-    <Animated.View style={[styles.section, animatedStyle]}>
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>
-          Hoạt động
-        </Text>
-      </View>
-      <ActivityTimeline
-        recentActivities={safeRecentActivities}
-        upcomingSchedules={safeUpcomingSchedules}
-        selectedGardenId={selectedGardenId}
-      />
-    </Animated.View>
-  );
-});
 
 // Update DynamicSections to use the defined props
 const DynamicSections = memo((props: DynamicSectionsProps) => {
@@ -514,8 +456,6 @@ const DynamicSections = memo((props: DynamicSectionsProps) => {
     selectedGardenId,
     sectionAnimations,
     gardenAlerts,
-    recentActivities,
-    upcomingSchedules,
     gardenWeatherData,
     theme,
     handleShowWeatherDetail,
@@ -626,44 +566,16 @@ const DynamicSections = memo((props: DynamicSectionsProps) => {
     theme,
   ]);
 
-  const renderActivitySection = useCallback(() => {
-    // Ensure recentActivities and upcomingSchedules are arrays
-    const safeRecentActivities = Array.isArray(recentActivities)
-      ? recentActivities
-      : [];
-    const safeUpcomingSchedules = Array.isArray(upcomingSchedules)
-      ? upcomingSchedules
-      : [];
-
-    return (
-      <ActivitySection
-        recentActivities={safeRecentActivities}
-        upcomingSchedules={safeUpcomingSchedules}
-        selectedGardenId={selectedGardenId}
-        animationValue={sectionAnimations.activity}
-        theme={theme}
-      />
-    );
-  }, [
-    recentActivities,
-    upcomingSchedules,
-    selectedGardenId,
-    sectionAnimations.activity,
-    theme,
-  ]);
-
   const renderSection = useCallback(
     ({ item, index }: { item: Section; index: number }) => {
       switch (item.type) {
         case SectionType.WEATHER:
           return renderWeatherSection();
-        case SectionType.ACTIVITY:
-          return renderActivitySection();
         default:
           return null;
       }
     },
-    [renderWeatherSection, renderActivitySection]
+    [renderWeatherSection]
   );
 
   // Use try-catch to protect against any iteration errors
@@ -719,8 +631,6 @@ function HomeScreenContent() {
     getWeatherTip,
     getSensorIconName,
     getSensorStatus,
-    recentActivities,
-    upcomingSchedules,
     handleRefresh,
     gardenSensorData,
     weatherAdviceByGarden,
@@ -1123,17 +1033,8 @@ function HomeScreenContent() {
       visibleSections.push({ type: SectionType.WEATHER, visible: true });
     }
 
-    // Show activity section if there are activities or schedules và có vườn được chọn hợp lệ
-    if (
-      hasValidGardenSelected &&
-      ((Array.isArray(recentActivities) && recentActivities.length > 0) ||
-        (Array.isArray(upcomingSchedules) && upcomingSchedules.length > 0))
-    ) {
-      visibleSections.push({ type: SectionType.ACTIVITY, visible: true });
-    }
-
     return visibleSections;
-  }, [selectedGardenId, gardens, recentActivities, upcomingSchedules]);
+  }, [selectedGardenId, gardens]);
 
   // Get selected garden for display in modals
   const selectedGardenName = useMemo(() => {
@@ -1190,12 +1091,6 @@ function HomeScreenContent() {
           weatherData={weatherData}
           gardenWeatherData={gardenWeatherData || {}}
           gardenAlerts={gardenAlerts || {}}
-          recentActivities={
-            Array.isArray(recentActivities) ? recentActivities : []
-          }
-          upcomingSchedules={
-            Array.isArray(upcomingSchedules) ? upcomingSchedules : []
-          }
           onShowAdvice={handleShowAdvice}
           onShowWeatherDetail={handleShowWeatherDetail}
           onScrollToWeatherSection={handleScrollToWeatherSection}
@@ -1203,7 +1098,6 @@ function HomeScreenContent() {
           adviceLoading={gardenAdviceLoading || {}}
           weatherDetailLoading={weatherDetailLoading || {}}
           getSensorStatus={getSensorStatus}
-          onNavigateToDetail={handleNavigateToGardenDetail}
         />
       </ScrollView>
 

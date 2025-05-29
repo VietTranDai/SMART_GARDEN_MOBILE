@@ -410,6 +410,17 @@ export default function ModuleLayout() {
           }}
         />
 
+        {/* Hidden screen for creating tasks */}
+        <Tabs.Screen 
+          name="tasks/create" 
+          options={{
+            href: null, 
+            headerTitle: "Tạo công việc mới",
+            // You might want to use a custom header like in create.tsx or rely on Stack options
+            // For now, using a simple title. It will use the default header style.
+          }}
+        />
+
         {/* 5. Profile Tab - User profile and settings */}
         <Tabs.Screen
           name="profile/index"

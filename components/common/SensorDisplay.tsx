@@ -331,7 +331,7 @@ export default memo(function SensorDisplay({
       // Sử dụng function từ props nếu có, nếu không dùng từ service
       return getSensorIconName
         ? getSensorIconName(type)
-        : sensorService.getSensorIconName(type);
+        : sensorService.getSensorIcon(type);
     },
     [getSensorIconName]
   );
@@ -341,7 +341,7 @@ export default memo(function SensorDisplay({
   }, []);
 
   const getSensorUnitTextFunc = useCallback((unit: string) => {
-    return sensorService.getSensorUnitText(unit);
+    return sensorService.getSensorUnitText(unit as SensorUnit);
   }, []);
 
   // Function to render icons based on icon name
