@@ -2,843 +2,333 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  Platform,
-  FlatList,
+  SectionList,
   RefreshControl,
-  Image,
+  ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppTheme } from "@/hooks/ui/useAppTheme";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { Picker } from '@react-native-picker/picker';
-import { ActivityType } from "@/types/activities/activity.types";
-import { gardenService } from "@/service/api";
+
+// Import custom hooks
+import { useJournalData } from "../../../components/journal/hooks/useJournalData";
+import { useJournalStats } from "../../../components/journal/hooks/useJournalStats";
+
+// Import components
+import { JournalHeader } from "../../../components/journal/components/JournalHeader";
+import { JournalDetailedStats } from "../../../components/journal/components/JournalDetailedStats";
+import { JournalFilters } from "../../../components/journal/components/JournalFilters";
+import { JournalActivityItem } from "../../../components/journal/components/JournalActivityItem";
+import { JournalEmptyState } from "../../../components/journal/components/JournalEmptyState";
+import { ActivityAnalyticsModal } from "../../../components/journal/components/ActivityAnalyticsModal";
+
+// Import utils and types
+import { groupActivitiesByDate, filterActivities } from "../../../components/journal/utils/journalUtils";
+import { JournalState, ActivitySection } from "../../../components/journal/types";
+import { createJournalStyles } from "../../../components/journal/styles/journalStyles";
+import { GardenActivityDto } from "@/types/activities/dtos";
 import activityService from "@/service/api/activity.service";
-import { Garden } from "@/types";
-import { GardenActivityDto, PaginatedGardenActivitiesResultDto, PaginationMeta } from "@/types/activities/dtos";
 
 export default function JournalScreen() {
   const theme = useAppTheme();
-  const [selectedGardenId, setSelectedGardenId] = useState<string | undefined>(undefined);
-  const [selectedActivityType, setSelectedActivityType] = useState<string | undefined>(undefined);
-  const [gardens, setGardens] = useState<Garden[]>([]);
-  const [loadingGardens, setLoadingGardens] = useState(true);
-  const [gardenFetchError, setGardenFetchError] = useState<string | null>(null);
-  
-  const [activities, setActivities] = useState<GardenActivityDto[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState<PaginationMeta | null>(null);
-  const [page, setPage] = useState(1);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [activityStats, setActivityStats] = useState({
-    total: 0,
-    thisMonth: 0,
-    thisWeek: 0,
+  const styles = createJournalStyles(theme);
+
+  // UI State
+  const [uiState, setUiState] = useState<JournalState>({
+    searchQuery: '',
+    isSearchActive: false,
+    isStatsExpanded: false,
+    selectedDateRange: '30days',
   });
 
-  // Activity type translations
-  const activityTypeTranslations: Record<ActivityType, string> = {
-    [ActivityType.PLANTING]: "Trồng cây",
-    [ActivityType.WATERING]: "Tưới nước",
-    [ActivityType.FERTILIZING]: "Bón phân",
-    [ActivityType.PRUNING]: "Cắt tỉa",
-    [ActivityType.HARVESTING]: "Thu hoạch",
-    [ActivityType.PEST_CONTROL]: "Kiểm soát sâu bệnh",
-    [ActivityType.SOIL_TESTING]: "Kiểm tra đất",
-    [ActivityType.WEEDING]: "Làm cỏ",
-    [ActivityType.OTHER]: "Hoạt động khác",
+  // Analytics Modal State
+  const [analyticsModalVisible, setAnalyticsModalVisible] = useState(false);
+  const [selectedActivityId, setSelectedActivityId] = useState<number | null>(null);
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+  // Custom hooks
+  const {
+    data,
+    stats,
+    pagination,
+    fetchUserGardens,
+    fetchActivities,
+    fetchDashboardStats,
+    onRefresh,
+    loadMoreActivities,
+    updateTotalStats,
+  } = useJournalData();
+
+  const {
+    detailedStats,
+    statsLoading,
+    statsError,
+    fetchDetailedStats,
+  } = useJournalStats();
+
+  // Derived state
+  const currentFilters = {
+    selectedGardenId: uiState.selectedGardenId,
+    selectedActivityType: uiState.selectedActivityType,
   };
-  
-  // Fetch gardens for filter
-  const fetchUserGardens = useCallback(async () => {
-    try {
-      setLoadingGardens(true);
-      setGardenFetchError(null);
-      const userGardens = await gardenService.getGardens();
-      setGardens(userGardens || []);
-    } catch (err) {
-      console.error("Failed to fetch gardens for filter:", err);
-      setGardenFetchError("Không thể tải danh sách vườn để lọc.");
-    } finally {
-      setLoadingGardens(false);
-    }
+
+  const filteredActivities = filterActivities(data.activities, uiState.searchQuery);
+  const sections = groupActivitiesByDate(filteredActivities);
+  const hasActiveFilters = !!(uiState.selectedGardenId || uiState.selectedActivityType);
+
+  // Event handlers
+  const handleSearchChange = useCallback((query: string) => {
+    setUiState(prev => ({ ...prev, searchQuery: query }));
   }, []);
 
-  // Calculate activity stats
-  const calculateActivityStats = useCallback((activities: GardenActivityDto[] = [], meta: PaginationMeta | null = null) => {
-    const now = new Date();
-    const thisMonth = now.getMonth();
-    const thisYear = now.getFullYear();
-    
-    // Get first day of current week (Sunday)
-    const firstDayOfWeek = new Date(now);
-    const day = now.getDay();
-    const diff = now.getDate() - day;
-    firstDayOfWeek.setDate(diff);
-    firstDayOfWeek.setHours(0, 0, 0, 0);
-    
-    const activitiesThisMonth = activities.filter(activity => {
-      const activityDate = new Date(activity.timestamp);
-      return activityDate.getMonth() === thisMonth && activityDate.getFullYear() === thisYear;
-    }).length;
-    
-    const activitiesThisWeek = activities.filter(activity => {
-      const activityDate = new Date(activity.timestamp);
-      return activityDate >= firstDayOfWeek;
-    }).length;
-    
-    setActivityStats({
-      total: meta?.totalItems || activities.length,
-      thisMonth: activitiesThisMonth,
-      thisWeek: activitiesThisWeek,
+  const handleFilterChange = useCallback((filterType: 'garden' | 'activityType', value?: string) => {
+    setUiState(prev => {
+      const newState = { ...prev };
+      if (filterType === 'garden') {
+        newState.selectedGardenId = value;
+      } else if (filterType === 'activityType') {
+        newState.selectedActivityType = value;
+      }
+      return newState;
     });
-  }, []);
 
-  // Fetch activities
-  const fetchActivities = useCallback(async (pageNum = 1, refresh = false) => {
-    try {
-      setError(null);
-      if (pageNum === 1 || refresh) {
-        setLoading(true);
-      } else {
-        setLoadingMore(true);
-      }
+    // Create new filters object
+    const newFilters = {
+      selectedGardenId: filterType === 'garden' ? value : uiState.selectedGardenId,
+      selectedActivityType: filterType === 'activityType' ? value : uiState.selectedActivityType,
+    };
+    
+    // Refetch data with new filters
+    fetchActivities(1, false, newFilters);
+    fetchDashboardStats(newFilters);
+  }, [uiState.selectedGardenId, uiState.selectedActivityType, fetchActivities, fetchDashboardStats]);
 
-      const params: any = {
-        page: pageNum,
-        limit: 10,
-      };
-      
-      if (selectedGardenId) {
-        params.gardenId = parseInt(selectedGardenId);
-      }
-      
-      if (selectedActivityType) {
-        params.type = selectedActivityType;
-      }
+  const handleDateRangeChange = useCallback((range: '7days' | '30days' | '90days') => {
+    setUiState(prev => ({ ...prev, selectedDateRange: range }));
+    fetchDetailedStats(range, currentFilters);
+  }, [fetchDetailedStats, currentFilters.selectedGardenId, currentFilters.selectedActivityType]);
 
-      const response = await activityService.getActivities(params);
-      
-      const items = response.items || [];
-      const meta = response.meta || null;
-
-      if (pageNum === 1 || refresh) {
-        setActivities(items);
-      } else {
-        setActivities(prev => [...prev, ...items]);
-      }
-      
-      setPagination(meta);
-      setPage(pageNum);
-      
-      // Calculate stats based on the fetched activities
-      calculateActivityStats(items, meta);
-    } catch (err) {
-      console.error('Failed to load activities:', err);
-      setError('Không thể tải nhật ký hoạt động. Vui lòng thử lại sau.');
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-      setRefreshing(false);
-    }
-  }, [selectedGardenId, selectedActivityType, calculateActivityStats]);
-
-  useEffect(() => {
-    fetchUserGardens();
-    fetchActivities(1, true);
-  }, [fetchUserGardens, fetchActivities]);
-
+  // Effects
   useFocusEffect(
     useCallback(() => {
+      const initialFilters = {
+        selectedGardenId: uiState.selectedGardenId,
+        selectedActivityType: uiState.selectedActivityType,
+      };
+      
       fetchUserGardens();
-      fetchActivities(1, true);
-    }, [fetchUserGardens, fetchActivities])
+      fetchActivities(1, false, initialFilters);
+      fetchDashboardStats(initialFilters);
+    }, [fetchUserGardens, fetchActivities, fetchDashboardStats, uiState.selectedGardenId, uiState.selectedActivityType])
   );
 
-  // Handle refresh
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchActivities(1, true);
-    setRefreshing(false);
-  }, [fetchActivities]);
+  useEffect(() => {
+    updateTotalStats();
+  }, [pagination?.totalItems, updateTotalStats]);
 
-  // Load more activities
-  const loadMoreActivities = useCallback(() => {
-    if (!pagination || loadingMore || !activities || activities.length === 0 || 
-        (pagination && activities.length >= pagination.totalItems)) {
-      return;
-    }
-    
-    const nextPage = page + 1;
-    if (nextPage <= pagination.totalPages) {
-      setLoadingMore(true);
-      fetchActivities(nextPage);
-    }
-  }, [pagination, loadingMore, activities, page, fetchActivities]);
-
-  // Handle activity press
-  const handleActivityPress = useCallback((activity: GardenActivityDto) => {
-    // Navigate to activity detail page (to be implemented)
-    console.log("Activity pressed:", activity.id);
-    // router.push(`/(modules)/journal/${activity.id}`);
-  }, []);
-
-  // Format date in Vietnamese
-  const formatDate = useCallback((dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    
-    const isToday = date.toDateString() === now.toDateString();
-    
-    const yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    const isYesterday = date.toDateString() === yesterday.toDateString();
-
-    const timeOptions: Intl.DateTimeFormatOptions = { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      hour12: false
-    };
-    const time = date.toLocaleTimeString('vi-VN', timeOptions);
-    
-    let dateLabel = '';
-    if (isToday) {
-      dateLabel = `Hôm nay, ${time}`;
-    } else if (isYesterday) {
-      dateLabel = `Hôm qua, ${time}`;
-    } else {
-      const dateOptions: Intl.DateTimeFormatOptions = {
-        weekday: 'long',
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric'
+  useEffect(() => {
+    if (uiState.isStatsExpanded) {
+      const filters = {
+        selectedGardenId: uiState.selectedGardenId,
+        selectedActivityType: uiState.selectedActivityType,
       };
-      dateLabel = `${date.toLocaleDateString('vi-VN', dateOptions)}, ${time}`;
+      fetchDetailedStats(uiState.selectedDateRange, filters);
     }
-    
-    return dateLabel;
-  }, []);
+  }, [uiState.isStatsExpanded, uiState.selectedDateRange, uiState.selectedGardenId, uiState.selectedActivityType, fetchDetailedStats]);
 
-  // Find selected garden name
-  const selectedGardenName = selectedGardenId 
-    ? gardens.find(g => g.id.toString() === selectedGardenId)?.name 
-    : undefined;
+  // Render functions
+  const renderSectionHeader = ({ section }: { section: ActivitySection }) => (
+    <View style={styles.sectionHeaderContainer}>
+      <View style={styles.calendarIconContainer}>
+        <Ionicons name="calendar-outline" size={16} color={theme.primary} />
+      </View>
+      <Text style={styles.sectionHeaderText}>{section.title}</Text>
+    </View>
+  );
 
-  // Activity icon based on type
-  const getActivityIcon = useCallback((type: string) => {
-    switch (type) {
-      case ActivityType.WATERING:
-        return 'water-outline';
-      case ActivityType.FERTILIZING:
-        return 'leaf-outline';
-      case ActivityType.PRUNING:
-        return 'cut-outline';
-      case ActivityType.HARVESTING:
-        return 'basket-outline';
-      case ActivityType.PEST_CONTROL:
-        return 'bug-outline';
-      case ActivityType.PLANTING:
-        return 'trending-up-outline';
-      case ActivityType.WEEDING:
-        return 'remove-circle-outline';
-      case ActivityType.SOIL_TESTING:
-        return 'flask-outline';
-      default:
-        return 'clipboard-outline';
-    }
-  }, []);
+  const renderActivityItem = ({ item, index, section }: { 
+    item: GardenActivityDto, 
+    index: number, 
+    section: ActivitySection 
+  }) => (
+    <JournalActivityItem
+      activity={item}
+      isLastInSection={index === section.data.length - 1}
+      onAnalyticsPress={handleActivityAnalytics}
+    />
+  );
 
-  // Render activity item
-  const renderActivityItem = useCallback(({ item }: { item: GardenActivityDto }) => {
-    const activityTypeDisplay = activityTypeTranslations[item.activityType as ActivityType] || item.activityType;
-    const formattedDate = formatDate(item.timestamp);
-    
+  const renderFooter = () => {
+    if (!data.loadingMore) return null;
     return (
-      <TouchableOpacity 
-        style={styles.activityCard}
-        onPress={() => handleActivityPress(item)}
-      >
-        <View style={styles.activityHeader}>
-          <View style={[styles.activityIconContainer, { backgroundColor: theme.primary + '1A' }]}>
-            <Ionicons
-              name={getActivityIcon(item.activityType)}
-              size={22}
-              color={theme.primary}
-            />
-          </View>
-          <View style={styles.activityTitleContainer}>
-            <Text style={styles.activityTitle}>{item.name}</Text>
-            <Text style={styles.activityType}>{activityTypeDisplay}</Text>
-          </View>
-          <Text style={styles.activityTime}>{formattedDate}</Text>
-        </View>
-        
-        {item.details && (
-          <View style={styles.detailsContainer}>
-            <Text style={styles.detailsText}>{item.details}</Text>
-          </View>
-        )}
-        
-        <View style={styles.metadataContainer}>
-          {item.gardenId && (
-            <View style={styles.metadataItem}>
-              <Ionicons name="leaf-outline" size={14} color={theme.textSecondary} />
-              <Text style={styles.metadataText}>
-                Vườn #{item.gardenId}
-              </Text>
-            </View>
-          )}
-          
-          {item.plantName && (
-            <View style={styles.metadataItem}>
-              <Ionicons name="flower-outline" size={14} color={theme.textSecondary} />
-              <Text style={styles.metadataText}>
-                {item.plantName}
-              </Text>
-            </View>
-          )}
-          
-          {item.plantGrowStage && (
-            <View style={styles.metadataItem}>
-              <Ionicons name="analytics-outline" size={14} color={theme.textSecondary} />
-              <Text style={styles.metadataText}>
-                {item.plantGrowStage}
-              </Text>
-            </View>
-          )}
-        </View>
-        
-        {/* Additional data section */}
-        {(item.notes || item.reason || 
-          item.temperature !== undefined || 
-          item.humidity !== undefined ||
-          item.soilMoisture !== undefined) && (
-          <View style={styles.additionalInfoContainer}>
-            {item.notes && (
-              <Text style={styles.notesText}>
-                <Text style={styles.labelText}>Ghi chú: </Text>
-                {item.notes}
-              </Text>
-            )}
-            
-            {/* Weather and sensor data in columns */}
-            <View style={styles.sensorDataContainer}>
-              {item.temperature !== undefined && (
-                <View style={styles.sensorItem}>
-                  <Ionicons name="thermometer-outline" size={16} color={theme.textSecondary} />
-                  <Text style={styles.sensorText}>{item.temperature}°C</Text>
-                </View>
-              )}
-              
-              {item.humidity !== undefined && (
-                <View style={styles.sensorItem}>
-                  <Ionicons name="water-outline" size={16} color={theme.textSecondary} />
-                  <Text style={styles.sensorText}>{item.humidity}%</Text>
-                </View>
-              )}
-              
-              {item.soilMoisture !== undefined && (
-                <View style={styles.sensorItem}>
-                  <MaterialCommunityIcons name="water-percent" size={16} color={theme.textSecondary} />
-                  <Text style={styles.sensorText}>{item.soilMoisture}%</Text>
-                </View>
-              )}
-              
-              {item.lightIntensity !== undefined && (
-                <View style={styles.sensorItem}>
-                  <Ionicons name="sunny-outline" size={16} color={theme.textSecondary} />
-                  <Text style={styles.sensorText}>{item.lightIntensity} lux</Text>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
-      </TouchableOpacity>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="small" color={theme.primary} />
+        <Text style={styles.loadingText}>Đang tải thêm...</Text>
+      </View>
     );
-  }, [handleActivityPress, formatDate, activityTypeTranslations, getActivityIcon, theme]);
-  
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.background,
-    },
-    headerSection: {
-      backgroundColor: theme.card,
-      paddingHorizontal: 16,
-      paddingTop: 12,
-      paddingBottom: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.border,
-    },
-    headerTitleRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 12,
-    },
-    headerTitle: {
-      fontSize: 22,
-      fontFamily: 'Inter-Bold',
-      color: theme.text,
-    },
-    summaryStatsContainer: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginVertical: 5,
-    },
-    statCard: {
-      flex: 1,
-      backgroundColor: theme.backgroundSecondary,
-      borderRadius: 8,
-      padding: 10,
-      marginHorizontal: 4,
-      alignItems: 'center',
-      borderWidth: 1,
-      borderColor: theme.borderLight,
-    },
-    statValue: {
-      fontSize: 18,
-      fontFamily: 'Inter-Bold',
-      color: theme.text,
-      marginBottom: 2,
-    },
-    statLabel: {
-      fontSize: 12,
-      fontFamily: 'Inter-Regular',
-      color: theme.textSecondary,
-      textAlign: 'center',
-    },
-    filterContainer: {
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      backgroundColor: theme.background,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.border,
-    },
-    filterRow: {
-      marginBottom: 8,
-    },
-    pickerLabel: {
-      fontSize: 14,
-      fontFamily: 'Inter-Medium',
-      color: theme.textSecondary,
-      marginBottom: 5,
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    pickerLabelText: {
-      fontSize: 14,
-      fontFamily: 'Inter-Medium',
-      color: theme.textSecondary,
-      marginLeft: 5,
-    },
-    pickerWrapper: {
-      backgroundColor: theme.backgroundSecondary,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: theme.border,
-      overflow: 'hidden',
-    },
-    pickerStyle: {
-      color: theme.text,
-      height: Platform.OS === 'ios' ? 150 : 50, // Taller for iOS
-    },
-    selectedFiltersContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      marginTop: 8,
-    },
-    selectedFilterItem: {
-      marginTop: 8,
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 8,
-      borderRadius: 8,
-      backgroundColor: theme.primary + '15',
-      borderLeftWidth: 3,
-      borderLeftColor: theme.primary,
-      marginRight: 8,
-    },
-    selectedFilterText: {
-      fontSize: 13,
-      fontFamily: 'Inter-Medium',
-      color: theme.text,
-      marginLeft: 6,
-      flex: 1,
-    },
-    clearFilterButton: {
-      padding: 6,
-    },
-    errorText: {
-      color: theme.error,
-      textAlign: 'center',
-      padding: 10,
-      fontFamily: 'Inter-Regular',
-    },
-    loadingContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 10,
-      justifyContent: 'center',
-    },
-    loadingText: {
-      marginLeft: 10,
-      color: theme.textSecondary,
-      fontFamily: 'Inter-Regular',
-    },
-    contentWrapper: {
-      flex: 1,
-    },
-    activityCard: {
-      backgroundColor: theme.card,
-      borderRadius: 10,
-      padding: 14,
-      marginVertical: 6,
-      marginHorizontal: 16,
-      shadowColor: theme.shadow,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.08,
-      shadowRadius: 3,
-      elevation: 1,
-      borderLeftWidth: 3,
-      borderLeftColor: theme.primary,
-    },
-    activityHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    activityIconContainer: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: 10,
-    },
-    activityTitleContainer: {
-      flex: 1,
-    },
-    activityTitle: {
-      fontSize: 16,
-      fontFamily: 'Inter-SemiBold',
-      color: theme.text,
-    },
-    activityType: {
-      fontSize: 13,
-      fontFamily: 'Inter-Regular',
-      color: theme.textSecondary,
-    },
-    activityTime: {
-      fontSize: 12,
-      fontFamily: 'Inter-Medium',
-      color: theme.textTertiary,
-      marginLeft: 5,
-    },
-    detailsContainer: {
-      marginTop: 10,
-      marginBottom: 8,
-      paddingHorizontal: 2,
-    },
-    detailsText: {
-      fontSize: 14,
-      fontFamily: 'Inter-Regular',
-      color: theme.text,
-      lineHeight: 20,
-    },
-    metadataContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      marginVertical: 8,
-    },
-    metadataItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: theme.backgroundSecondary + '40',
-      paddingHorizontal: 6,
-      paddingVertical: 3,
-      borderRadius: 4,
-      marginRight: 6,
-      marginBottom: 4,
-    },
-    metadataText: {
-      fontSize: 12,
-      fontFamily: 'Inter-Regular',
-      color: theme.textSecondary,
-      marginLeft: 4,
-    },
-    additionalInfoContainer: {
-      marginTop: 6,
-      paddingTop: 8,
-      borderTopWidth: 1,
-      borderTopColor: theme.borderLight,
-    },
-    notesText: {
-      fontSize: 13,
-      fontFamily: 'Inter-Regular',
-      color: theme.textSecondary,
-      marginBottom: 8,
-    },
-    labelText: {
-      fontFamily: 'Inter-Medium',
-      color: theme.text,
-    },
-    sensorDataContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-    },
-    sensorItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: theme.backgroundSecondary + '30',
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 6,
-      marginRight: 8,
-      marginBottom: 4,
-    },
-    sensorText: {
-      fontSize: 12,
-      fontFamily: 'Inter-Medium',
-      color: theme.textSecondary,
-      marginLeft: 4,
-    },
-    emptyContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 20,
-    },
-    emptyTitle: {
-      fontSize: 20,
-      fontFamily: 'Inter-SemiBold',
-      color: theme.text,
-      marginTop: 16,
-      marginBottom: 8,
-    },
-    emptyText: {
-      fontSize: 15,
-      fontFamily: 'Inter-Regular',
-      color: theme.textSecondary,
-      textAlign: 'center',
-      maxWidth: 300,
-      lineHeight: 22,
-    },
-    fab: {
-      position: 'absolute',
-      bottom: 20,
-      right: 20,
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      backgroundColor: theme.primary,
-      justifyContent: 'center',
-      alignItems: 'center',
-      elevation: 4,
-      shadowColor: theme.shadow,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 3.5,
-    },
-    fabIcon: {
-      color: '#ffffff',
-    },
-  });
+  };
+
+  const handleEndReached = useCallback(() => {
+    loadMoreActivities(currentFilters);
+  }, [loadMoreActivities, currentFilters.selectedGardenId, currentFilters.selectedActivityType]);
+
+  const handleRefresh = useCallback(() => {
+    onRefresh(currentFilters);
+  }, [onRefresh, currentFilters.selectedGardenId, currentFilters.selectedActivityType]);
+
+  const handleCreateActivity = () => {
+    router.push('/activity/create');
+  };
+
+  const handleActivityAnalytics = async (activityId: number) => {
+    console.log('handleActivityAnalytics called with activityId:', activityId);
+    setSelectedActivityId(activityId);
+    setAnalyticsModalVisible(true);
+    setAnalyticsLoading(true);
+    setAnalyticsData(null);
+
+    try {
+      const data = await activityService.getActivityAnalysis(activityId);
+      console.log('Analytics data received:', data);
+      setAnalyticsData(data);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      setAnalyticsData(null);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
+
+  const handleCloseAnalyticsModal = () => {
+    setAnalyticsModalVisible(false);
+    setSelectedActivityId(null);
+    setAnalyticsData(null);
+    setAnalyticsLoading(false);
+  };
+
+  // Render main content
+  const renderContent = () => {
+    if (data.loading) {
+      return (
+        <View style={[styles.emptyContainer, { justifyContent: 'center' }]}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={{ marginTop: 16, color: theme.textSecondary }}>
+            Đang tải nhật ký hoạt động...
+          </Text>
+        </View>
+      );
+    }
+
+    if (data.error) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.errorText}>{data.error}</Text>
+          <TouchableOpacity 
+            style={styles.emptyButton}
+            onPress={() => fetchActivities(1, false, currentFilters)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="refresh" size={18} color="#fff" />
+            <Text style={styles.emptyButtonText}>Thử lại</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (filteredActivities.length === 0) {
+      return (
+        <JournalEmptyState
+          searchQuery={uiState.searchQuery.trim() || undefined}
+          hasFilters={hasActiveFilters}
+        />
+      );
+    }
+
+    return (
+      <SectionList
+        sections={sections}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={renderActivityItem}
+        renderSectionHeader={renderSectionHeader}
+        refreshControl={
+          <RefreshControl
+            refreshing={data.refreshing}
+            onRefresh={handleRefresh}
+            colors={[theme.primary]}
+            tintColor={theme.primary}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.1}
+        ListFooterComponent={renderFooter}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      />
+    );
+  };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header Section with Activity Stats */}
-      <View style={styles.headerSection}>
-        <View style={styles.headerTitleRow}>
-          <Text style={styles.headerTitle}>Nhật ký hoạt động</Text>
-          {loading && !refreshing && (
-            <ActivityIndicator size="small" color={theme.primary} style={{ width: 18, height: 18 }} />
-          )}
-        </View>
+    <View style={styles.container}>
+      {/* Compact Header with search and stats */}
+      <JournalHeader
+        stats={stats}
+        isSearchActive={uiState.isSearchActive}
+        setIsSearchActive={(active) => 
+          setUiState(prev => ({ ...prev, isSearchActive: active }))
+        }
+        searchQuery={uiState.searchQuery}
+        onSearchChange={handleSearchChange}
+        activities={filteredActivities}
+      />
 
-        <View style={styles.summaryStatsContainer}>
-          <View style={[styles.statCard, { backgroundColor: theme.backgroundSecondary }]}>
-            <Text style={styles.statValue}>{activityStats.total}</Text>
-            <Text style={styles.statLabel}>Tổng cộng</Text>
-          </View>
-          
-          <View style={[styles.statCard, { backgroundColor: theme.backgroundSecondary }]}>
-            <Text style={styles.statValue}>{activityStats.thisMonth}</Text>
-            <Text style={styles.statLabel}>Tháng này</Text>
-          </View>
-          
-          <View style={[styles.statCard, { backgroundColor: theme.backgroundSecondary }]}>
-            <Text style={styles.statValue}>{activityStats.thisWeek}</Text>
-            <Text style={styles.statLabel}>Tuần này</Text>
-          </View>
-        </View>
-      </View>
+      {/* Compact Filters - Luôn hiển thị */}
+      <JournalFilters
+        isExpanded={true}
+        setIsExpanded={() => {}} // Không cần toggle nữa
+        selectedGardenId={uiState.selectedGardenId}
+        setSelectedGardenId={(id) => handleFilterChange('garden', id)}
+        selectedActivityType={uiState.selectedActivityType}
+        setSelectedActivityType={(type) => handleFilterChange('activityType', type)}
+        gardens={data.gardens}
+        loadingGardens={data.loadingGardens}
+        gardenFetchError={data.gardenFetchError}
+        isStatsExpanded={uiState.isStatsExpanded}
+        setIsStatsExpanded={(expanded) => setUiState(prev => ({ ...prev, isStatsExpanded: expanded }))}
+      />
 
-      {/* Filter Section */}
-      <View style={styles.filterContainer}>
-        {/* Garden filter */}
-        <View style={styles.filterRow}>
-          <View style={styles.pickerLabel}>
-            <Ionicons name="leaf-outline" size={16} color={theme.textSecondary} />
-            <Text style={styles.pickerLabelText}>Lọc theo vườn</Text>
-          </View>
-          
-          {loadingGardens ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={theme.primary} />
-              <Text style={styles.loadingText}>Đang tải danh sách vườn...</Text>
-            </View>
-          ) : gardenFetchError ? (
-            <Text style={styles.errorText}>{gardenFetchError}</Text>
-          ) : (
-            <View style={styles.pickerWrapper}>
-              <Picker
-                selectedValue={selectedGardenId}
-                onValueChange={(itemValue) => setSelectedGardenId(itemValue?.toString())}
-                style={styles.pickerStyle}
-                dropdownIconColor={theme.text}
-              >
-                <Picker.Item label="Tất cả các vườn" value={undefined} />
-                {gardens.map((garden) => (
-                  <Picker.Item 
-                    key={garden.id} 
-                    label={garden.name || `Vườn #${garden.id}`} 
-                    value={garden.id.toString()} 
-                  />
-                ))}
-              </Picker>
-            </View>
-          )}
-        </View>
-        
-        {/* Activity type filter */}
-        <View style={styles.filterRow}>
-          <View style={styles.pickerLabel}>
-            <Ionicons name="options-outline" size={16} color={theme.textSecondary} />
-            <Text style={styles.pickerLabelText}>Lọc theo loại hoạt động</Text>
-          </View>
-          
-          <View style={styles.pickerWrapper}>
-            <Picker
-              selectedValue={selectedActivityType}
-              onValueChange={(itemValue) => setSelectedActivityType(itemValue?.toString())}
-              style={styles.pickerStyle}
-              dropdownIconColor={theme.text}
-            >
-              <Picker.Item label="Tất cả các hoạt động" value={undefined} />
-              {Object.entries(activityTypeTranslations).map(([type, translation]) => (
-                <Picker.Item key={type} label={translation} value={type} />
-              ))}
-            </Picker>
-          </View>
-        </View>
-        
-        {/* Show selected filters */}
-        <View style={styles.selectedFiltersContainer}>
-          {selectedGardenId && (
-            <View style={styles.selectedFilterItem}>
-              <Ionicons name="leaf-outline" size={16} color={theme.primary} />
-              <Text style={styles.selectedFilterText} numberOfLines={1}>
-                {selectedGardenName || `Vườn #${selectedGardenId}`}
-              </Text>
-              <TouchableOpacity 
-                style={styles.clearFilterButton}
-                onPress={() => setSelectedGardenId(undefined)}
-              >
-                <Ionicons name="close-circle" size={20} color={theme.primary} />
-              </TouchableOpacity>
-            </View>
-          )}
-          
-          {selectedActivityType && (
-            <View style={styles.selectedFilterItem}>
-              <Ionicons name="options-outline" size={16} color={theme.primary} />
-              <Text style={styles.selectedFilterText} numberOfLines={1}>
-                {activityTypeTranslations[selectedActivityType as ActivityType] || selectedActivityType}
-              </Text>
-              <TouchableOpacity 
-                style={styles.clearFilterButton}
-                onPress={() => setSelectedActivityType(undefined)}
-              >
-                <Ionicons name="close-circle" size={20} color={theme.primary} />
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </View>
+      {/* Compact Detailed Stats */}
+      <JournalDetailedStats
+        isExpanded={uiState.isStatsExpanded}
+        detailedStats={detailedStats}
+        statsLoading={statsLoading}
+        statsError={statsError}
+        selectedDateRange={uiState.selectedDateRange}
+        setSelectedDateRange={handleDateRangeChange}
+      />
 
-      {/* Activity List */}
+      {/* Main Content with improved flex */}
       <View style={styles.contentWrapper}>
-        {loading && !refreshing && activities.length === 0 ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.primary} />
-            <Text style={styles.loadingText}>Đang tải nhật ký hoạt động...</Text>
-          </View>
-        ) : error ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="alert-circle-outline" size={48} color={theme.error} />
-            <Text style={[styles.emptyText, { color: theme.error }]}>{error}</Text>
-            <TouchableOpacity
-              style={[styles.statCard, { marginTop: 16, backgroundColor: theme.primary }]}
-              onPress={() => fetchActivities(1, true)}
-            >
-              <Text style={[styles.statLabel, { color: '#fff' }]}>Thử lại</Text>
-            </TouchableOpacity>
-          </View>
-        ) : activities.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons name="notebook-outline" size={64} color={theme.textTertiary} />
-            <Text style={styles.emptyTitle}>Không có hoạt động nào</Text>
-            <Text style={styles.emptyText}>
-              {(selectedGardenId || selectedActivityType) ? 
-                'Không tìm thấy hoạt động nào phù hợp với bộ lọc hiện tại.' : 
-                'Chưa có hoạt động nào được ghi nhận. Hãy thêm hoạt động mới để theo dõi công việc vườn của bạn.'}
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={activities}
-            renderItem={renderActivityItem}
-            keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={{ paddingVertical: 10 }}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                colors={[theme.primary]}
-                tintColor={theme.primary}
-              />
-            }
-            onEndReached={loadMoreActivities}
-            onEndReachedThreshold={0.3}
-            ListFooterComponent={
-              loadingMore ? (
-                <ActivityIndicator
-                  size="small"
-                  color={theme.primary}
-                  style={{ marginVertical: 20 }}
-                />
-              ) : null
-            }
-          />
-        )}
+        {renderContent()}
       </View>
 
-      {/* Floating Action Button for creating new activity */}
-      <TouchableOpacity 
+      {/* Floating Action Button */}
+      <TouchableOpacity
         style={styles.fab}
-        onPress={() => {
-          // Navigate to create activity (to be implemented)
-          // router.push('/(modules)/journal/create');
-        }}
+        onPress={handleCreateActivity}
+        activeOpacity={0.8}
       >
         <Ionicons name="add" size={24} style={styles.fabIcon} />
       </TouchableOpacity>
-    </SafeAreaView>
+
+      {/* Activity Analytics Modal */}
+      <ActivityAnalyticsModal
+        visible={analyticsModalVisible}
+        analytics={analyticsData}
+        loading={analyticsLoading}
+        onClose={handleCloseAnalyticsModal}
+      />
+    </View>
   );
 } 

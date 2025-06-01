@@ -29,6 +29,7 @@ import { userService } from "@/service/api";
 import { isGardener } from "@/types/users/user.types";
 import env from "@/config/environment";
 import { LinearGradient } from "expo-linear-gradient";
+import { ONBOARDING_COMPLETED_KEY } from "@/constants/strings";
 
 const CustomSwitch = ({
   value,
@@ -186,7 +187,7 @@ export default function ProfileScreen() {
           {
             text: "Xác nhận",
             onPress: async () => {
-              await removeItem("@onboarding_completed");
+              await removeItem(ONBOARDING_COMPLETED_KEY);
               handleSignOut();
             },
             style: "destructive",

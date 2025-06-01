@@ -30,10 +30,10 @@ const placeholderImages = {
     uri: "https://images.unsplash.com/photo-1416879595882-3373a0480b5b",
   },
   monitoring: {
-    uri: "https://images.unsplash.com/photo-1523348837708-15d4a09cfac2",
+    uri: "https://plus.unsplash.com/premium_photo-1661892625449-fc0d2e771ab9?q=80&w=2670&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
   },
   notifications: {
-    uri: "https://images.unsplash.com/photo-1505142468610-359e7d316be0",
+    uri: "https://images.unsplash.com/photo-1705832883904-728d7264bceb?q=80&w=2670&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
   },
   getStarted: {
     uri: "https://images.unsplash.com/photo-1523348837708-15d4a09cfac2",
@@ -137,21 +137,23 @@ export default function OnboardingScreen() {
             style={[styles.imageCover, { backgroundColor: theme.background }]}
           />
           <View style={styles.iconOverlay}>
-            <Ionicons
-              name={
-                item.id === "1"
-                  ? "leaf"
-                  : item.id === "2"
-                    ? "grid"
-                    : item.id === "3"
-                      ? "analytics"
-                      : item.id === "4"
-                        ? "notifications"
-                        : "sunny"
-              }
-              size={60}
-              color={theme.primary}
-            />
+            <View style={[styles.iconBackground, { backgroundColor: `${theme.primary}15` }]}>
+              <Ionicons
+                name={
+                  item.id === "1"
+                    ? "leaf"
+                    : item.id === "2"
+                      ? "grid"
+                      : item.id === "3"
+                        ? "analytics"
+                        : item.id === "4"
+                          ? "notifications"
+                          : "sunny"
+                }
+                size={40}
+                color={theme.primary}
+              />
+            </View>
           </View>
         </View>
         <View style={styles.textContainer}>
@@ -208,7 +210,7 @@ export default function OnboardingScreen() {
 
       {currentIndex < onboardingData.length - 1 && (
         <TouchableOpacity style={styles.skipButton} onPress={skipOnboarding}>
-          <Text style={[styles.skipText, { color: theme.primary }]}>Skip</Text>
+          <Text style={[styles.skipText, { color: theme.primary }]}>Bỏ qua</Text>
         </TouchableOpacity>
       )}
 
@@ -238,7 +240,7 @@ export default function OnboardingScreen() {
             style={[styles.button, { backgroundColor: theme.primary }]}
             onPress={nextSlide}
           >
-            <Text style={styles.buttonText}>Next</Text>
+            <Text style={styles.buttonText}>Tiếp theo</Text>
             <Ionicons
               name="arrow-forward"
               size={20}
@@ -251,7 +253,7 @@ export default function OnboardingScreen() {
             style={[styles.button, { backgroundColor: theme.primary }]}
             onPress={finishOnboarding}
           >
-            <Text style={styles.buttonText}>Get Started</Text>
+            <Text style={styles.buttonText}>Bắt đầu</Text>
             <Ionicons
               name="checkmark"
               size={20}
@@ -294,16 +296,23 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    opacity: 0.15,
+    opacity: 0.05,
   },
   iconOverlay: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 20,
+    right: 20,
     justifyContent: "center",
     alignItems: "center",
+  },
+  iconBackground: {
+    padding: 12,
+    borderRadius: 25,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   textContainer: {
     flex: 0.4,
@@ -313,15 +322,17 @@ const styles = StyleSheet.create({
     marginTop: 30,
   },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 10,
+    marginBottom: 12,
+    lineHeight: 32,
   },
   description: {
-    fontSize: 17,
+    fontSize: 16,
     textAlign: "center",
-    lineHeight: 24,
+    lineHeight: 22,
+    paddingHorizontal: 10,
   },
   bottomContainer: {
     width: "100%",

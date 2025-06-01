@@ -1,47 +1,32 @@
 export const onboardingData = [
   {
     id: "1",
-    title: "Welcome to SmartFarm",
+    title: "Chào mừng đến với SmartFarm",
     description:
-      "Your personal smart garden assistant for monitoring and managing your plants with ease.",
-    image: {
-      uri: "https://via.placeholder.com/300x200?text=Welcome+to+SmartFarm",
-    },
+      "Trợ lý thông minh cho vườn cây của bạn - giúp theo dõi và chăm sóc cây trồng một cách dễ dàng.",
   },
   {
     id: "2",
-    title: "Manage Multiple Gardens",
+    title: "Quản lý nhiều khu vườn",
     description:
-      "Create and organize different garden spaces – indoor plants, vegetable gardens, flower beds, or fruit trees.",
-    image: {
-      uri: "https://via.placeholder.com/300x200?text=Manage+Multiple+Gardens",
-    },
+      "Tạo và tổ chức các khu vườn khác nhau - cây trong nhà, vườn rau, vườn hoa, hay cây ăn quả.",
   },
   {
     id: "3",
-    title: "Monitor Plant Health",
+    title: "Theo dõi sức khỏe cây trồng",
     description:
-      "Track real-time metrics like soil moisture, light levels, and temperature to keep your plants thriving.",
-    image: {
-      uri: "https://via.placeholder.com/300x200?text=Monitor+Plant+Health",
-    },
+      "Giám sát thời gian thực các chỉ số như độ ẩm đất, ánh sáng và nhiệt độ để cây phát triển tốt nhất.",
   },
   {
     id: "4",
-    title: "Smart Notifications",
+    title: "Thông báo thông minh",
     description:
-      "Receive timely alerts when your plants need water, fertilizer, or attention based on sensor data.",
-    image: {
-      uri: "https://via.placeholder.com/300x200?text=Smart+Notifications",
-    },
+      "Nhận cảnh báo kịp thời khi cây cần tưới nước, bón phân hoặc chăm sóc dựa trên dữ liệu cảm biến.",
   },
   {
     id: "5",
-    title: "Start Growing Smarter",
+    title: "Bắt đầu trồng trọt thông minh",
     description:
-      "Sign in now to begin your smart gardening journey and watch your plants flourish.",
-    image: {
-      uri: "https://via.placeholder.com/300x200?text=Start+Growing+Smarter",
-    },
+      "Đăng nhập ngay để bắt đầu hành trình làm vườn thông minh và xem cây cối phát triển.",
   },
 ];

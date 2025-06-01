@@ -103,11 +103,12 @@ export interface Comment {
 // Vote record
 export interface Vote {
   id: number;
-  userDataId: number;
+  userData: CommunityUser;
   targetType: VoteTargetType;
-  targetId: number;
+  postId?: number;
+  commentId?: number;
   voteValue: number; // 1 = upvote, -1 = downvote
-  createdAt?: string;
+  createdAt: Date;
 }
 
 // Follow relation
@@ -136,8 +137,25 @@ export interface CreateCommentDto {
   content: string;
 }
 
-export interface VoteDto {
+export interface CreateVoteDto {
+  voteValue: number;
+  targetType: VoteTargetType;
+  postId?: number;
+  commentId?: number;
+}
+
+export interface VoteRequestDto {
   voteValue: number; // 1 | -1 | 0 (gỡ vote)
+}
+
+export interface VoteDto {
+  id: number;
+  userData: CommunityUser;
+  targetType: VoteTargetType;
+  postId?: number;
+  commentId?: number;
+  voteValue: number;
+  createdAt: Date;
 }
 
 export interface FollowInfo {

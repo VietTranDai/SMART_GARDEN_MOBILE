@@ -1,7 +1,7 @@
 import React, { memo, useMemo } from "react";
 import { View, StyleSheet } from "react-native";
 import GardenSection from "./GardenSection";
-import WeatherSection from "./WeatherSection";
+import CalendarSection from "./CalendarSection";
 import { GardenDisplayDto } from "@/types/gardens/dtos";
 import {
   GardenWeatherData,
@@ -10,10 +10,10 @@ import {
 import { Alert } from "@/types/alerts/alert.types";
 import { SensorData, SensorType } from "@/types/gardens/sensor.types";
 
-// Define Section Types
+// Define Section Types - Replace WEATHER with CALENDAR
 export enum SectionType {
   GARDENS = "GARDENS",
-  WEATHER = "WEATHER",
+  CALENDAR = "CALENDAR",
   ALERTS = "ALERTS",
 }
 
@@ -35,7 +35,7 @@ interface HomeSectionsProps {
   // Sensor data
   sensorDataByGarden: Record<number, Record<string, SensorData[]>>;
 
-  // Weather data
+  // Weather data (keeping for compatibility, though not used in calendar)
   weatherData: WeatherObservation | null;
   gardenWeatherData: Record<number, GardenWeatherData>;
 
@@ -107,13 +107,11 @@ const HomeSections = memo(
           getSensorStatus={getSensorStatus}
         />
 
-        {/* Weather Section */}
-        {isSectionVisible(SectionType.WEATHER) && (
-          <WeatherSection
+        {/* Calendar Section - Replace WeatherSection */}
+        {isSectionVisible(SectionType.CALENDAR) && (
+          <CalendarSection
             gardenId={selectedGardenId}
             selectedGarden={selectedGarden}
-            gardenWeatherData={gardenWeatherData}
-            weatherData={weatherData}
             onShowDetail={onShowWeatherDetail}
           />
         )}

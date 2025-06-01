@@ -4,7 +4,7 @@ import { COMMUNITY_ENDPOINTS } from "../endpoints";
 import {
   CreatePostDto,
   CreateCommentDto,
-  VoteDto,
+  VoteRequestDto,
   Tag,
   FollowInfo,
   Comment,
@@ -139,7 +139,7 @@ class CommunityService {
   /**
    * Vote on a post (upvote/downvote)
    */
-  async votePost(postId: string, voteData: VoteDto): Promise<any> {
+  async votePost(postId: string, voteData: VoteRequestDto): Promise<any> {
     try {
       const response = await apiClient.post(
         COMMUNITY_ENDPOINTS.POST_VOTE(postId),
@@ -219,7 +219,7 @@ class CommunityService {
   /**
    * Vote on a comment (upvote/downvote)
    */
-  async voteComment(commentId: string, voteData: VoteDto): Promise<any> {
+  async voteComment(commentId: string, voteData: VoteRequestDto): Promise<any> {
     try {
       const response = await apiClient.post(
         COMMUNITY_ENDPOINTS.COMMENT_VOTE(commentId),

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from "react";
-import { Tabs } from "expo-router";
+import { Tabs, usePathname } from "expo-router";
 import {
   Ionicons,
   FontAwesome5,

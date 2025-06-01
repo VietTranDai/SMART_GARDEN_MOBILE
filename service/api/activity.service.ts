@@ -34,7 +34,6 @@ class ActivityService {
     try {
       const response = await apiClient.get(ACTIVITY_ENDPOINTS.LIST_CREATE, { params });
       // Assuming the backend returns data in the shape of PaginatedGardenActivitiesResultDto directly
-      console.log("response.data.data", response.data.data);
       return response.data.data || { items: [], meta: { totalItems: 0, itemsPerPage: params?.limit || 10, currentPage: params?.page || 1, totalPages: 0 } };
     } catch (error) {
       console.error("Error fetching activities:", error);
@@ -93,6 +92,7 @@ class ActivityService {
       const response = await apiClient.get(
         ACTIVITY_ENDPOINTS.ANALYSIS(activityId)
       );
+      console.log("response.data.data", response.data.data);
       return response.data.data || null;
     } catch (error) {
       console.error(`Error fetching activity analysis for ${activityId}:`, error);
@@ -113,6 +113,7 @@ class ActivityService {
   }): Promise<ActivityStatsResponseDto | null> {
     try {
       const response = await apiClient.get(ACTIVITY_ENDPOINTS.STATS, { params });
+      console.log("response.data.data", response.data.data);
       return response.data.data || null;
     } catch (error) {
       console.error("Error fetching activity statistics:", error);

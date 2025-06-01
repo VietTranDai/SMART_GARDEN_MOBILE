@@ -21,7 +21,7 @@ import { useLocalSearchParams, router } from "expo-router";
 import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import communityService from "@/service/api/community.service";
 import { Post, Comment, CreateCommentDto } from "@/types";
-import { VoteDto, VoteTargetType } from "@/types/social/post.types";
+import { VoteRequestDto, VoteTargetType } from "@/types/social/post.types";
 import env from "@/config/environment";
 import ContentLoader, { Rect, Circle } from "react-content-loader/native";
 
@@ -330,7 +330,7 @@ export default function PostDetailScreen() {
     try {
       if (targetType === VoteTargetType.POST && post) {
         // Call API to vote on post
-        const voteData: VoteDto = { voteValue: voteValue };
+        const voteData: VoteRequestDto = { voteValue: voteValue };
         const result = await communityService.votePost(targetId, voteData);
 
         // Update local state with the result from API
@@ -341,7 +341,7 @@ export default function PostDetailScreen() {
         });
       } else if (targetType === VoteTargetType.COMMENT) {
         // Call API to vote on comment
-        const voteData: VoteDto = { voteValue: voteValue };
+        const voteData: VoteRequestDto = { voteValue: voteValue };
         const result = await communityService.voteComment(targetId, voteData);
 
         // Update the comment in our local state

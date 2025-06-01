@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   Platform,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
@@ -235,16 +234,9 @@ export default function TasksScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       {/* Header Section with Task Stats */}
       <View style={styles.headerSection}>
-        <View style={styles.headerTitleRow}>
-          <Text style={styles.headerTitle}>Danh sách công việc</Text>
-          {loadingCounts && (
-            <ActivityIndicator size="small" color={theme.primary} style={styles.countLoadingIndicator} />
-          )}
-        </View>
-
         <View style={styles.summaryStatsContainer}>
           <View style={[styles.statCard, { backgroundColor: theme.backgroundSecondary }]}>
             <Text style={styles.statValue}>{taskCounts.total}</Text>
@@ -326,6 +318,6 @@ export default function TasksScreen() {
       >
         <Ionicons name="add-outline" style={styles.fabIcon} />
       </TouchableOpacity>
-    </SafeAreaView>
+    </View>
   );
 }

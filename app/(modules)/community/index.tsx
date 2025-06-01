@@ -19,7 +19,6 @@ import {
   Dimensions,
   Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { Ionicons, FontAwesome5, Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -395,7 +394,7 @@ export default function CommunityScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <View style={styles.container}>
       <View style={styles.searchContainer}>
         <View
           style={[
@@ -540,7 +539,7 @@ export default function CommunityScreen() {
           )}
         </>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

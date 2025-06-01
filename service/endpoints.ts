@@ -41,6 +41,7 @@ export const GARDEN_ENDPOINTS = {
     `/gardens/${gardenId}/plant-statistics`,
   PLANT_ADVICE: (gardenId: string | number) =>
     `/gardens/${gardenId}/plant-advice`,
+  CALENDAR: (gardenId: string | number) => `/gardener-calendar/${gardenId}`,
 };
 
 // Plant endpoints
@@ -166,6 +167,18 @@ export const ALERT_ENDPOINTS = {
 };
 
 // Photo evaluation endpoints
+export const PHOTO_EVALUATION_ENDPOINTS = {
+  LIST: "/photo-evaluations", // GET với query params (page, limit)
+  LIST_BY_GARDEN: (gardenId: string | number) =>
+    `/photo-evaluations/garden/${gardenId}`, // GET với query params (page, limit)
+  DETAIL: (photoId: string | number) => `/photo-evaluations/${photoId}`, // GET
+  CREATE: "/photo-evaluations", // POST với FormData
+  UPDATE: (photoId: string | number) => `/photo-evaluations/${photoId}`, // PUT
+  DELETE: (photoId: string | number) => `/photo-evaluations/${photoId}`, // DELETE
+  STATS: "/photo-evaluations/stats", // GET thống kê
+};
+
+// Photo endpoints (garden photos)
 export const PHOTO_ENDPOINTS = {
   LIST_BY_GARDEN: (gardenId: string | number) =>
     `/photo-evaluations/garden/${gardenId}`,
@@ -188,4 +201,5 @@ export default {
   WEATHER: WEATHER_ENDPOINTS,
   ALERT: ALERT_ENDPOINTS,
   PHOTO: PHOTO_ENDPOINTS,
+  PHOTO_EVALUATION: PHOTO_EVALUATION_ENDPOINTS,
 };

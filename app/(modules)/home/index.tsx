@@ -39,6 +39,7 @@ import EmptyGardensView from "@/components/common/EmptyGardensView";
 import AdviceModal from "@/components/common/AdviceModal";
 import WeatherDetailModal from "@/components/common/WeatherDetailModal";
 import AlertDetailsModal from "@/components/common/AlertDetailsModal";
+import GardenCalendarDetailModal from "@/components/garden/GardenCalendarDetailModal";
 import { GardenProvider } from "@/contexts/GardenContext";
 import HomeSections, {
   SectionType,
@@ -118,16 +119,13 @@ interface GardenSectionProps {
   onNavigateToDetail: (gardenId: number) => void;
 }
 
-interface WeatherSectionProps {
-  currentWeather: WeatherObservation | null;
+// Update interface name and props for calendar section
+interface CalendarSectionProps {
+  gardenId: number | null;
   selectedGarden: GardenDisplayDto | undefined;
-  hourlyForecast: HourlyForecast[];
-  dailyForecast: DailyForecast[];
-  getWeatherTip: any;
-  showFullDetails: boolean;
-  onShowWeatherDetail: () => void;
   animationValue: Animated.Value;
   theme: any;
+  onShowDetail: (gardenId: number) => void;
 }
 
 interface AlertSectionProps {
@@ -137,15 +135,14 @@ interface AlertSectionProps {
   theme: any;
 }
 
-
-// Define the props for DynamicSections
+// Define the props for DynamicSections - Update to use calendar
 interface DynamicSectionsProps {
   sections: Section[];
   weatherData: WeatherObservation | null;
   selectedGardenId: number | null;
   sectionAnimations: {
     gardens: Animated.Value;
-    weather: Animated.Value;
+    calendar: Animated.Value; // Change from weather to calendar
     activity: Animated.Value;
   };
   gardenAlerts: Record<number, Alert[]>;
@@ -333,72 +330,6 @@ const GardenSection = memo((props: GardenSectionProps) => {
   );
 });
 
-const WeatherSection = memo((props: WeatherSectionProps) => {
-  const {
-    currentWeather,
-    selectedGarden,
-    hourlyForecast,
-    dailyForecast,
-    getWeatherTip,
-    showFullDetails,
-    onShowWeatherDetail,
-    animationValue,
-    theme,
-  } = props;
-
-  const styles = useMemo(() => extendedHomeStyles(theme), [theme]);
-
-  const animatedStyle = {
-    opacity: animationValue,
-    transform: [
-      {
-        translateY: animationValue.interpolate({
-          inputRange: [0, 1],
-          outputRange: [20, 0],
-        }),
-      },
-    ],
-  };
-
-  const weatherData = useMemo(() => {
-    return {
-      current: currentWeather,
-      hourly: Array.isArray(hourlyForecast) ? hourlyForecast : [],
-      daily: Array.isArray(dailyForecast) ? dailyForecast : [],
-    };
-  }, [currentWeather, hourlyForecast, dailyForecast]);
-
-  return (
-    <Animated.View style={[styles.section, animatedStyle]}>
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>
-          {selectedGarden ? `Thời tiết - ${selectedGarden.name}` : "Thời tiết"}
-        </Text>
-        {showFullDetails && (
-          <TouchableOpacity
-            style={styles.sectionAction}
-            onPress={onShowWeatherDetail}
-          >
-            <Text style={[styles.sectionActionText, { color: theme.primary }]}>
-              Chi tiết
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.primary} />
-          </TouchableOpacity>
-        )}
-      </View>
-      <WeatherDisplay
-        currentWeather={weatherData.current}
-        selectedGarden={selectedGarden}
-        hourlyForecast={weatherData.hourly}
-        dailyForecast={weatherData.daily}
-        getWeatherTip={getWeatherTip}
-        showFullDetails={showFullDetails}
-        onShowDetail={onShowWeatherDetail}
-      />
-    </Animated.View>
-  );
-});
-
 const AlertSection = memo((props: AlertSectionProps) => {
   const { selectedGardenId, gardenAlerts, animationValue, theme } = props;
 
@@ -446,136 +377,83 @@ const AlertSection = memo((props: AlertSectionProps) => {
   );
 });
 
+const CalendarSection = memo((props: CalendarSectionProps) => {
+  const {
+    gardenId,
+    selectedGarden,
+    animationValue,
+    theme,
+    onShowDetail,
+  } = props;
 
+  const styles = useMemo(() => extendedHomeStyles(theme), [theme]);
+
+  const animatedStyle = {
+    opacity: animationValue,
+    transform: [
+      {
+        translateY: animationValue.interpolate({
+          inputRange: [0, 1],
+          outputRange: [20, 0],
+        }),
+      },
+    ],
+  };
+
+  return (
+    <Animated.View style={[styles.section, animatedStyle]}>
+      {/* Calendar content will be handled by CalendarSection component */}
+      <View style={styles.emptyContainer}>
+        <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+          Lịch trình vườn sẽ hiển thị ở đây
+        </Text>
+      </View>
+    </Animated.View>
+  );
+});
 
 // Update DynamicSections to use the defined props
 const DynamicSections = memo((props: DynamicSectionsProps) => {
   const {
     sections,
-    weatherData,
     selectedGardenId,
     sectionAnimations,
     gardenAlerts,
-    gardenWeatherData,
+    gardens,
     theme,
     handleShowWeatherDetail,
-    getWeatherTip,
-    gardens,
   } = props;
 
-  // Tối ưu: Tách logic lấy selected garden ra khỏi render
+  const styles = useMemo(() => extendedHomeStyles(theme), [theme]);
+
+  // Find selected garden
   const selectedGarden = useMemo(() => {
-    // Đảm bảo gardens là một mảng hợp lệ
-    if (!Array.isArray(gardens) || gardens.length === 0) {
-      return undefined;
-    }
-    // Đảm bảo selectedGardenId không phải là null hoặc undefined
-    if (selectedGardenId === null || selectedGardenId === undefined) {
-      return undefined;
-    }
-    return gardens.find((g) => g.id === selectedGardenId);
-  }, [gardens, selectedGardenId]);
+    if (!selectedGardenId || !Array.isArray(gardens)) return undefined;
+    return gardens.find((garden) => garden.id === selectedGardenId);
+  }, [selectedGardenId, gardens]);
 
-  // Tối ưu: Tách logic lấy weather data ra khỏi render với kiểm tra an toàn
-  const currentWeatherData = useMemo(() => {
-    try {
-      // Kiểm tra kỹ lưỡng các giá trị null và undefined
-      if (
-        selectedGardenId === null ||
-        selectedGardenId === undefined ||
-        !gardenWeatherData ||
-        typeof gardenWeatherData !== "object"
-      ) {
-        return weatherData || null;
-      }
-
-      // Kiểm tra an toàn khi truy cập gardenWeatherData[selectedGardenId]
-      const hasGardenData = Object.prototype.hasOwnProperty.call(
-        gardenWeatherData,
-        selectedGardenId
-      );
-      if (!hasGardenData || !gardenWeatherData[selectedGardenId]?.current) {
-        return weatherData || null;
-      }
-
-      return gardenWeatherData[selectedGardenId].current;
-    } catch (error) {
-      console.error("Error getting current weather data:", error);
-      return weatherData || null;
-    }
-  }, [selectedGardenId, gardenWeatherData, weatherData]);
-
-  // Tối ưu: Tách logic lấy forecast data ra khỏi render với kiểm tra an toàn
-  const forecastData = useMemo(() => {
-    try {
-      const defaultData = { hourly: [], daily: [] };
-
-      if (
-        !selectedGardenId ||
-        !gardenWeatherData ||
-        typeof gardenWeatherData !== "object" ||
-        !(selectedGardenId in gardenWeatherData)
-      ) {
-        return defaultData;
-      }
-
-      const garden = gardenWeatherData[selectedGardenId];
-
-      // Safe check for hourly data
-      const hourly =
-        garden.hourly && Array.isArray(garden.hourly) ? [...garden.hourly] : [];
-
-      // Safe check for daily data
-      const daily =
-        garden.daily && Array.isArray(garden.daily) ? [...garden.daily] : [];
-
-      return { hourly, daily };
-    } catch (error) {
-      console.error("Error getting forecast data:", error);
-      return { hourly: [], daily: [] };
-    }
-  }, [selectedGardenId, gardenWeatherData]);
-
-  // Cập nhật renderWeatherSection để kiểm tra an toàn selectedGarden
-  const renderWeatherSection = useCallback(() => {
-    const isSelectedGarden = !!selectedGardenId && !!selectedGarden;
-
+  const renderCalendarSection = useCallback(() => {
     return (
-      <WeatherSection
-        currentWeather={currentWeatherData}
+      <CalendarSection
+        gardenId={selectedGardenId}
         selectedGarden={selectedGarden}
-        hourlyForecast={forecastData.hourly || []}
-        dailyForecast={forecastData.daily || []}
-        getWeatherTip={getWeatherTip}
-        showFullDetails={isSelectedGarden}
-        onShowWeatherDetail={() =>
-          selectedGardenId ? handleShowWeatherDetail(selectedGardenId) : null
-        }
-        animationValue={sectionAnimations.weather}
+        animationValue={sectionAnimations.calendar} // Use calendar animation
         theme={theme}
+        onShowDetail={(gardenId: number) => handleShowWeatherDetail(gardenId)}
       />
     );
-  }, [
-    selectedGardenId,
-    selectedGarden,
-    currentWeatherData,
-    forecastData,
-    getWeatherTip,
-    handleShowWeatherDetail,
-    sectionAnimations.weather,
-    theme,
-  ]);
+  }, [selectedGardenId, selectedGarden, sectionAnimations.calendar, theme, handleShowWeatherDetail]);
 
   const renderSection = useCallback(
     ({ item, index }: { item: Section; index: number }) => {
       switch (item.type) {
-        case SectionType.WEATHER:
-          return renderWeatherSection();
+        case SectionType.CALENDAR: // Change from WEATHER to CALENDAR
+          return renderCalendarSection();
         default:
           return null;
       }
     },
-    [renderWeatherSection]
+    [renderCalendarSection]
   );
 
   // Use try-catch to protect against any iteration errors
@@ -657,6 +535,10 @@ function HomeScreenContent() {
   const [selectedGardenForAlerts, setSelectedGardenForAlerts] = useState<
     number | null
   >(null);
+  const [calendarDetailVisible, setCalendarDetailVisible] = useState(false);
+  const [selectedGardenForCalendar, setSelectedGardenForCalendar] = useState<
+    number | null
+  >(null);
 
   // State for garden-specific advice data, loading, and error
   const [gardenAdviceByGarden, setGardenAdviceByGarden] = useState<
@@ -672,10 +554,10 @@ function HomeScreenContent() {
   // Animation ref for refresh control
   const refreshAnimationRef = useRef(new Animated.Value(0));
 
-  // Section animations
+  // Section animations - Update to use calendar instead of weather
   const sectionAnimations = {
     gardens: useRef(new Animated.Value(0)).current,
-    weather: useRef(new Animated.Value(0)).current,
+    calendar: useRef(new Animated.Value(0)).current, // Change from weather to calendar
     activity: useRef(new Animated.Value(0)).current,
   };
 
@@ -689,7 +571,7 @@ function HomeScreenContent() {
           duration: 400,
           useNativeDriver: true,
         }),
-        Animated.timing(sectionAnimations.weather, {
+        Animated.timing(sectionAnimations.calendar, { // Change from weather to calendar
           toValue: 1,
           duration: 400,
           useNativeDriver: true,
@@ -749,7 +631,7 @@ function HomeScreenContent() {
           duration: 400,
           useNativeDriver: true,
         }),
-        Animated.timing(sectionAnimations.weather, {
+        Animated.timing(sectionAnimations.calendar, { // Change from weather to calendar
           toValue: 1,
           duration: 400,
           useNativeDriver: true,
@@ -919,61 +801,28 @@ function HomeScreenContent() {
     [navigation]
   );
 
-  // Handle showing weather detail modal
-  const handleShowWeatherDetail = useCallback(
+  // Handle showing calendar detail modal (replace weather detail functionality)
+  const handleShowCalendarDetail = useCallback(
     async (gardenId: number) => {
       // Kiểm tra gardenId có hợp lệ không
       if (gardenId === null || gardenId === undefined || isNaN(gardenId)) {
-        console.log("Invalid garden ID, skipping weather detail");
+        console.log("Invalid garden ID, skipping calendar detail");
         return;
       }
 
-      setSelectedGardenForWeather(gardenId);
-
-      // Đảm bảo gardenWeatherData hợp lệ
-      if (!gardenWeatherData || typeof gardenWeatherData !== "object") {
-        await fetchCompleteWeatherData(gardenId);
-      }
-      // Fetch complete weather data if needed
-      else if (!gardenWeatherData[gardenId]?.current) {
-        await fetchCompleteWeatherData(gardenId);
-      }
-
-      // Đảm bảo weatherAdviceByGarden hợp lệ
-      if (
-        !weatherAdviceByGarden ||
-        typeof weatherAdviceByGarden !== "object" ||
-        (!weatherAdviceByGarden[gardenId] &&
-          (!weatherDetailLoading || !weatherDetailLoading[gardenId]))
-      ) {
-        await fetchWeatherAdvice(gardenId);
-      }
-
-      // Đảm bảo optimalGardenTimes hợp lệ
-      if (
-        gardenWeatherData &&
-        typeof gardenWeatherData === "object" &&
-        gardenId in gardenWeatherData &&
-        gardenWeatherData[gardenId]?.hourly &&
-        (!optimalGardenTimes ||
-          typeof optimalGardenTimes !== "object" ||
-          !optimalGardenTimes[gardenId] ||
-          !optimalGardenTimes[gardenId]?.WATERING)
-      ) {
-        await calculateOptimalTimes(gardenId, "WATERING");
-      }
-
-      setWeatherDetailVisible(true);
+      setSelectedGardenForCalendar(gardenId);
+      setCalendarDetailVisible(true);
     },
-    [
-      gardenWeatherData,
-      weatherAdviceByGarden,
-      weatherDetailLoading,
-      fetchCompleteWeatherData,
-      fetchWeatherAdvice,
-      calculateOptimalTimes,
-      optimalGardenTimes,
-    ]
+    []
+  );
+
+  // Handle showing weather detail modal (keeping for compatibility)
+  const handleShowWeatherDetail = useCallback(
+    async (gardenId: number) => {
+      // For now, redirect to calendar detail instead of weather detail
+      handleShowCalendarDetail(gardenId);
+    },
+    [handleShowCalendarDetail]
   );
 
   // Handle showing alert details modal
@@ -988,24 +837,24 @@ function HomeScreenContent() {
     setAlertDetailVisible(true);
   }, []);
 
-  // Scroll to weather section
-  const handleScrollToWeatherSection = useCallback(
+  // Scroll to calendar section (updated from weather section)
+  const handleScrollToCalendarSection = useCallback(
     (gardenId: number) => {
       // Kiểm tra gardenId có hợp lệ không
       if (gardenId === null || gardenId === undefined || isNaN(gardenId)) {
-        console.log("Invalid garden ID, skipping scroll to weather");
+        console.log("Invalid garden ID, skipping scroll to calendar");
         return;
       }
 
-      // Select garden to display its weather
+      // Select garden to display its calendar
       selectGarden(gardenId);
 
       // Use timeout to ensure garden selection is processed
       setTimeout(() => {
-        // Scroll down to where weather section would be
+        // Scroll down to where calendar section would be
         if (scrollViewRef.current) {
           scrollViewRef.current.scrollTo({
-            y: 300, // Approximate position of weather section
+            y: 300, // Approximate position of calendar section
             animated: true,
           });
         }
@@ -1028,9 +877,9 @@ function HomeScreenContent() {
       Array.isArray(gardens) &&
       gardens.some((g) => g.id === selectedGardenId);
 
-    // Luôn hiển thị phần thời tiết khi có một vườn được chọn hợp lệ
+    // Luôn hiển thị phần lịch trình khi có một vườn được chọn hợp lệ
     if (hasValidGardenSelected) {
-      visibleSections.push({ type: SectionType.WEATHER, visible: true });
+      visibleSections.push({ type: SectionType.CALENDAR, visible: true }); // Change from WEATHER to CALENDAR
     }
 
     return visibleSections;
@@ -1048,6 +897,11 @@ function HomeScreenContent() {
     return gardens.find((g) => g.id === selectedGardenForWeather);
   }, [selectedGardenForWeather, gardens]);
 
+  const selectedGardenForCalendarModal = useMemo(() => {
+    if (!selectedGardenForCalendar || !Array.isArray(gardens)) return undefined;
+    return gardens.find((g) => g.id === selectedGardenForCalendar);
+  }, [selectedGardenForCalendar, gardens]);
+
   // If loading, show loading indicator
   if (loading && !refreshing) {
     return <LoadingView message="Đang tải dữ liệu..." />;
@@ -1064,7 +918,7 @@ function HomeScreenContent() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <ScrollView
         ref={scrollViewRef}
         style={styles.scrollView}
@@ -1093,7 +947,7 @@ function HomeScreenContent() {
           gardenAlerts={gardenAlerts || {}}
           onShowAdvice={handleShowAdvice}
           onShowWeatherDetail={handleShowWeatherDetail}
-          onScrollToWeatherSection={handleScrollToWeatherSection}
+          onScrollToWeatherSection={handleScrollToCalendarSection}
           onShowAlertDetails={handleShowAlertDetails}
           adviceLoading={gardenAdviceLoading || {}}
           weatherDetailLoading={weatherDetailLoading || {}}
@@ -1224,7 +1078,14 @@ function HomeScreenContent() {
         }
         theme={theme}
       />
-    </SafeAreaView>
+
+      <GardenCalendarDetailModal
+        visible={calendarDetailVisible}
+        onClose={() => setCalendarDetailVisible(false)}
+        gardenId={selectedGardenForCalendar}
+        selectedGarden={selectedGardenForCalendarModal as GardenDisplayDto | undefined}
+      />
+    </View>
   );
 }
 
