@@ -45,22 +45,26 @@ export interface PhotoEvaluationWithRelations extends PhotoEvaluation {
 
 // DTOs
 export interface CreatePhotoEvaluationDto {
-  taskId: number;
   gardenId: number;
-  gardenActivityId?: number;
-  plantName?: string;
-  plantGrowStage?: string;
   notes?: string;
 }
 
 export interface UpdatePhotoEvaluationDto {
-  aiFeedback?: string;
-  confidence?: number;
   notes?: string;
 }
 
-export interface PhotoEvaluationFormData extends CreatePhotoEvaluationDto {
-  image: File;
+// ✅ SIMPLIFIED: Only what backend actually needs
+export interface PhotoEvaluationFormData {
+  gardenId: number;
+  notes?: string;
+  image: File | ReactNativeImageFile;
+}
+
+// React Native image file format
+export interface ReactNativeImageFile {
+  uri: string;
+  type: string;
+  name: string;
 }
 
 // API Response types
@@ -152,3 +156,4 @@ export interface PhotoUploadResult {
   error?: string;
   progress?: PhotoUploadProgress;
 }
+

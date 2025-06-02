@@ -282,7 +282,7 @@ const GardenWateringTab: React.FC<GardenWateringTabProps> = ({ gardenId }) => {
                 </View>
                 <View style={styles.amountBadge}>
                   <Text style={[styles.amountText, { color: theme.text }]}>
-                    {currentDecision.recommended_amount}L
+                    {currentDecision.recommended_amount.toFixed(2)}L
                   </Text>
                 </View>
               </View>
@@ -431,7 +431,7 @@ const GardenWateringTab: React.FC<GardenWateringTabProps> = ({ gardenId }) => {
               </View>
               <View style={styles.statItem}>
                 <Text style={[styles.statValue, { color: theme.info || '#29B6F6' }]}>
-                  {decisionStats.averageWaterAmount.toFixed(1)}L
+                  {decisionStats.averageWaterAmount.toFixed(2)}L
                 </Text>
                 <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
                   Lượng nước TB
@@ -517,7 +517,7 @@ const GardenWateringTab: React.FC<GardenWateringTabProps> = ({ gardenId }) => {
                   
                   {schedule.amount && (
                     <Text style={[styles.scheduleAmount, { color: theme.primary }]}>
-                      {schedule.amount}L
+                      {schedule.amount.toFixed(2)}L
                     </Text>
                   )}
                 </View>

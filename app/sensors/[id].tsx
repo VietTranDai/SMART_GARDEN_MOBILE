@@ -967,6 +967,7 @@ export default function SensorDetailScreen() {
           headerTintColor: theme.text,
           headerTitleStyle: { fontFamily: "Inter-SemiBold", fontSize: 18 },
           headerTitleAlign: "center",
+          presentation: 'card',
           headerLeft: () => (
             <TouchableOpacity
               onPress={() => router.back()}

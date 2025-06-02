@@ -23,7 +23,6 @@ import {
   PhotoEvaluationStatsResponse,
   PhotoEvaluationFormData,
   PhotoUploadProgress,
-  PlantGrowthStage,
 } from "@/types/activities/photo-evaluations.type";
 import { Garden } from "@/types/gardens/garden.types";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -53,11 +52,8 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [uploadModalVisible, setUploadModalVisible] = useState(false);
   
-  // Upload form states - Initialize with garden plant name when available
+  // Upload form states - Simplified to match backend API
   const [uploadForm, setUploadForm] = useState({
-    taskId: 1, // Default task ID
-    plantName: "",
-    plantGrowStage: PlantGrowthStage.VEGETATIVE,
     notes: "",
   });
   const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerResult | null>(null);
@@ -76,14 +72,6 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
     try {
       const gardenData = await GardenService.getGardenById(gardenId);
       setGarden(gardenData);
-      
-      // Update upload form with garden's plant name
-      if (gardenData?.plantName) {
-        setUploadForm(prev => ({
-          ...prev,
-          plantName: gardenData.plantName || "",
-        }));
-      }
     } catch (error) {
       console.error("Error loading garden:", error);
     }
@@ -198,7 +186,7 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
     }
   };
 
-  // Enhanced upload function with better error handling and retry logic
+  // Enhanced upload function with simplified form data
   const uploadPhoto = async (retryCount = 0) => {
     if (!selectedImage?.assets?.[0]) return;
 
@@ -214,16 +202,24 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
     setUploadProgress(null);
 
     try {
+      // ✅ SIMPLIFIED: Only gardenId, notes, and image
       const formData: PhotoEvaluationFormData = {
-        ...uploadForm,
         gardenId: Number(gardenId),
-        plantName: garden?.plantName || "",
+        notes: uploadForm.notes || undefined, // Only include if not empty
         image: {
           uri: asset.uri,
-          type: asset.type || "image/jpeg",
+          type: asset.mimeType || asset.type || "image/jpeg",
           name: asset.fileName || `photo_${Date.now()}.jpg`,
-        } as any,
+        },
       };
+
+      console.log("📝 Simplified form data prepared:", {
+        gardenId: formData.gardenId,
+        hasNotes: !!formData.notes,
+        imageUri: (formData.image as any).uri,
+        imageType: (formData.image as any).type,
+        imageName: (formData.image as any).name,
+      });
 
       const result = await PhotoEvaluationService.createPhotoEvaluation(
         formData,
@@ -231,15 +227,11 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
       );
 
       if (result.success) {
-        Alert.alert("Thành công", "Tải ảnh lên thành công!");
+        Alert.alert("Thành công", "Ảnh đã được tải lên thành công! AI sẽ phân tích và cung cấp kết quả sớm.");
         setUploadModalVisible(false);
         setSelectedImage(null);
-        setUploadForm({
-          taskId: 1,
-          plantName: garden?.plantName || "",
-          plantGrowStage: PlantGrowthStage.VEGETATIVE,
-          notes: "",
-        });
+        // Reset form
+        setUploadForm({ notes: "" });
         await loadData();
       } else {
         const errorMessage = result.error || "Có lỗi xảy ra khi tải ảnh lên";
@@ -247,7 +239,8 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
         // Handle specific error types with retry option
         if (errorMessage.includes("Hết thời gian chờ") || 
             errorMessage.includes("timeout") ||
-            errorMessage.includes("kết nối mạng")) {
+            errorMessage.includes("kết nối mạng") ||
+            errorMessage.includes("Request queued for offline mode")) {
           
           if (retryCount < 2) { // Max 3 attempts
             Alert.alert(
@@ -288,6 +281,11 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
                 }
               }
             ]
+          );
+        } else if (errorMessage.includes("Vườn không tồn tại")) {
+          Alert.alert(
+            "Lỗi vườn", 
+            "Vướn không tồn tại hoặc bạn không có quyền truy cập. Vui lòng kiểm tra lại."
           );
         } else {
           Alert.alert("Lỗi", errorMessage);
@@ -638,26 +636,6 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
             {!uploading && (
               <View style={styles.formContainer}>
                 <View style={styles.inputGroup}>
-                  <Text style={[styles.inputLabel, { color: theme.text }]}>Tên cây</Text>
-                  <TextInput
-                    style={[styles.textInputReadonly, { 
-                      backgroundColor: theme.backgroundSecondary,
-                      color: theme.textSecondary,
-                      borderColor: theme.borderLight
-                    }]}
-                    value={garden?.plantName || "Chưa có thông tin cây trồng"}
-                    editable={false}
-                    placeholder="Tên cây từ thông tin vườn"
-                    placeholderTextColor={theme.textTertiary}
-                  />
-                  {garden?.plantName && (
-                    <Text style={[styles.inputHelper, { color: theme.textTertiary }]}>
-                      Tự động lấy từ thông tin vườn
-                    </Text>
-                  )}
-                </View>
-
-                <View style={styles.inputGroup}>
                   <Text style={[styles.inputLabel, { color: theme.text }]}>Ghi chú (tùy chọn)</Text>
                   <TextInput
                     style={[styles.textArea, { 
@@ -667,11 +645,14 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
                     }]}
                     value={uploadForm.notes}
                     onChangeText={(text) => setUploadForm(prev => ({ ...prev, notes: text }))}
-                    placeholder="Nhập ghi chú về ảnh..."
+                    placeholder="Nhập ghi chú về ảnh (tùy chọn)..."
                     placeholderTextColor={theme.textTertiary}
                     multiline
                     numberOfLines={3}
                   />
+                  <Text style={[styles.inputHelper, { color: theme.textTertiary }]}>
+                    Thông tin cây trồng sẽ được lấy tự động từ vườn
+                  </Text>
                 </View>
 
                 <View style={styles.uploadTipsContainer}>
@@ -687,6 +668,9 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
                   <Text style={[styles.uploadTip, { color: theme.textSecondary }]}>
                     • Chụp ảnh rõ nét để AI phân tích tốt hơn
                   </Text>
+                  <Text style={[styles.uploadTip, { color: theme.textSecondary }]}>
+                    • AI sẽ tự động phân tích dựa trên thông tin vườn
+                  </Text>
                 </View>
 
                 <TouchableOpacity
@@ -694,7 +678,7 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
                   onPress={() => uploadPhoto()}
                 >
                   <Ionicons name="cloud-upload" size={20} color="#fff" style={{ marginRight: 8 }} />
-                  <Text style={styles.uploadButtonText}>Tải lên và đánh giá</Text>
+                  <Text style={styles.uploadButtonText}>Tải lên và đánh giá AI</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -748,7 +732,7 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
               Chưa có ảnh nào
             </Text>
             <Text style={[styles.emptySubtext, { color: theme.textTertiary }]}>
-              Hãy chụp ảnh vườn để AI phân tích tình trạng cây trồng
+              Chụp ảnh vườn để AI tự động phân tích tình trạng cây trồng dựa trên thông tin vườn
             </Text>
           </View>
         ) : (

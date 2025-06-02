@@ -102,7 +102,6 @@ class PhotoEvaluationService {
     onProgress?: (progress: PhotoUploadProgress) => void
   ): Promise<PhotoUploadResult> {
     try {
-      // Validate file size before upload
       if (photoData.image && (photoData.image as any).fileSize) {
         const maxSize = 10 * 1024 * 1024; // 10MB
         if ((photoData.image as any).fileSize > maxSize) {
@@ -115,29 +114,38 @@ class PhotoEvaluationService {
 
       const formData = new FormData();
       
-      formData.append('image', photoData.image);
+      const imageFile = photoData.image;
       
-      formData.append('taskId', photoData.taskId.toString());
+      if ('uri' in imageFile) {
+        formData.append('image', {
+          uri: imageFile.uri,
+          type: imageFile.type || "image/jpeg",
+          name: imageFile.name || `photo_${Date.now()}.jpg`,
+        } as any);
+        
+        console.log("📸 React Native image added to FormData:", {
+          uri: imageFile.uri,
+          type: imageFile.type,
+          name: imageFile.name
+        });
+      } else {
+        formData.append('image', imageFile);
+        console.log("🌐 Web file added to FormData");
+      }
+      
       formData.append('gardenId', photoData.gardenId.toString());
       
-      if (photoData.gardenActivityId) {
-        formData.append('gardenActivityId', photoData.gardenActivityId.toString());
-      }
-      if (photoData.plantName) {
-        formData.append('plantName', photoData.plantName);
-      }
-      if (photoData.plantGrowStage) {
-        formData.append('plantGrowStage', photoData.plantGrowStage);
-      }
       if (photoData.notes) {
         formData.append('notes', photoData.notes);
       }
 
+      console.log("🚀 Sending simplified multipart/form-data request...");
+      
       const response = await apiClient.post(
         PHOTO_EVALUATION_ENDPOINTS.CREATE,
         formData,
         {
-          timeout: 300000, // 5 minutes for photo uploads (increased from default)
+          timeout: 60000, // 1 minute
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -154,12 +162,14 @@ class PhotoEvaluationService {
         }
       );
 
+      console.log("✅ Upload successful!");
+
       return {
         success: true,
         data: response.data.data || response.data
       };
     } catch (error) {
-      console.error("Error creating photo evaluation:", error);
+      console.error("❌ Error creating photo evaluation:", error);
       
       // Enhanced error handling
       let errorMessage = "Có lỗi xảy ra khi tải ảnh lên";
@@ -170,6 +180,8 @@ class PhotoEvaluationService {
           errorMessage = "Hết thời gian chờ. File ảnh có thể quá lớn hoặc kết nối mạng chậm. Vui lòng thử lại.";
         } else if (error.message.includes("Network Error") || error.message.includes("kết nối mạng")) {
           errorMessage = "Không có kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.";
+        } else if (error.message.includes("Request queued for offline mode")) {
+          errorMessage = "Kết nối mạng không ổn định. Vui lòng thử lại sau.";
         } else if (error.message.includes("413") || error.message.includes("Payload Too Large")) {
           errorMessage = "File ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 10MB.";
         } else if (error.message.includes("400")) {
@@ -184,6 +196,12 @@ class PhotoEvaluationService {
         const status = (error as any).response.status;
         const responseData = (error as any).response.data;
         
+        console.log("🔍 Response error details:", {
+          status,
+          data: responseData,
+          headers: (error as any).response.headers
+        });
+        
         switch (status) {
           case 400:
             errorMessage = responseData?.message || "Dữ liệu không hợp lệ";
@@ -193,6 +211,9 @@ class PhotoEvaluationService {
             break;
           case 403:
             errorMessage = "Không có quyền thực hiện thao tác này";
+            break;
+          case 404:
+            errorMessage = "Vườn không tồn tại hoặc không có quyền truy cập";
             break;
           case 413:
             errorMessage = "File ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 10MB.";

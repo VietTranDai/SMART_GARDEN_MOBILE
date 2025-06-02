@@ -33,19 +33,7 @@ class CommunityService {
           limit: searchParams.limit || 10,
         },
       });
-      console.log("Posts response data structure:", {
-        postsCount: response.data.data.data?.length || 0,
-        firstPost: response.data.data.data?.[0] ? {
-          id: response.data.data.data[0].id,
-          title: response.data.data.data[0].title,
-          commentCount: response.data.data.data[0].commentCount,
-          commentsArrayLength: response.data.data.data[0].comments?.length,
-          hasComments: !!response.data.data.data[0].comments,
-          totalVote: response.data.data.data[0].total_vote
-        } : 'No posts',
-        total: response.data.data.total,
-        page: response.data.data.page
-      });
+      
       return response.data.data;
     } catch (error) {
       console.error("Failed to search posts:", error);

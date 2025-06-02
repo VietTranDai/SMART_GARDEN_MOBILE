@@ -86,7 +86,7 @@ class ApiClientManager {
         const isConnected = this.networkMonitor.getConnectionStatus();
 
         // Handle offline scenarios
-        if (!isConnected) {
+        if (isConnected === false) {
           return this.handleOfflineRequest(config);
         }
 

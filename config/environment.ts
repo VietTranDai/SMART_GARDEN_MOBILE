@@ -77,7 +77,7 @@ interface Environment {
 // Get environment variables using internal helpers
 const env: Environment = {
   apiUrl: getEnvInternal("API_URL", "https://api.example.com"),
-  apiTimeout: getNumEnvInternal("API_TIMEOUT", 20000),
+  apiTimeout: getNumEnvInternal("API_TIMEOUT", 60000),
   apiVersion: getEnvInternal("API_VERSION", "v1"),
   apiDebug: getBoolEnvInternal("API_DEBUG", false),
 };

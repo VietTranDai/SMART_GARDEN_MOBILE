@@ -1,3 +1,5 @@
+import env from "@/config/environment";
+
 // Mock NetInfo for environments where the native module isn't available
 const NetInfoMock = {
     configure: () => {},
@@ -36,7 +38,7 @@ const NetInfoMock = {
     private setupNetworkListener() {
       try {
         this.NetInfo.configure({
-          reachabilityUrl: process.env.EXPO_PUBLIC_API_URL || 'https://www.google.com',
+          reachabilityUrl: `${env.apiUrl}/${env.apiVersion}` || 'https://www.google.com',
           reachabilityTest: async (response: any) => response.status === 200,
           reachabilityLongTimeout: 30 * 1000,
           reachabilityShortTimeout: 5 * 1000,
@@ -47,7 +49,7 @@ const NetInfoMock = {
           const wasConnected = this.isConnected;
           this.isConnected = 
             state?.isConnected !== false && state?.isInternetReachable !== false;
-  
+        
           if (wasConnected !== this.isConnected) {
             this.notifyListeners(this.isConnected);
           }
