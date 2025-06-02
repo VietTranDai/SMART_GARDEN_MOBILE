@@ -371,13 +371,6 @@ export default function ModuleLayout() {
             headerTitle: "Tạo vườn mới",
           }}
         />
-        <Tabs.Screen
-          name="gardens/schedule/[id]"
-          options={{
-            href: null,
-            headerTitle: "Lịch tưới nước",
-          }}
-        />
 
         {/* 3. Community Tab */}
         <Tabs.Screen
@@ -431,7 +424,7 @@ export default function ModuleLayout() {
           name="tasks/[id]" 
           options={{
             href: null, 
-            headerTitle: "Chi tiết công việc",
+            headerShown: false,
           }}
         />
 
@@ -518,7 +511,7 @@ export default function ModuleLayout() {
           name="community/[id]"
           options={{
             href: null,
-            headerTitle: "Chi tiết bài viết",
+            headerShown: false,
           }}
         />
 
@@ -527,14 +520,6 @@ export default function ModuleLayout() {
           options={{
             href: null,
             headerTitle: "Bài viết mới",
-          }}
-        />
-
-        <Tabs.Screen
-          name="gardens/schedule"
-          options={{
-            href: null,
-            headerTitle: "Lịch tưới nước",
           }}
         />
 

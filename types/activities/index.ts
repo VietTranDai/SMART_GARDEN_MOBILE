@@ -7,3 +7,4 @@
 export * from "./activity.types";
 export * from "./task.types";
 export * from "./dtos";
+export * from "./watering-schedules.type";

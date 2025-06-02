@@ -34,6 +34,8 @@ export default function AuthScreen() {
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
+  const loadingOpacity = useRef(new Animated.Value(0)).current;
+  const buttonScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -50,6 +52,23 @@ export default function AuthScreen() {
     ]).start();
   }, []);
 
+  // Animate loading overlay
+  useEffect(() => {
+    if (isLoading) {
+      Animated.timing(loadingOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(loadingOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isLoading]);
+
   const styles = useMemo(() => createStyles(), []);
   const { signIn } = useUser();
 
@@ -60,6 +79,21 @@ export default function AuthScreen() {
     }
     setErrorMessage("");
     setIsLoading(true);
+    
+    // Button press animation
+    Animated.sequence([
+      Animated.timing(buttonScale, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonScale, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
     try {
       await new Promise((resolve) => setTimeout(resolve, 1200));
       await signIn({ username, password });
@@ -77,11 +111,20 @@ export default function AuthScreen() {
     >
       <StatusBar style={isDarkMode ? "light" : "dark"} />
 
-      {isLoading && (
-        <View style={styles.loadingOverlay}>
+      <Animated.View 
+        style={[
+          styles.loadingOverlay,
+          {
+            opacity: loadingOpacity,
+            pointerEvents: isLoading ? 'auto' : 'none'
+          }
+        ]}
+      >
+        <View style={styles.loadingContent}>
           <ActivityIndicator size="large" color="#4CAF50" />
+          <Text style={styles.loadingText}>Đang đăng nhập...</Text>
         </View>
-      )}
+      </Animated.View>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -168,13 +211,32 @@ export default function AuthScreen() {
                 </View>
               </View>
 
-              <TouchableOpacity
-                onPress={handleSignIn}
-                style={styles.signInButton}
-                disabled={isLoading}
-              >
-                <Text style={styles.signInText}>Đăng nhập</Text>
-              </TouchableOpacity>
+              <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                <TouchableOpacity
+                  onPress={handleSignIn}
+                  style={[
+                    styles.signInButton,
+                    isLoading && styles.signInButtonLoading
+                  ]}
+                  disabled={isLoading}
+                >
+                  <View style={styles.signInButtonContent}>
+                    {isLoading && (
+                      <ActivityIndicator 
+                        size="small" 
+                        color="#FFF" 
+                        style={styles.buttonSpinner}
+                      />
+                    )}
+                    <Text style={[
+                      styles.signInText,
+                      isLoading && styles.signInTextLoading
+                    ]}>
+                      {isLoading ? "Đang xử lý..." : "Đăng nhập"}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </Animated.View>
             </View>
           </Animated.View>
 
@@ -210,9 +272,29 @@ const createStyles = () =>
     gradientContainer: { flex: 1 },
     loadingOverlay: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: "rgba(232, 245, 233, 0.8)",
+      backgroundColor: "rgba(232, 245, 233, 0.95)",
       justifyContent: "center",
       alignItems: "center",
+      zIndex: 1000,
+    },
+    loadingContent: {
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "#FFFFFF",
+      paddingHorizontal: 32,
+      paddingVertical: 24,
+      borderRadius: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    loadingText: {
+      marginTop: 12,
+      fontSize: 16,
+      color: "#2E7D32",
+      fontWeight: "500",
     },
     flex: { flex: 1 },
     scrollContainer: {
@@ -256,8 +338,28 @@ const createStyles = () =>
       paddingVertical: 12,
       alignItems: "center",
       marginTop: 8,
+      minHeight: 44,
+      justifyContent: "center",
     },
-    signInText: { color: "#FFF", fontSize: 16, fontWeight: "600" },
+    signInButtonLoading: {
+      backgroundColor: "#81C784",
+    },
+    signInButtonContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    buttonSpinner: {
+      marginRight: 8,
+    },
+    signInText: { 
+      color: "#FFF", 
+      fontSize: 16, 
+      fontWeight: "600" 
+    },
+    signInTextLoading: {
+      opacity: 0.8,
+    },
     footerContainer: {
       alignItems: "center",
       marginTop: 20,

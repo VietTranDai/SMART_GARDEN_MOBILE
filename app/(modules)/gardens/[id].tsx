@@ -22,6 +22,7 @@ import GardenOverviewTab from "@/components/garden/GardenOverviewTab";
 import GardenSensorsTab from "@/components/garden/GardenSensorsTab";
 import GardenPlantTab from "@/components/garden/GardenPlantTab";
 import GardenPhotosTab from "@/components/garden/GardenPhotosTab";
+import GardenWateringTab from "@/components/garden/GardenWateringTab";
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -83,6 +84,15 @@ export default function GardenDetailScreen() {
     ]
   );
 
+  const WateringTab = useCallback(
+    () => (
+      <GardenWateringTab
+        gardenId={id}
+      />
+    ),
+    [id]
+  );
+
   const SensorsTab = useCallback(
     () => (
       <GardenSensorsTab
@@ -116,17 +126,10 @@ export default function GardenDetailScreen() {
   const PhotosTab = useCallback(
     () => (
       <GardenPhotosTab
-        photos={gardenPhotos}
-        gardenId={garden?.id}
-        initiatePhotoUpload={async () => {
-          if (garden && garden.id) {
-            await handleUploadPhoto(garden.id);
-          }
-        }}
-        isLoading={isLoading}
+        gardenId={garden?.id || id}
       />
     ),
-    [gardenPhotos, garden, handleUploadPhoto, isLoading]
+    [garden?.id, id]
   );
 
   // Loading state
@@ -199,9 +202,14 @@ export default function GardenDetailScreen() {
               borderBottomColor: theme.borderLight,
             },
             tabBarLabelStyle: {
-              fontSize: 13,
+              fontSize: 12,
               fontFamily: "Inter-Medium",
               textTransform: "none",
+            },
+            tabBarScrollEnabled: true,
+            tabBarItemStyle: {
+              width: 'auto',
+              minWidth: 80,
             },
           }}
         >
@@ -211,7 +219,17 @@ export default function GardenDetailScreen() {
             options={{
               tabBarLabel: "Tổng quan",
               tabBarIcon: ({ color }: { color: string }) => (
-                <Ionicons name="home-outline" size={20} color={color} />
+                <Ionicons name="home-outline" size={18} color={color} />
+              ),
+            }}
+          />
+          <Tab.Screen
+            name="Watering"
+            component={WateringTab}
+            options={{
+              tabBarLabel: "Tưới nước",
+              tabBarIcon: ({ color }: { color: string }) => (
+                <Ionicons name="water-outline" size={18} color={color} />
               ),
             }}
           />
@@ -222,8 +240,8 @@ export default function GardenDetailScreen() {
               tabBarLabel: "Cảm biến",
               tabBarIcon: ({ color }: { color: string }) => (
                 <Ionicons
-                  name="hardware-chip-outline"
-                  size={20}
+                  name="pulse-outline"
+                  size={18}
                   color={color}
                 />
               ),
@@ -235,7 +253,7 @@ export default function GardenDetailScreen() {
             options={{
               tabBarLabel: "Cây trồng",
               tabBarIcon: ({ color }: { color: string }) => (
-                <Ionicons name="leaf-outline" size={20} color={color} />
+                <Ionicons name="leaf-outline" size={18} color={color} />
               ),
             }}
           />
@@ -245,7 +263,7 @@ export default function GardenDetailScreen() {
             options={{
               tabBarLabel: "Hình ảnh",
               tabBarIcon: ({ color }: { color: string }) => (
-                <Ionicons name="images-outline" size={20} color={color} />
+                <Ionicons name="images-outline" size={18} color={color} />
               ),
             }}
           />

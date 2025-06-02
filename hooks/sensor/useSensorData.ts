@@ -3,9 +3,9 @@ import { SensorType, SensorData } from "@/types/gardens/sensor.types";
 import { sensorService } from "@/service/api";
 
 // Cấu hình
-const SENSOR_POLLING_INTERVAL = 5000; // 5 giây tiêu chuẩn cho sản phẩm
+const SENSOR_POLLING_INTERVAL = 8000; // 5 giây tiêu chuẩn cho sản phẩm
 const MAX_READINGS_TO_KEEP = 20; // Số lượng đọc cảm biến tối đa cần lưu trữ
-const MIN_POLLING_INTERVAL = 1500; // Khoảng thời gian tối thiểu giữa các lần polling (ms)
+const MIN_POLLING_INTERVAL = 5000; // Khoảng thời gian tối thiểu giữa các lần polling (ms)
 
 // Export sensor status function
 export const getSensorStatus = sensorService.getSensorStatus;

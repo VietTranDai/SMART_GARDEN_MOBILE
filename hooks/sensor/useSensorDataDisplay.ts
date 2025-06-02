@@ -149,7 +149,7 @@ export default function useSensorDataDisplay(
       case SensorType.LIGHT:
         return "sunny-outline";
       default:
-        return "hardware-chip-outline";
+        return "pulse-outline";
     }
   };
 

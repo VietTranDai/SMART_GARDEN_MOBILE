@@ -144,7 +144,7 @@ const GardenSensorsTab: React.FC<GardenSensorsTabProps> = ({
   ) {
     return (
       <EmptyStateView
-        icon="hardware-chip-outline"
+        icon="pulse-outline"
         title="Không có cảm biến"
         message="Chưa có cảm biến nào được kết nối hoặc báo cáo dữ liệu cho khu vườn này."
       />

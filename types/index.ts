@@ -21,8 +21,11 @@ export * from "./weather/weather.types";
 // Export-plant-related types
 export * from "./plants";
 
-// Export activity and task-related types
-export * from "./activities";
+// Export essential activity and task-related types
+export * from "./activities/activity.types";
+export * from "./activities/task.types";
+export * from "./activities/dtos";
+// Note: Import watering schedules and photo evaluations types directly from their files
 
 // Export social-related types
 export * from "./social";

@@ -47,12 +47,6 @@ class GardenCalendarService {
 
       // Process and normalize the calendar data
       const processedData = this.processCalendarData(calendarData);
-      
-      console.debug(`Fetched calendar data for garden ${gardenId}:`, {
-        totalActivities: processedData.recentActivities.length,
-        upcomingTasks: processedData.upcomingTasks.length,
-        wateringSchedules: processedData.upcomingWateringSchedules.length,
-      });
 
       return processedData;
     } catch (error) {

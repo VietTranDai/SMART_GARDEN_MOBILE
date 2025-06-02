@@ -39,7 +39,7 @@ export interface PostImage {
   url: string;
 }
 
-// Bài viết chính
+// Bài viết chính - Updated to match backend PostDto
 export interface Post {
   id: number;
 
@@ -66,6 +66,10 @@ export interface Post {
   tags?: Tag[];
   images?: PostImage[];
   comments?: Comment[];
+
+  // Số lượng
+  commentCount?: number;
+  imageCount?: number;
 
   // Vote của user hiện tại (–1, 0, +1)
   userVote?: number;
@@ -121,13 +125,32 @@ export interface Follow {
 /**
  * DTOs cho API
  */
+
+// Search DTO to match backend SearchPostDto
+export interface SearchPostDto {
+  search?: string;      // Tìm kiếm tổng hợp trong title, content, plantName
+  tagName?: string;     // Tìm kiếm theo tên tag
+  gardenerId?: number;  // Lọc theo ID người làm vườn
+  page?: number;        // Số trang (default: 1)
+  limit?: number;       // Số bài viết mỗi trang (default: 10)
+}
+
+// Paginated response structure
+export interface PaginatedPostResponse {
+  data: Post[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface CreatePostDto {
   title: string;
   content: string;
   gardenId?: number;
   plantName?: string;
   plantGrowStage?: string;
-  tagIds: number[];
+  tagIds: number[] | string[]; // Support both number[] and string[]
   images?: File[]; // nếu bạn upload ảnh lên API
 }
 
@@ -164,4 +187,11 @@ export interface FollowInfo {
   follower: CommunityUser;
   followed: CommunityUser;
   createdAt: string;
+}
+
+// Delete post response
+export interface DeletePostResponseDto {
+  success: boolean;
+  message: string;
+  deletedId?: number | string;
 }

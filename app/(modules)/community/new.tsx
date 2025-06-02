@@ -178,7 +178,7 @@ export default function NewPostScreen() {
     try {
       setLoadingImage(true);
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: false,
         aspect: [4, 3],
         quality: 0.8,
@@ -258,12 +258,12 @@ export default function NewPostScreen() {
     setSubmitting(true);
 
     try {
-      // Using FormData instead of direct image paths
+      // Using FormData for image uploads
       const formData = new FormData();
       formData.append("title", title.trim());
       formData.append("content", content.trim());
 
-      // Add tag IDs
+      // Add tag IDs as strings (to match the updated CreatePostDto)
       selectedTags.forEach((tag) => {
         formData.append("tagIds", tag.id.toString());
       });
@@ -273,17 +273,33 @@ export default function NewPostScreen() {
         formData.append("gardenId", selectedGarden.id.toString());
       }
 
+      // Add plant information if available
+      // You could add these fields to your form if needed
+      // formData.append("plantName", plantName);
+      // formData.append("plantGrowStage", plantGrowStage);
+
       // Add images
-      images.forEach((image) => {
-        // @ts-ignore - We need to ignore type checking here as the FormData types don't match React Native's file object
-        formData.append("images", image);
+      images.forEach((image, index) => {
+        formData.append(`images`, {
+          uri: image.uri,
+          type: image.type,
+          name: image.name,
+        } as any);
       });
 
-      // @ts-ignore - Ignore the type error since communityService.createPost expects CreatePostDto but we're sending FormData
-      await communityService.createPost(formData);
+      // Create the post
+      const newPost = await communityService.createPost(formData);
 
-      // Navigate back after successful post creation
-      router.back();
+      Alert.alert(
+        "Thành công",
+        "Bài viết của bạn đã được đăng thành công!",
+        [
+          {
+            text: "OK",
+            onPress: () => router.back(),
+          },
+        ]
+      );
     } catch (err) {
       console.error("Failed to create post:", err);
       Alert.alert("Lỗi", "Không thể tạo bài viết. Vui lòng thử lại.");

@@ -276,7 +276,7 @@ const GardenCard = memo(
                 ]}
               >
                 <Ionicons
-                  name="hardware-chip-outline"
+                  name="pulse-outline"
                   size={16}
                   color={theme.primary}
                   style={styles.statIcon}

@@ -11,17 +11,13 @@ import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { createStatsStyles } from '../styles/statsStyles';
 import { 
   ActivityStatsResponseDto, 
-  DailyActivityStatsDto, 
-  MonthlyActivityStatsDto 
 } from '@/types/activities/dtos';
 import { ACTIVITY_COLOR_MAP } from '../types';
-import { getActivityIcon, formatPercentage } from '../utils/journalUtils';
+import { formatPercentage } from '../utils/journalUtils';
 
 interface EnhancedStatsSectionProps {
   detailedStats: ActivityStatsResponseDto;
 }
-
-const { width: screenWidth } = Dimensions.get('window');
 
 export const EnhancedStatsSection: React.FC<EnhancedStatsSectionProps> = ({
   detailedStats,

@@ -14,7 +14,7 @@ interface UseGardenSensorsReturn {
   refreshSensors: () => void;
 }
 
-const POLLING_INTERVAL = 5000; // 5 seconds
+const POLLING_INTERVAL = 8000; // 5 seconds
 
 export function useGardenSensors({
   gardenId,

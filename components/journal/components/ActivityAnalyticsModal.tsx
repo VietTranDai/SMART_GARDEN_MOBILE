@@ -6,7 +6,6 @@ import { useTheme } from '../../../contexts/ThemeContext';
 
 // Helper functions for analytics
 const formatPercentile = (value: number) => `${Math.round(value)}%`;
-const formatEfficiencyRating = (value: number) => `${Math.round(value * 100)}%`;
 const translateActivityType = (activityType: string) => {
   switch(activityType) {
     case 'WATERING': return 'Tưới nước';
@@ -26,14 +25,7 @@ const translateActivityType = (activityType: string) => {
     case 'INSPECTION': return 'Kiểm tra';
     default: return activityType;
   }
-};
-const translateImprovementTrend = (trend: string) => {
-  switch(trend) {
-    case 'IMPROVING': return 'Đang cải thiện';
-    case 'STABLE': return 'Ổn định';  
-    case 'DECLINING': return 'Đang giảm';
-    default: return trend;
-  }
+
 };
 const translateEffectivenessLevel = (level: string) => {
   switch(level) {
@@ -57,14 +49,6 @@ const getRatingColor = (rating: number) => {
   if (rating >= 0.8) return '#10B981';
   if (rating >= 0.6) return '#F59E0B';
   return '#EF4444';
-};
-const formatDuration = (minutes: number) => {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  if (hours > 0) {
-    return `${hours}h${mins > 0 ? ` ${mins}m` : ''}`;
-  }
-  return `${mins}m`;
 };
 
 interface ActivityAnalyticsModalProps {

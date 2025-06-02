@@ -6,14 +6,12 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { createStatsStyles } from '../styles/statsStyles';
 import { ActivityStatsResponseDto } from '@/types/activities/dtos';
 import { ACTIVITY_COLOR_MAP, ACTIVITY_TYPE_TRANSLATIONS } from '../types';
 import { getActivityIcon, formatPercentage, formatNumber } from '../utils/journalUtils';
-import { ActivityType } from '@/types/activities/activity.types';
-import { EnhancedStatsSection } from './EnhancedStatsSection';
 
 interface JournalDetailedStatsProps {
   isExpanded: boolean;
@@ -34,14 +32,6 @@ export const JournalDetailedStats: React.FC<JournalDetailedStatsProps> = ({
 }) => {
   const theme = useAppTheme();
   const styles = createStatsStyles(theme);
-
-  // Debug info
-  console.log('JournalDetailedStats render:', { 
-    isExpanded, 
-    hasDetailedStats: !!detailedStats, 
-    statsLoading, 
-    statsError: !!statsError 
-  });
 
   if (!isExpanded) return null;
 
@@ -71,7 +61,7 @@ export const JournalDetailedStats: React.FC<JournalDetailedStatsProps> = ({
     );
   }
 
-  const { overview, byActivityType, trends } = detailedStats;
+  const { overview, byActivityType } = detailedStats;
 
   // Fallback if no data in detailedStats
   if (!overview) {

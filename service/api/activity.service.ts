@@ -92,7 +92,6 @@ class ActivityService {
       const response = await apiClient.get(
         ACTIVITY_ENDPOINTS.ANALYSIS(activityId)
       );
-      console.log("response.data.data", response.data.data);
       return response.data.data || null;
     } catch (error) {
       console.error(`Error fetching activity analysis for ${activityId}:`, error);
@@ -113,7 +112,6 @@ class ActivityService {
   }): Promise<ActivityStatsResponseDto | null> {
     try {
       const response = await apiClient.get(ACTIVITY_ENDPOINTS.STATS, { params });
-      console.log("response.data.data", response.data.data);
       return response.data.data || null;
     } catch (error) {
       console.error("Error fetching activity statistics:", error);

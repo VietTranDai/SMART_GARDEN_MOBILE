@@ -22,7 +22,7 @@ import {
 } from "@/service/api";
 import * as ImagePicker from "expo-image-picker";
 import Toast from "react-native-toast-message";
-import { WateringSchedule } from "@/types";
+import { WateringSchedule } from "@/types/activities/watering-schedules.type";
 import {
   PlantStatisticsData,
   PlantAdviceData,
@@ -138,7 +138,7 @@ export function useGardenDetail({ gardenId }: { gardenId: string | null }) {
         }),
       ]);
 
-      const scheduleData = await wateringService.getGardenWateringSchedules(id);
+      const scheduleData = await wateringService.getByGarden(id);
 
       setPlantDetails(plantDetailsData);
       setSensorHistory(sensorHistoryData);
@@ -370,7 +370,7 @@ export function useGardenDetail({ gardenId }: { gardenId: string | null }) {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,

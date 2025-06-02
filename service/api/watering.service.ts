@@ -1,23 +1,19 @@
+import { CreateWateringDecision, CreateWateringSchedule, WateringDecision, WateringScheduleQueryParams, WateringStatsQueryParams, WateringStats, WateringSchedule } from "@/types/activities/watering-schedules.type";
 import apiClient from "../apiClient";
-import { WATERING_ENDPOINTS } from "../endpoints";
-import { TaskStatus, WateringSchedule } from "@/types";
+import { WATERING_ENDPOINTS, WATERING_DECISION_ENDPOINTS } from "../endpoints";
 
 /**
- * Watering Service
- *
+ * Watering Schedule Service
+ * 
  * Handles all watering schedule-related API calls
  */
-class WateringService {
+class WateringScheduleService {
   /**
-   * Get all watering schedules
+   * Get all watering schedules of current user
    * @param params Query parameters
    * @returns List of watering schedules
    */
-  async getWateringSchedules(params?: {
-    status?: TaskStatus;
-    startDate?: string;
-    endDate?: string;
-  }): Promise<WateringSchedule[]> {
+  async getAll(params?: WateringScheduleQueryParams): Promise<WateringSchedule[]> {
     try {
       const response = await apiClient.get(WATERING_ENDPOINTS.LIST, {
         params,
@@ -30,18 +26,31 @@ class WateringService {
   }
 
   /**
+   * Get watering schedule by ID
+   * @param scheduleId Schedule ID
+   * @returns Watering schedule details
+   */
+  async getById(scheduleId: number | string): Promise<WateringSchedule | null> {
+    try {
+      const response = await apiClient.get(
+        WATERING_ENDPOINTS.DETAIL(scheduleId)
+      );
+      return response.data?.data || null;
+    } catch (error) {
+      console.error(`Error fetching watering schedule ${scheduleId}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Get watering schedules for a garden
    * @param gardenId Garden ID
    * @param params Query parameters
    * @returns List of watering schedules for the garden
    */
-  async getGardenWateringSchedules(
+  async getByGarden(
     gardenId: number | string,
-    params?: {
-      status?: TaskStatus;
-      startDate?: string;
-      endDate?: string;
-    }
+    params?: WateringScheduleQueryParams
   ): Promise<WateringSchedule[]> {
     try {
       const response = await apiClient.get(
@@ -59,36 +68,14 @@ class WateringService {
   }
 
   /**
-   * Get watering schedule by ID
-   * @param scheduleId Schedule ID
-   * @returns Watering schedule details
-   */
-  async getWateringScheduleById(
-    scheduleId: number | string
-  ): Promise<WateringSchedule | null> {
-    try {
-      const response = await apiClient.get(
-        WATERING_ENDPOINTS.DETAIL(scheduleId)
-      );
-      return response.data?.data || null;
-    } catch (error) {
-      console.error(`Error fetching watering schedule ${scheduleId}:`, error);
-      return null;
-    }
-  }
-
-  /**
    * Create a new watering schedule
    * @param gardenId Garden ID
    * @param scheduleData Schedule data
    * @returns Created watering schedule
    */
-  async createWateringSchedule(
+  async create(
     gardenId: number | string,
-    scheduleData: {
-      scheduledAt: string;
-      amount: number;
-    }
+    scheduleData: CreateWateringSchedule
   ): Promise<WateringSchedule | null> {
     try {
       const response = await apiClient.post(
@@ -106,11 +93,11 @@ class WateringService {
   }
 
   /**
-   * Generate automatic watering schedule for a garden
+   * Auto generate watering schedule for a garden
    * @param gardenId Garden ID
    * @returns Generated watering schedule
    */
-  async generateAutomaticSchedule(
+  async autoGenerate(
     gardenId: number | string
   ): Promise<WateringSchedule | null> {
     try {
@@ -128,11 +115,11 @@ class WateringService {
   }
 
   /**
-   * Complete a watering schedule
+   * Mark schedule as completed
    * @param scheduleId Schedule ID
    * @returns Updated watering schedule
    */
-  async completeWateringSchedule(
+  async complete(
     scheduleId: number | string
   ): Promise<WateringSchedule | null> {
     try {
@@ -147,11 +134,11 @@ class WateringService {
   }
 
   /**
-   * Skip a watering schedule
+   * Mark schedule as skipped
    * @param scheduleId Schedule ID
    * @returns Updated watering schedule
    */
-  async skipWateringSchedule(
+  async skip(
     scheduleId: number | string
   ): Promise<WateringSchedule | null> {
     try {
@@ -169,7 +156,7 @@ class WateringService {
    * Delete a watering schedule
    * @param scheduleId Schedule ID
    */
-  async deleteWateringSchedule(scheduleId: number | string): Promise<boolean> {
+  async delete(scheduleId: number | string): Promise<boolean> {
     try {
       await apiClient.delete(WATERING_ENDPOINTS.DETAIL(scheduleId));
       return true;
@@ -185,16 +172,16 @@ class WateringService {
    * @param limit Maximum number of schedules to return
    * @returns List of upcoming watering schedules
    */
-  async getUpcomingWateringSchedules(
+  async getUpcomingSchedules(
     gardenId: number | string,
     limit: number = 5
   ): Promise<any[]> {
     try {
       const now = new Date();
 
-      // Get all schedules for this garden
-      const schedules = await this.getGardenWateringSchedules(gardenId, {
-        status: TaskStatus.PENDING, // Only get pending schedules
+      // Get all pending schedules for this garden
+      const schedules = await this.getByGarden(gardenId, {
+        status: "PENDING",
       });
 
       // Filter for future schedules and sort by scheduled time
@@ -226,4 +213,104 @@ class WateringService {
   }
 }
 
-export default new WateringService();
+/**
+ * Watering Decision Model Service
+ * 
+ * Handles all watering AI decision-related API calls
+ */
+class WateringDecisionService {
+  /**
+   * Get watering decision for garden from AI model
+   * @param gardenId Garden ID
+   * @returns AI watering decision
+   */
+  async getDecisionByGarden(
+    gardenId: number | string
+  ): Promise<WateringDecision | null> {
+    try {
+      const response = await apiClient.get(
+        WATERING_DECISION_ENDPOINTS.GET_DECISION(gardenId)
+      );
+      return response.data?.data || null;
+    } catch (error) {
+      console.error(
+        `Error fetching watering decision for garden ${gardenId}:`,
+        error
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Create custom watering decision with sensor data
+   * @param gardenId Garden ID
+   * @param decisionData Custom sensor data
+   * @returns AI watering decision
+   */
+  async createCustomDecision(
+    gardenId: number | string,
+    decisionData: CreateWateringDecision
+  ): Promise<WateringDecision | null> {
+    try {
+      const response = await apiClient.post(
+        WATERING_DECISION_ENDPOINTS.CUSTOM_DECISION(gardenId),
+        decisionData
+      );
+      return response.data?.data || null;
+    } catch (error) {
+      console.error(
+        `Error creating custom watering decision for garden ${gardenId}:`,
+        error
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Get watering decision statistics for garden
+   * @param gardenId Garden ID
+   * @param params Query parameters
+   * @returns Watering decision statistics
+   */
+  async getStatsByGarden(
+    gardenId: number | string,
+    params?: WateringStatsQueryParams
+  ): Promise<WateringStats | null> {
+    try {
+      const response = await apiClient.get(
+        WATERING_DECISION_ENDPOINTS.STATS(gardenId),
+        { params }
+      );
+      return response.data?.data || null;
+    } catch (error) {
+      console.error(
+        `Error fetching watering stats for garden ${gardenId}:`,
+        error
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Test AI model connection
+   * @returns Test result
+   */
+  async testAIConnection(): Promise<any> {
+    try {
+      const response = await apiClient.get(
+        WATERING_DECISION_ENDPOINTS.TEST_AI
+      );
+      return response.data || null;
+    } catch (error) {
+      console.error("Error testing AI connection:", error);
+      return null;
+    }
+  }
+}
+
+// Export service instances
+export const wateringScheduleService = new WateringScheduleService();
+export const wateringDecisionService = new WateringDecisionService();
+
+// Export default as watering schedule service for backward compatibility
+export default wateringScheduleService;

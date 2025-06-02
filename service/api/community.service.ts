@@ -8,14 +8,10 @@ import {
   Tag,
   FollowInfo,
   Comment,
+  SearchPostDto,
+  PaginatedPostResponse,
+  DeletePostResponseDto,
 } from "@/types";
-
-// Define the missing interface locally
-interface DeletePostResponseDto {
-  success: boolean;
-  message: string;
-  deletedId?: number | string;
-}
 
 /**
  * Community Service
@@ -23,45 +19,36 @@ interface DeletePostResponseDto {
  */
 class CommunityService {
   /**
-   * Get all posts with optional pagination
+   * Search and filter posts with advanced options
+   * Replaces getPosts, getFilteredPosts, and searchPosts methods
    */
-  async getPosts(page: number = 1, limit: number = 10): Promise<Post[]> {
+  async searchPosts(searchParams: SearchPostDto): Promise<PaginatedPostResponse> {
     try {
       const response = await apiClient.get(COMMUNITY_ENDPOINTS.POSTS, {
-        params: { page, limit },
-      });
-      return response.data.data;
-    } catch (error) {
-      console.error("Failed to fetch posts:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get posts with filtering and pagination
-   */
-  async getFilteredPosts(
-    tagIds?: number[],
-    searchQuery?: string,
-    gardenId?: number,
-    userId?: number,
-    page: number = 1,
-    limit: number = 10
-  ): Promise<Post[]> {
-    try {
-      const response = await apiClient.get(COMMUNITY_ENDPOINTS.POSTS_FILTER, {
         params: {
-          page,
-          limit,
-          tagIds: tagIds?.join(","),
-          searchQuery,
-          gardenId,
-          userId,
+          search: searchParams.search,
+          tagName: searchParams.tagName,
+          gardenerId: searchParams.gardenerId,
+          page: searchParams.page || 1,
+          limit: searchParams.limit || 10,
         },
       });
+      console.log("Posts response data structure:", {
+        postsCount: response.data.data.data?.length || 0,
+        firstPost: response.data.data.data?.[0] ? {
+          id: response.data.data.data[0].id,
+          title: response.data.data.data[0].title,
+          commentCount: response.data.data.data[0].commentCount,
+          commentsArrayLength: response.data.data.data[0].comments?.length,
+          hasComments: !!response.data.data.data[0].comments,
+          totalVote: response.data.data.data[0].total_vote
+        } : 'No posts',
+        total: response.data.data.total,
+        page: response.data.data.page
+      });
       return response.data.data;
     } catch (error) {
-      console.error("Failed to fetch filtered posts:", error);
+      console.error("Failed to search posts:", error);
       throw error;
     }
   }
@@ -69,10 +56,10 @@ class CommunityService {
   /**
    * Get a post by ID
    */
-  async getPostById(postId: string): Promise<Post> {
+  async getPostById(postId: string | number): Promise<Post> {
     try {
       const response = await apiClient.get(
-        COMMUNITY_ENDPOINTS.POST_DETAIL(postId)
+        COMMUNITY_ENDPOINTS.POST_DETAIL(postId.toString())
       );
       return response.data.data;
     } catch (error) {
@@ -106,12 +93,12 @@ class CommunityService {
    * Update a post
    */
   async updatePost(
-    postId: string,
+    postId: string | number,
     postData: Partial<CreatePostDto>
   ): Promise<Post> {
     try {
       const response = await apiClient.patch(
-        COMMUNITY_ENDPOINTS.POST_DETAIL(postId),
+        COMMUNITY_ENDPOINTS.POST_DETAIL(postId.toString()),
         postData
       );
       return response.data.data;
@@ -124,12 +111,11 @@ class CommunityService {
   /**
    * Delete a post
    */
-  async deletePost(postId: string): Promise<DeletePostResponseDto> {
+  async deletePost(postId: string | number): Promise<void> {
     try {
-      const response = await apiClient.delete(
-        COMMUNITY_ENDPOINTS.POST_DETAIL(postId)
+      await apiClient.delete(
+        COMMUNITY_ENDPOINTS.POST_DETAIL(postId.toString())
       );
-      return response.data.data;
     } catch (error) {
       console.error("Failed to delete post:", error);
       throw error;
@@ -139,10 +125,10 @@ class CommunityService {
   /**
    * Vote on a post (upvote/downvote)
    */
-  async votePost(postId: string, voteData: VoteRequestDto): Promise<any> {
+  async votePost(postId: string | number, voteData: VoteRequestDto): Promise<any> {
     try {
       const response = await apiClient.post(
-        COMMUNITY_ENDPOINTS.POST_VOTE(postId),
+        COMMUNITY_ENDPOINTS.POST_VOTE(postId.toString()),
         voteData
       );
       return response.data.data;
@@ -155,10 +141,10 @@ class CommunityService {
   /**
    * Get comments for a post
    */
-  async getPostComments(postId: string): Promise<Comment[]> {
+  async getPostComments(postId: string | number): Promise<Comment[]> {
     try {
       const response = await apiClient.get(
-        COMMUNITY_ENDPOINTS.POST_COMMENTS(postId)
+        COMMUNITY_ENDPOINTS.POST_COMMENTS(postId.toString())
       );
       return response.data.data;
     } catch (error) {
@@ -186,10 +172,10 @@ class CommunityService {
   /**
    * Update a comment
    */
-  async updateComment(commentId: string, content: string): Promise<Comment> {
+  async updateComment(commentId: string | number, content: string): Promise<Comment> {
     try {
       const response = await apiClient.patch(
-        COMMUNITY_ENDPOINTS.COMMENT_DETAIL(commentId),
+        COMMUNITY_ENDPOINTS.COMMENT_DETAIL(commentId.toString()),
         {
           content,
         }
@@ -204,10 +190,10 @@ class CommunityService {
   /**
    * Delete a comment
    */
-  async deleteComment(commentId: string): Promise<any> {
+  async deleteComment(commentId: string | number): Promise<any> {
     try {
       const response = await apiClient.delete(
-        COMMUNITY_ENDPOINTS.COMMENT_DETAIL(commentId)
+        COMMUNITY_ENDPOINTS.COMMENT_DETAIL(commentId.toString())
       );
       return response.data.data;
     } catch (error) {
@@ -219,10 +205,10 @@ class CommunityService {
   /**
    * Vote on a comment (upvote/downvote)
    */
-  async voteComment(commentId: string, voteData: VoteRequestDto): Promise<any> {
+  async voteComment(commentId: string | number, voteData: VoteRequestDto): Promise<any> {
     try {
       const response = await apiClient.post(
-        COMMUNITY_ENDPOINTS.COMMENT_VOTE(commentId),
+        COMMUNITY_ENDPOINTS.COMMENT_VOTE(commentId.toString()),
         voteData
       );
       return response.data.data;
@@ -289,25 +275,6 @@ class CommunityService {
   }
 
   /**
-   * Search posts by query
-   */
-  async searchPosts(
-    query: string,
-    page: number = 1,
-    limit: number = 10
-  ): Promise<Post[]> {
-    try {
-      const response = await apiClient.get(COMMUNITY_ENDPOINTS.POSTS_SEARCH, {
-        params: { query, page, limit },
-      });
-      return response.data.data;
-    } catch (error) {
-      console.error("Failed to search posts:", error);
-      throw error;
-    }
-  }
-
-  /**
    * Get followers of a gardener
    * @param gardenerId Gardener ID
    * @returns List of followers
@@ -349,6 +316,35 @@ class CommunityService {
    */
   async unfollowUser(gardenerId: number | string): Promise<void> {
     await apiClient.delete(COMMUNITY_ENDPOINTS.UNFOLLOW_USER(gardenerId));
+  }
+
+  // Legacy methods for backward compatibility (deprecated)
+  /**
+   * @deprecated Use searchPosts instead
+   */
+  async getPosts(page: number = 1, limit: number = 10): Promise<Post[]> {
+    const response = await this.searchPosts({ page, limit });
+    return response.data;
+  }
+
+  /**
+   * @deprecated Use searchPosts instead
+   */
+  async getFilteredPosts(
+    tagIds?: number[],
+    searchQuery?: string,
+    gardenId?: number,
+    userId?: number,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<Post[]> {
+    const response = await this.searchPosts({
+      search: searchQuery,
+      gardenerId: userId,
+      page,
+      limit,
+    });
+    return response.data;
   }
 }
 

@@ -173,7 +173,7 @@ export default function SensorDetailView({
           ) : (
             <View style={styles.centeredMessageContainer}>
               <Ionicons
-                name="hardware-chip-outline"
+                name="pulse-outline"
                 size={48}
                 color={theme.textSecondary}
               />

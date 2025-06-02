@@ -116,6 +116,17 @@ export const WATERING_ENDPOINTS = {
     `/watering-schedules/gardens/${gardenId}/auto`,
 };
 
+// Watering decision model endpoints
+export const WATERING_DECISION_ENDPOINTS = {
+  GET_DECISION: (gardenId: string | number) =>
+    `/watering-decision/garden/${gardenId}`,
+  CUSTOM_DECISION: (gardenId: string | number) =>
+    `/watering-decision/garden/${gardenId}/custom`,
+  STATS: (gardenId: string | number) =>
+    `/watering-decision/garden/${gardenId}/stats`,
+  TEST_AI: "/watering-decision/test-ai",
+};
+
 // Define the base API endpoints for community features
 export const COMMUNITY_ENDPOINTS = {
   // Posts endpoints
@@ -197,6 +208,7 @@ export default {
   TASK: TASK_ENDPOINTS,
   ACTIVITY: ACTIVITY_ENDPOINTS,
   WATERING: WATERING_ENDPOINTS,
+  WATERING_DECISION: WATERING_DECISION_ENDPOINTS,
   COMMUNITY: COMMUNITY_ENDPOINTS,
   WEATHER: WEATHER_ENDPOINTS,
   ALERT: ALERT_ENDPOINTS,

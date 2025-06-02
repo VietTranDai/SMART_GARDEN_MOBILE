@@ -15,7 +15,6 @@ import {
   Dimensions,
   Animated,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, FontAwesome5, Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
 import { useAppTheme } from "@/hooks/ui/useAppTheme";
@@ -144,6 +143,11 @@ const ImageGallery = ({ images }: { images: PostImageItem[] }) => {
     setLoading((prev) => ({ ...prev, [index]: true }));
   };
 
+  const getImageUrl = (url: string) => {
+    return `${env.apiUrl}/${url}`;
+  };
+
+
   return (
     <View style={{ width: "100%" }}>
       <FlatList
@@ -169,7 +173,7 @@ const ImageGallery = ({ images }: { images: PostImageItem[] }) => {
               </View>
             )}
             <Image
-              source={{ uri: item.url }}
+              source={{ uri: getImageUrl(item.url) }}
               style={[styles.galleryImage, loading[index] && { opacity: 0.3 }]}
               resizeMode="cover"
               onLoadStart={() => handleImageLoadStart(index)}
@@ -224,7 +228,8 @@ export default function PostDetailScreen() {
       setError(null);
       setLoading(true);
 
-      const postId = typeof id === "string" ? id : id.toString();
+      // Convert ID to string for API calls (service now handles both string and number)
+      const postId = Array.isArray(id) ? id[0] : id.toString();
 
       // Fetch post details and comments in parallel
       const [postData, commentsData] = await Promise.all([
@@ -324,7 +329,7 @@ export default function PostDetailScreen() {
 
   const handleVote = async (
     targetType: VoteTargetType,
-    targetId: string,
+    targetId: string | number,
     voteValue: number
   ) => {
     try {
@@ -336,8 +341,8 @@ export default function PostDetailScreen() {
         // Update local state with the result from API
         setPost({
           ...post,
-          total_vote: result.total_vote,
-          userVote: result.userVote,
+          total_vote: result.total_vote || (post.total_vote + voteValue),
+          userVote: voteValue,
         });
       } else if (targetType === VoteTargetType.COMMENT) {
         // Call API to vote on comment
@@ -347,21 +352,21 @@ export default function PostDetailScreen() {
         // Update the comment in our local state
         setComments(
           comments.map((comment) => {
-            if (comment.id.toString() === targetId) {
+            if (comment.id.toString() === targetId.toString()) {
               return {
                 ...comment,
-                score: result.score,
-                userVote: result.userVote,
+                score: result.score || (comment.score + voteValue),
+                userVote: voteValue,
               };
             } else if (comment.replies) {
               return {
                 ...comment,
                 replies: comment.replies.map((reply) =>
-                  reply.id.toString() === targetId
+                  reply.id.toString() === targetId.toString()
                     ? {
                         ...reply,
-                        score: result.score,
-                        userVote: result.userVote,
+                        score: result.score || (reply.score + voteValue),
+                        userVote: voteValue,
                       }
                     : reply
                 ),
@@ -373,7 +378,7 @@ export default function PostDetailScreen() {
       }
     } catch (err) {
       console.error("Failed to register vote:", err);
-      Alert.alert("Error", "Failed to register your vote. Please try again.");
+      Alert.alert("Lỗi", "Không thể ghi nhận bình chọn. Vui lòng thử lại.");
     }
   };
 
@@ -382,11 +387,11 @@ export default function PostDetailScreen() {
 
     setSubmitting(true);
     try {
-      // Convert string ID to number if needed by the API
-      const postId = typeof id === "string" ? parseInt(id, 10) : id;
+      // Convert ID to number for CreateCommentDto
+      const postId = Array.isArray(id) ? parseInt(id[0], 10) : parseInt(id.toString(), 10);
 
       const commentData: CreateCommentDto = {
-        postId: Number(postId),
+        postId: postId,
         content: newComment.trim(),
         parentId: replyTo?.id,
       };
@@ -400,9 +405,11 @@ export default function PostDetailScreen() {
       // Reset form
       setNewComment("");
       setReplyTo(null);
+
+      Alert.alert("Thành công", "Bình luận của bạn đã được đăng.");
     } catch (err) {
       console.error("Failed to submit comment:", err);
-      Alert.alert("Error", "Failed to submit your comment. Please try again.");
+      Alert.alert("Lỗi", "Không thể đăng bình luận. Vui lòng thử lại.");
     } finally {
       setSubmitting(false);
     }
@@ -735,9 +742,8 @@ export default function PostDetailScreen() {
   };
 
   return (
-    <SafeAreaView
+    <View
       style={[styles.container, { backgroundColor: theme.background }]}
-      edges={["top"]}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -747,7 +753,9 @@ export default function PostDetailScreen() {
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() => {
+              router.replace("/(modules)/community/");
+            }}
           >
             <Ionicons name="arrow-back" size={24} color={theme.primary} />
           </TouchableOpacity>
@@ -963,7 +971,7 @@ export default function PostDetailScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -976,6 +984,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     padding: 16,
+    paddingTop: 50,
   },
   backButton: {
     padding: 4,

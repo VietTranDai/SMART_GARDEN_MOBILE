@@ -178,7 +178,7 @@ export default function useHomeData() {
     pollSensorData();
 
     // Setup interval - runs every 5 seconds
-    const intervalId = setInterval(pollSensorData, 5000);
+    const intervalId = setInterval(pollSensorData, 8000);
 
     // Cleanup function
     return () => {

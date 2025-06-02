@@ -12,8 +12,6 @@ import { createJournalStyles } from '../styles/journalStyles';
 import { Garden } from '@/types/gardens/garden.types';
 
 interface JournalFiltersProps {
-  isExpanded: boolean;
-  setIsExpanded: (expanded: boolean) => void;
   selectedGardenId?: string;
   setSelectedGardenId: (id?: string) => void;
   selectedActivityType?: string;
@@ -26,8 +24,6 @@ interface JournalFiltersProps {
 }
 
 export const JournalFilters: React.FC<JournalFiltersProps> = ({
-  isExpanded,
-  setIsExpanded,
   selectedGardenId,
   setSelectedGardenId,
   selectedActivityType,

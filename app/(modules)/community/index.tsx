@@ -23,12 +23,45 @@ import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { Ionicons, FontAwesome5, Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import communityService from "@/service/api/community.service";
-import { Post, Tag } from "@/types";
+import { Post, Tag, SearchPostDto, PaginatedPostResponse } from "@/types";
 import env from "@/config/environment";
 import ContentLoader, { Rect } from "@/components/ui/ContentLoader";
 
 const ITEMS_PER_PAGE = 10;
 const SCREEN_WIDTH = Dimensions.get("window").width;
+
+// Utility function to format comment count
+const formatCommentCount = (count: number): string => {
+  if (count === 0) return "0 bình luận";
+  if (count === 1) return "1 bình luận";
+  if (count < 1000) return `${count} bình luận`;
+  if (count < 1000000) return `${(count / 1000).toFixed(1)}k bình luận`;
+  return `${(count / 1000000).toFixed(1)}M bình luận`;
+};
+
+// Utility function to format vote count
+const formatVoteCount = (count: number): string => {
+  if (count === 0) return "0";
+  if (Math.abs(count) < 1000) return count.toString();
+  if (Math.abs(count) < 1000000) return `${(count / 1000).toFixed(1)}k`;
+  return `${(count / 1000000).toFixed(1)}M`;
+};
+
+// Get comment count from post data
+const getCommentCount = (post: Post): number => {
+  // Prioritize commentCount if available
+  if (typeof post.commentCount === 'number' && post.commentCount >= 0) {
+    return post.commentCount;
+  }
+  
+  // Fallback to comments array length
+  if (post.comments && Array.isArray(post.comments)) {
+    return post.comments.length;
+  }
+  
+  // Default to 0
+  return 0;
+};
 
 // Skeleton loader component for posts
 const PostSkeleton = ({ theme }: { theme: any }) => {
@@ -113,13 +146,14 @@ export default function CommunityScreen() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMorePosts, setHasMorePosts] = useState(true);
+  const [totalPosts, setTotalPosts] = useState(0);
   const [scrollToTopVisible, setScrollToTopVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   // Memoize styles
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  // Fetch posts and tags
+  // Fetch posts and tags with new search API
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -127,26 +161,39 @@ export default function CommunityScreen() {
     setHasMorePosts(true);
 
     try {
-      // Fetch posts with optional tag filter
-      const params: any = {
+      // Prepare search parameters
+      const searchParams: SearchPostDto = {
         page: 1,
         limit: ITEMS_PER_PAGE,
       };
+      
       if (selectedTag) {
-        params.tag = selectedTag;
+        searchParams.tagName = selectedTag;
       }
-      if (searchQuery) {
-        params.search = searchQuery;
+      if (searchQuery.trim()) {
+        searchParams.search = searchQuery.trim();
       }
 
-      const [postsData, tagsData] = await Promise.all([
-        communityService.getPosts(params),
+      const [postsResponse, tagsData] = await Promise.all([
+        communityService.searchPosts(searchParams),
         communityService.getTags(),
       ]);
 
-      setPosts(postsData);
+      console.log("Community data loaded:", {
+        postsCount: postsResponse.data.length,
+        samplePost: postsResponse.data[0] ? {
+          id: postsResponse.data[0].id,
+          title: postsResponse.data[0].title,
+          commentCount: postsResponse.data[0].commentCount,
+          commentsLength: postsResponse.data[0].comments?.length,
+          actualCommentCount: getCommentCount(postsResponse.data[0])
+        } : null
+      });
+
+      setPosts(postsResponse.data);
+      setTotalPosts(postsResponse.total);
       setTags(tagsData);
-      setHasMorePosts(postsData.length === ITEMS_PER_PAGE);
+      setHasMorePosts(postsResponse.data.length === ITEMS_PER_PAGE && postsResponse.page < postsResponse.totalPages);
     } catch (err) {
       console.error("Failed to load community data:", err);
       setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
@@ -162,23 +209,25 @@ export default function CommunityScreen() {
     try {
       const nextPage = page + 1;
 
-      const params: any = {
+      // Prepare search parameters for next page
+      const searchParams: SearchPostDto = {
         page: nextPage,
         limit: ITEMS_PER_PAGE,
       };
+      
       if (selectedTag) {
-        params.tag = selectedTag;
+        searchParams.tagName = selectedTag;
       }
-      if (searchQuery) {
-        params.search = searchQuery;
+      if (searchQuery.trim()) {
+        searchParams.search = searchQuery.trim();
       }
 
-      const morePosts = await communityService.getPosts(params);
+      const morePostsResponse: PaginatedPostResponse = await communityService.searchPosts(searchParams);
 
-      if (morePosts.length > 0) {
-        setPosts((prev) => [...prev, ...morePosts]);
+      if (morePostsResponse.data.length > 0) {
+        setPosts((prev) => [...prev, ...morePostsResponse.data]);
         setPage(nextPage);
-        setHasMorePosts(morePosts.length === ITEMS_PER_PAGE);
+        setHasMorePosts(nextPage < morePostsResponse.totalPages);
       } else {
         setHasMorePosts(false);
       }
@@ -200,25 +249,20 @@ export default function CommunityScreen() {
     setRefreshing(false);
   }, [fetchInitialData]);
 
-  const handleSearch = useCallback(() => {
-    Keyboard.dismiss();
-    fetchInitialData();
-  }, [fetchInitialData]);
-
-  const clearSearch = useCallback(() => {
-    setSearchQuery("");
-    // Only re-fetch if we had a previous search query
-    if (searchQuery) {
-      setTimeout(fetchInitialData, 100);
-    }
-  }, [searchQuery, fetchInitialData]);
-
-  const handleTagPress = useCallback(
-    (tagName: string) => {
-      // Toggle tag selection
-      setSelectedTag(selectedTag === tagName ? null : tagName);
+  const handleSearch = useCallback(
+    (query: string) => {
+      setSearchQuery(query);
+      // Debounce search - will trigger fetchInitialData via useEffect
     },
-    [selectedTag]
+    []
+  );
+
+  const handleTagSelect = useCallback(
+    (tagName: string | null) => {
+      setSelectedTag(tagName);
+      // Will trigger fetchInitialData via useEffect
+    },
+    []
   );
 
   const formatDate = (dateInput: string | Date) => {
@@ -260,7 +304,7 @@ export default function CommunityScreen() {
             </View>
           </View>
           <View style={styles.postStats}>
-            <Text style={styles.voteCount}>{item.total_vote}</Text>
+            <Text style={styles.voteCount}>{formatVoteCount(item.total_vote)}</Text>
             <Ionicons
               name={item.userVote === 1 ? "arrow-up" : "arrow-up-outline"}
               size={16}
@@ -319,7 +363,7 @@ export default function CommunityScreen() {
                 color={theme.textSecondary}
               />
               <Text style={styles.metaText}>
-                {item.comments?.length || 0} bình luận
+                {formatCommentCount(getCommentCount(item))}
               </Text>
             </View>
           </View>
@@ -411,14 +455,14 @@ export default function CommunityScreen() {
             style={styles.searchInput}
             placeholder="Tìm kiếm bài viết..."
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={handleSearch}
             onFocus={() => setIsSearchFocused(true)}
             onBlur={() => setIsSearchFocused(false)}
-            onSubmitEditing={handleSearch}
+            onSubmitEditing={() => {}}
             returnKeyType="search"
           />
           {searchQuery ? (
-            <TouchableOpacity onPress={clearSearch}>
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
               <Ionicons name="close" size={20} color={theme.textSecondary} />
             </TouchableOpacity>
           ) : null}
@@ -435,7 +479,7 @@ export default function CommunityScreen() {
       {tags.length > 0 && (
         <View style={styles.tagsScrollContainer}>
           <FlatList
-            data={tags}
+            data={[{ id: 0, name: "Tất cả" }, ...tags]}
             keyExtractor={(item) => item.id.toString()}
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -444,14 +488,18 @@ export default function CommunityScreen() {
               <TouchableOpacity
                 style={[
                   styles.tagChip,
-                  selectedTag === item.name && styles.tagChipSelected,
+                  (item.name === "Tất cả" && !selectedTag) || selectedTag === item.name 
+                    ? styles.tagChipSelected 
+                    : null,
                 ]}
-                onPress={() => handleTagPress(item.name)}
+                onPress={() => handleTagSelect(item.name === "Tất cả" ? null : item.name)}
               >
                 <Text
                   style={[
                     styles.tagChipText,
-                    selectedTag === item.name && styles.tagChipTextSelected,
+                    (item.name === "Tất cả" && !selectedTag) || selectedTag === item.name 
+                      ? styles.tagChipTextSelected 
+                      : null,
                   ]}
                 >
                   {item.name}
@@ -487,9 +535,15 @@ export default function CommunityScreen() {
             size={64}
             color={theme.textTertiary}
           />
-          <Text style={styles.emptyTitle}>Chưa có bài viết nào</Text>
+          <Text style={styles.emptyTitle}>
+            {searchQuery || selectedTag 
+              ? "Không tìm thấy bài viết nào" 
+              : "Chưa có bài viết nào"}
+          </Text>
           <Text style={styles.emptyText}>
-            Hãy là người đầu tiên chia sẻ kinh nghiệm làm vườn của bạn!
+            {searchQuery || selectedTag 
+              ? "Hãy thử tìm kiếm với từ khóa khác hoặc xóa bộ lọc"
+              : "Hãy là người đầu tiên chia sẻ kinh nghiệm làm vườn của bạn!"}
           </Text>
           <TouchableOpacity
             style={styles.createPostButton}

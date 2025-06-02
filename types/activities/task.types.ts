@@ -32,20 +32,3 @@ export interface Task {
   createdAt: string; // ISO 8601 string (corresponds to Date on backend)
   updatedAt: string; // ISO 8601 string (corresponds to Date on backend)
 }
-
-export interface WateringSchedule {
-  id: number;
-  gardenId: number;
-
-  // Schedule details
-  scheduledAt: string;
-  amount?: number;
-  status: TaskStatus;
-
-  notes?: string;
-
-  // Timestamps
-  createdAt?: string;
-  updatedAt?: string;
-}
-

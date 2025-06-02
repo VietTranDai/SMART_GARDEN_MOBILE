@@ -748,7 +748,7 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
             plantStats.predictions.riskFactors
               .slice(0, 3)
               .map((risk: RiskFactor, index: number) => (
-                <RiskFactorItem key={index} risk={risk} theme={theme} />
+                <RiskFactorItem key={`risk-${risk.type}-${index}`} risk={risk} theme={theme} />
               ))
           ) : (
             <Text style={[styles.noDataText, { color: theme.textSecondary }]}>
@@ -769,7 +769,7 @@ const GardenPlantTab: React.FC<GardenPlantTabProps> = ({
             {plantDetailedAdvice.immediateActions.map(
               (action: ImmediateAction, index: number) => (
                 <ImmediateActionItem
-                  key={action.id} // Use action.id if available and unique
+                  key={action.id || `action-${index}`}
                   action={action}
                   theme={theme}
                 />

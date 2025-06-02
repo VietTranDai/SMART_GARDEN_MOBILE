@@ -36,7 +36,7 @@ const ALERT_TYPE_MAP: Partial<
   Record<AlertType, { icon: string; color: string; label: string }>
 > = {
   [AlertType.SENSOR_ERROR]: {
-    icon: "hardware-chip-outline",
+    icon: "pulse-outline",
     color: "#3498db",
     label: "Cảm biến",
   },

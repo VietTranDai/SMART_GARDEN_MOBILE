@@ -17,6 +17,7 @@ import {
 import { Image } from "expo-image";
 import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import PhotoEvaluationService from "@/service/api/photo-evaluations.service";
+import GardenService from "@/service/api/garden.service";
 import {
   PhotoEvaluationWithRelations,
   PhotoEvaluationStatsResponse,
@@ -24,6 +25,7 @@ import {
   PhotoUploadProgress,
   PlantGrowthStage,
 } from "@/types/activities/photo-evaluations.type";
+import { Garden } from "@/types/gardens/garden.types";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
@@ -38,6 +40,7 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
   const { width: windowWidth } = useWindowDimensions();
 
   // States
+  const [garden, setGarden] = useState<Garden | null>(null);
   const [photos, setPhotos] = useState<PhotoEvaluationWithRelations[]>([]);
   const [stats, setStats] = useState<PhotoEvaluationStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,7 +53,7 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [uploadModalVisible, setUploadModalVisible] = useState(false);
   
-  // Upload form states
+  // Upload form states - Initialize with garden plant name when available
   const [uploadForm, setUploadForm] = useState({
     taskId: 1, // Default task ID
     plantName: "",
@@ -67,6 +70,24 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
   const numColumns = 2;
   const gap = 12;
   const photoSize = (windowWidth - 32 - (numColumns - 1) * gap) / numColumns;
+
+  // Load garden info
+  const loadGarden = useCallback(async () => {
+    try {
+      const gardenData = await GardenService.getGardenById(gardenId);
+      setGarden(gardenData);
+      
+      // Update upload form with garden's plant name
+      if (gardenData?.plantName) {
+        setUploadForm(prev => ({
+          ...prev,
+          plantName: gardenData.plantName || "",
+        }));
+      }
+    } catch (error) {
+      console.error("Error loading garden:", error);
+    }
+  }, [gardenId]);
 
   // Load data functions
   const loadPhotos = useCallback(async (pageNum = 1, append = false) => {
@@ -101,13 +122,28 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    await Promise.all([loadPhotos(), loadStats()]);
+    await Promise.all([loadGarden(), loadPhotos(), loadStats()]);
     setLoading(false);
-  }, [loadPhotos, loadStats]);
+  }, [loadGarden, loadPhotos, loadStats]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Validate mobile image file
+  const validateMobileImageFile = (asset: ImagePicker.ImagePickerAsset): { isValid: boolean; error?: string } => {
+    const maxSize = 10 * 1024 * 1024; // 10MB
+
+    if (!asset) {
+      return { isValid: false, error: "Vui lòng chọn file ảnh" };
+    }
+
+    if (asset.fileSize && asset.fileSize > maxSize) {
+      return { isValid: false, error: "File ảnh không được vượt quá 10MB" };
+    }
+
+    return { isValid: true };
+  };
 
   // Event handlers
   const onRefresh = useCallback(async () => {
@@ -131,7 +167,7 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
@@ -162,18 +198,15 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
     }
   };
 
-  // Upload functions
-  const uploadPhoto = async () => {
+  // Enhanced upload function with better error handling and retry logic
+  const uploadPhoto = async (retryCount = 0) => {
     if (!selectedImage?.assets?.[0]) return;
 
     const asset = selectedImage.assets[0];
-    const validation = PhotoEvaluationService.validateImageFile({
-      size: asset.fileSize || 0,
-      type: asset.type || "image/jpeg",
-    } as File);
+    const validation = validateMobileImageFile(asset);
 
     if (!validation.isValid) {
-      Alert.alert("Lỗi", validation.error);
+      Alert.alert("Lỗi", validation.error || "Có lỗi xảy ra khi tải ảnh lên");
       return;
     }
 
@@ -184,6 +217,7 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
       const formData: PhotoEvaluationFormData = {
         ...uploadForm,
         gardenId: Number(gardenId),
+        plantName: garden?.plantName || "",
         image: {
           uri: asset.uri,
           type: asset.type || "image/jpeg",
@@ -202,17 +236,92 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
         setSelectedImage(null);
         setUploadForm({
           taskId: 1,
-          plantName: "",
+          plantName: garden?.plantName || "",
           plantGrowStage: PlantGrowthStage.VEGETATIVE,
           notes: "",
         });
         await loadData();
       } else {
-        Alert.alert("Lỗi", result.error || "Có lỗi xảy ra khi tải ảnh lên");
+        const errorMessage = result.error || "Có lỗi xảy ra khi tải ảnh lên";
+        
+        // Handle specific error types with retry option
+        if (errorMessage.includes("Hết thời gian chờ") || 
+            errorMessage.includes("timeout") ||
+            errorMessage.includes("kết nối mạng")) {
+          
+          if (retryCount < 2) { // Max 3 attempts
+            Alert.alert(
+              "Lỗi kết nối", 
+              `${errorMessage}\n\nBạn có muốn thử lại không? (Lần thử ${retryCount + 1}/3)`,
+              [
+                { text: "Hủy", style: "cancel" },
+                { 
+                  text: "Thử lại", 
+                  onPress: () => {
+                    setTimeout(() => uploadPhoto(retryCount + 1), 1000);
+                  }
+                }
+              ]
+            );
+            return;
+          } else {
+            Alert.alert(
+              "Lỗi kết nối", 
+              "Đã thử tải lên 3 lần nhưng không thành công. Vui lòng:\n\n• Kiểm tra kết nối mạng\n• Thử chọn ảnh nhỏ hơn\n• Thử lại sau"
+            );
+          }
+        } else if (errorMessage.includes("File ảnh quá lớn")) {
+          Alert.alert(
+            "File quá lớn", 
+            "File ảnh vượt quá giới hạn cho phép. Vui lòng:\n\n• Chọn ảnh khác nhỏ hơn\n• Nén ảnh trước khi tải lên"
+          );
+        } else if (errorMessage.includes("Phiên đăng nhập")) {
+          Alert.alert(
+            "Phiên hết hạn", 
+            "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+            [
+              { 
+                text: "Đăng nhập lại", 
+                onPress: () => {
+                  // Navigate to login - you might need to implement this
+                  console.log("Navigate to login");
+                }
+              }
+            ]
+          );
+        } else {
+          Alert.alert("Lỗi", errorMessage);
+        }
       }
     } catch (error) {
       console.error("Upload error:", error);
-      Alert.alert("Lỗi", "Có lỗi xảy ra khi tải ảnh lên");
+      
+      const errorMessage = error instanceof Error ? error.message : "Có lỗi xảy ra khi tải ảnh lên";
+      
+      // Handle network errors with retry
+      if (errorMessage.includes("timeout") || 
+          errorMessage.includes("network") || 
+          errorMessage.includes("kết nối mạng")) {
+        
+        if (retryCount < 2) {
+          Alert.alert(
+            "Lỗi kết nối",
+            `Không thể kết nối đến server. Bạn có muốn thử lại không? (Lần thử ${retryCount + 1}/3)`,
+            [
+              { text: "Hủy", style: "cancel" },
+              { 
+                text: "Thử lại", 
+                onPress: () => {
+                  setTimeout(() => uploadPhoto(retryCount + 1), 2000);
+                }
+              }
+            ]
+          );
+          return;
+        }
+      }
+      
+      Alert.alert("Lỗi", errorMessage);
     } finally {
       setUploading(false);
       setUploadProgress(null);
@@ -468,18 +577,31 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
 
           <ScrollView style={styles.modalBody}>
             {selectedImage?.assets?.[0] && (
-              <Image
-                source={{ uri: selectedImage.assets[0].uri }}
-                style={styles.previewImage}
-                contentFit="cover"
-              />
+              <View style={styles.imagePreviewContainer}>
+                <Image
+                  source={{ uri: selectedImage.assets[0].uri }}
+                  style={styles.previewImage}
+                  contentFit="cover"
+                />
+                {selectedImage.assets[0].fileSize && (
+                  <Text style={[styles.fileSizeText, { color: theme.textSecondary }]}>
+                    Kích thước: {(selectedImage.assets[0].fileSize / (1024 * 1024)).toFixed(2)} MB
+                  </Text>
+                )}
+              </View>
             )}
 
             {uploading && uploadProgress && (
               <View style={styles.progressContainer}>
-                <Text style={[styles.progressText, { color: theme.text }]}>
-                  Đang tải lên... {uploadProgress.percentage}%
-                </Text>
+                <View style={styles.progressHeader}>
+                  <Text style={[styles.progressText, { color: theme.text }]}>
+                    Đang tải lên...
+                  </Text>
+                  <Text style={[styles.progressPercentage, { color: theme.primary }]}>
+                    {uploadProgress.percentage}%
+                  </Text>
+                </View>
+                
                 <View style={[styles.progressBar, { backgroundColor: theme.borderLight }]}>
                   <View 
                     style={[
@@ -491,24 +613,48 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
                     ]} 
                   />
                 </View>
+                
+                <Text style={[styles.progressDetails, { color: theme.textSecondary }]}>
+                  {(uploadProgress.loaded / (1024 * 1024)).toFixed(2)} MB / {(uploadProgress.total / (1024 * 1024)).toFixed(2)} MB
+                </Text>
+                
+                <View style={styles.uploadingTips}>
+                  <Text style={[styles.uploadingTipsTitle, { color: theme.text }]}>
+                    Lưu ý khi tải ảnh:
+                  </Text>
+                  <Text style={[styles.uploadingTip, { color: theme.textSecondary }]}>
+                    • Giữ ứng dụng mở trong quá trình tải
+                  </Text>
+                  <Text style={[styles.uploadingTip, { color: theme.textSecondary }]}>
+                    • Đảm bảo kết nối mạng ổn định
+                  </Text>
+                  <Text style={[styles.uploadingTip, { color: theme.textSecondary }]}>
+                    • Ảnh lớn sẽ mất nhiều thời gian hơn
+                  </Text>
+                </View>
               </View>
             )}
 
             {!uploading && (
               <View style={styles.formContainer}>
                 <View style={styles.inputGroup}>
-                  <Text style={[styles.inputLabel, { color: theme.text }]}>Tên cây (tùy chọn)</Text>
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>Tên cây</Text>
                   <TextInput
-                    style={[styles.textInput, { 
+                    style={[styles.textInputReadonly, { 
                       backgroundColor: theme.backgroundSecondary,
-                      color: theme.text,
+                      color: theme.textSecondary,
                       borderColor: theme.borderLight
                     }]}
-                    value={uploadForm.plantName}
-                    onChangeText={(text) => setUploadForm(prev => ({ ...prev, plantName: text }))}
-                    placeholder="Nhập tên cây..."
+                    value={garden?.plantName || "Chưa có thông tin cây trồng"}
+                    editable={false}
+                    placeholder="Tên cây từ thông tin vườn"
                     placeholderTextColor={theme.textTertiary}
                   />
+                  {garden?.plantName && (
+                    <Text style={[styles.inputHelper, { color: theme.textTertiary }]}>
+                      Tự động lấy từ thông tin vườn
+                    </Text>
+                  )}
                 </View>
 
                 <View style={styles.inputGroup}>
@@ -521,17 +667,33 @@ const GardenPhotosTab: React.FC<GardenPhotosTabProps> = ({ gardenId }) => {
                     }]}
                     value={uploadForm.notes}
                     onChangeText={(text) => setUploadForm(prev => ({ ...prev, notes: text }))}
-                    placeholder="Nhập ghi chú..."
+                    placeholder="Nhập ghi chú về ảnh..."
                     placeholderTextColor={theme.textTertiary}
                     multiline
                     numberOfLines={3}
                   />
                 </View>
 
+                <View style={styles.uploadTipsContainer}>
+                  <Text style={[styles.uploadTipsTitle, { color: theme.text }]}>
+                    💡 Mẹo để tải ảnh thành công:
+                  </Text>
+                  <Text style={[styles.uploadTip, { color: theme.textSecondary }]}>
+                    • Chọn ảnh có kích thước dưới 10MB
+                  </Text>
+                  <Text style={[styles.uploadTip, { color: theme.textSecondary }]}>
+                    • Đảm bảo kết nối WiFi hoặc 4G/5G ổn định
+                  </Text>
+                  <Text style={[styles.uploadTip, { color: theme.textSecondary }]}>
+                    • Chụp ảnh rõ nét để AI phân tích tốt hơn
+                  </Text>
+                </View>
+
                 <TouchableOpacity
                   style={[styles.uploadButton, { backgroundColor: theme.primary }]}
-                  onPress={uploadPhoto}
+                  onPress={() => uploadPhoto()}
                 >
+                  <Ionicons name="cloud-upload" size={20} color="#fff" style={{ marginRight: 8 }} />
                   <Text style={styles.uploadButtonText}>Tải lên và đánh giá</Text>
                 </TouchableOpacity>
               </View>
@@ -899,11 +1061,19 @@ const styles = StyleSheet.create({
   progressContainer: {
     padding: 16,
   },
+  progressHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
   progressText: {
     fontSize: 14,
     fontFamily: "Inter-Medium",
-    marginBottom: 8,
-    textAlign: "center",
+  },
+  progressPercentage: {
+    fontSize: 14,
+    fontFamily: "Inter-Bold",
   },
   progressBar: {
     height: 4,
@@ -913,6 +1083,28 @@ const styles = StyleSheet.create({
   progressFill: {
     height: "100%",
     borderRadius: 2,
+  },
+  progressDetails: {
+    fontSize: 12,
+    fontFamily: "Inter-Regular",
+    textAlign: "right",
+    marginTop: 4,
+  },
+  uploadingTips: {
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.05)",
+  },
+  uploadingTipsTitle: {
+    fontSize: 16,
+    fontFamily: "Inter-SemiBold",
+    marginBottom: 8,
+  },
+  uploadingTip: {
+    fontSize: 14,
+    fontFamily: "Inter-Regular",
+    marginBottom: 4,
   },
   formContainer: {
     padding: 16,
@@ -932,6 +1124,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter-Regular",
   },
+  textInputReadonly: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    fontFamily: "Inter-Regular",
+    opacity: 0.7,
+  },
   textArea: {
     borderWidth: 1,
     borderRadius: 8,
@@ -941,16 +1141,51 @@ const styles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: "top",
   },
+  inputHelper: {
+    fontSize: 12,
+    fontFamily: "Inter-Regular",
+    marginTop: 4,
+    textAlign: "right",
+    opacity: 0.8,
+  },
   uploadButton: {
     padding: 16,
     borderRadius: 8,
     alignItems: "center",
     marginTop: 8,
+    flexDirection: "row",
+    justifyContent: "center",
   },
   uploadButtonText: {
     color: "#fff",
     fontSize: 16,
     fontFamily: "Inter-SemiBold",
+  },
+  imagePreviewContainer: {
+    marginBottom: 16,
+    padding: 16,
+  },
+  fileSizeText: {
+    fontSize: 12,
+    fontFamily: "Inter-Regular",
+    textAlign: "right",
+    marginTop: 8,
+  },
+  uploadTipsContainer: {
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.05)",
+  },
+  uploadTipsTitle: {
+    fontSize: 16,
+    fontFamily: "Inter-SemiBold",
+    marginBottom: 8,
+  },
+  uploadTip: {
+    fontSize: 14,
+    fontFamily: "Inter-Regular",
+    marginBottom: 4,
   },
 });
 

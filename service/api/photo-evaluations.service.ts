@@ -1,16 +1,13 @@
 import apiClient from "../apiClient";
 import { PHOTO_EVALUATION_ENDPOINTS } from "../endpoints";
 import {
-  PhotoEvaluation,
   PhotoEvaluationWithRelations,
-  CreatePhotoEvaluationDto,
   UpdatePhotoEvaluationDto,
   PhotoEvaluationFormData,
   PhotoEvaluationListResponse,
   PhotoEvaluationStatsResponse,
   PhotoEvaluationDisplayDto,
   PhotoEvaluationFilters,
-  AIEvaluationResult,
   PlantGrowthStage,
   PhotoUploadResult,
   PhotoUploadProgress
@@ -43,7 +40,7 @@ class PhotoEvaluationService {
         return { data: [], total: 0, page, limit };
       }
 
-      return response.data;
+      return response.data.data;
     } catch (error) {
       console.error("Error fetching photo evaluations:", error);
       return { data: [], total: 0, page, limit };
@@ -72,7 +69,7 @@ class PhotoEvaluationService {
         return { data: [], total: 0, page, limit };
       }
 
-      return response.data;
+      return response.data.data;
     } catch (error) {
       console.error(`Error fetching photo evaluations for garden ${gardenId}:`, error);
       return { data: [], total: 0, page, limit };
@@ -105,12 +102,21 @@ class PhotoEvaluationService {
     onProgress?: (progress: PhotoUploadProgress) => void
   ): Promise<PhotoUploadResult> {
     try {
+      // Validate file size before upload
+      if (photoData.image && (photoData.image as any).fileSize) {
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if ((photoData.image as any).fileSize > maxSize) {
+          return {
+            success: false,
+            error: "File ảnh không được vượt quá 10MB"
+          };
+        }
+      }
+
       const formData = new FormData();
       
-      // Add image file
       formData.append('image', photoData.image);
       
-      // Add other fields
       formData.append('taskId', photoData.taskId.toString());
       formData.append('gardenId', photoData.gardenId.toString());
       
@@ -131,6 +137,7 @@ class PhotoEvaluationService {
         PHOTO_EVALUATION_ENDPOINTS.CREATE,
         formData,
         {
+          timeout: 300000, // 5 minutes for photo uploads (increased from default)
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -153,9 +160,60 @@ class PhotoEvaluationService {
       };
     } catch (error) {
       console.error("Error creating photo evaluation:", error);
+      
+      // Enhanced error handling
+      let errorMessage = "Có lỗi xảy ra khi tải ảnh lên";
+      
+      if (error instanceof Error) {
+        // Network errors
+        if (error.message.includes("timeout") || error.message.includes("ECONNABORTED")) {
+          errorMessage = "Hết thời gian chờ. File ảnh có thể quá lớn hoặc kết nối mạng chậm. Vui lòng thử lại.";
+        } else if (error.message.includes("Network Error") || error.message.includes("kết nối mạng")) {
+          errorMessage = "Không có kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.";
+        } else if (error.message.includes("413") || error.message.includes("Payload Too Large")) {
+          errorMessage = "File ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 10MB.";
+        } else if (error.message.includes("400")) {
+          errorMessage = "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.";
+        } else if (error.message.includes("500")) {
+          errorMessage = "Lỗi server. Vui lòng thử lại sau.";
+        }
+      }
+      
+      // Handle axios response errors
+      if ((error as any).response) {
+        const status = (error as any).response.status;
+        const responseData = (error as any).response.data;
+        
+        switch (status) {
+          case 400:
+            errorMessage = responseData?.message || "Dữ liệu không hợp lệ";
+            break;
+          case 401:
+            errorMessage = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+            break;
+          case 403:
+            errorMessage = "Không có quyền thực hiện thao tác này";
+            break;
+          case 413:
+            errorMessage = "File ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 10MB.";
+            break;
+          case 422:
+            errorMessage = responseData?.message || "Dữ liệu không hợp lệ";
+            break;
+          case 500:
+          case 502:
+          case 503:
+          case 504:
+            errorMessage = "Lỗi server. Vui lòng thử lại sau.";
+            break;
+          default:
+            errorMessage = responseData?.message || `Lỗi ${status}: ${responseData?.error || "Không xác định"}`;
+        }
+      }
+      
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error occurred"
+        error: errorMessage
       };
     }
   }
@@ -204,7 +262,7 @@ class PhotoEvaluationService {
   async getPhotoEvaluationStats(): Promise<PhotoEvaluationStatsResponse | null> {
     try {
       const response = await apiClient.get(PHOTO_EVALUATION_ENDPOINTS.STATS);
-      return response.data || null;
+      return response.data.data || null;
     } catch (error) {
       console.error("Error fetching photo evaluation stats:", error);
       return null;

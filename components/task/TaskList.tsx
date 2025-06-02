@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '@/hooks/ui/useAppTheme';
 import { router, useFocusEffect } from 'expo-router';
-import { Task, TaskStatus } from '@/types/activities/task.types';
+import { TaskStatus } from '@/types/activities/task.types';
 import { GetTasksQueryDto, PaginationMeta, TaskDto } from '@/types/activities/dtos';
 import { taskService } from '@/service/api';
 import { ActivityType } from '@/types/activities/activity.types';
