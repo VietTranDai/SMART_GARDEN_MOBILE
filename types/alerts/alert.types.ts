@@ -35,6 +35,7 @@ export interface Alert {
 
   // Garden relationship (optional)
   gardenId?: number;
+  gardenName?: string;
 
   // User relationship (mandatory)
   userId: number;

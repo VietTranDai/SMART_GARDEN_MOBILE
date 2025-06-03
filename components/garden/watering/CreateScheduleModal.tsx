@@ -22,6 +22,9 @@ interface CreateScheduleModalProps {
   onClose: () => void;
   onSubmit: (data: CreateWateringSchedule) => Promise<void>;
   loading: boolean;
+  gardenId: number;
+  onGetOptimalAmount?: (wateringTime: Date | string, notes?: string) => Promise<number | null>;
+  aiConnectionStatus?: 'connected' | 'disconnected' | 'testing';
 }
 
 const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
@@ -29,6 +32,9 @@ const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
   onClose,
   onSubmit,
   loading,
+  gardenId,
+  onGetOptimalAmount,
+  aiConnectionStatus = 'disconnected',
 }) => {
   const theme = useAppTheme();
   
@@ -42,6 +48,7 @@ const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [loadingAIAmount, setLoadingAIAmount] = useState(false);
 
   // Quick amount selection options
   const quickAmountOptions = [1, 2, 2.5, 3, 4, 5];
@@ -50,6 +57,53 @@ const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
   const getScheduledDate = (): Date => {
     if (!formData.scheduledAt) return new Date();
     return formData.scheduledAt instanceof Date ? formData.scheduledAt : new Date(formData.scheduledAt);
+  };
+
+  const handleGetAIAmount = async () => {
+    if (!onGetOptimalAmount || aiConnectionStatus !== 'connected') {
+      Alert.alert(
+        'Không thể kết nối AI',
+        'AI hiện tại không khả dụng. Vui lòng kiểm tra kết nối.'
+      );
+      return;
+    }
+
+    const scheduledDate = getScheduledDate();
+    
+    setLoadingAIAmount(true);
+    try {
+      const amount = await onGetOptimalAmount(
+        scheduledDate,
+        formData.notes || `Đề xuất lượng nước cho thời gian ${scheduledDate.toLocaleString()}`
+      );
+      
+      if (amount && amount > 0) {
+        setFormData({ ...formData, amount: Math.round(amount * 10) / 10 }); // Round to 1 decimal place
+        Alert.alert(
+          'Đề xuất từ AI',
+          `AI đề xuất tưới ${amount.toFixed(1)} lít vào thời gian này dựa trên dữ liệu cảm biến hiện tại.`,
+          [
+            {
+              text: 'Áp dụng',
+              style: 'default'
+            }
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Không có đề xuất',
+          'AI không thể đưa ra đề xuất lượng nước phù hợp. Vui lòng thử lại sau.'
+        );
+      }
+    } catch (error) {
+      console.error('Error getting AI amount:', error);
+      Alert.alert(
+        'Lỗi AI',
+        'Không thể lấy đề xuất từ AI. Vui lòng thử lại sau.'
+      );
+    } finally {
+      setLoadingAIAmount(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -62,7 +116,6 @@ const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
 
     try {
       await onSubmit({
-        gardenId: 0, // Will be set by parent component
         scheduledAt: scheduledDate,
         amount: formData.amount,
         notes: formData.notes || undefined,
@@ -79,6 +132,7 @@ const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
       amount: 2.5,
       notes: '',
     });
+    setLoadingAIAmount(false);
     onClose();
   };
 
@@ -205,9 +259,35 @@ const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
 
           {/* Amount Section */}
           <View style={[styles.section, { backgroundColor: surfaceColor }]}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Lượng nước (lít)
-            </Text>
+            <View style={styles.amountHeader}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                Lượng nước (lít)
+              </Text>
+              
+              {onGetOptimalAmount && (
+                <TouchableOpacity
+                  style={[
+                    styles.aiButton,
+                    {
+                      backgroundColor: aiConnectionStatus === 'connected' 
+                        ? theme.success || '#66BB6A'
+                        : theme.textSecondary || '#999',
+                    },
+                  ]}
+                  onPress={handleGetAIAmount}
+                  disabled={loadingAIAmount || aiConnectionStatus !== 'connected'}
+                >
+                  {loadingAIAmount ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Ionicons name="sparkles" size={16} color="white" />
+                  )}
+                  <Text style={styles.aiButtonText}>
+                    {loadingAIAmount ? 'Đang tính...' : 'AI Đề xuất'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
             <View style={styles.amountContainer}>
               <TextInput
@@ -265,6 +345,24 @@ const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
                 </TouchableOpacity>
               ))}
             </View>
+
+            {aiConnectionStatus === 'connected' && (
+              <View style={[styles.aiTipCard, { backgroundColor: theme.background }]}>
+                <Ionicons name="bulb-outline" size={16} color={theme.warning} />
+                <Text style={[styles.aiTipText, { color: theme.textSecondary }]}>
+                  Sử dụng "AI Đề xuất" để nhận lượng nước phù hợp dựa trên dữ liệu cảm biến thời gian thực
+                </Text>
+              </View>
+            )}
+
+            {aiConnectionStatus !== 'connected' && (
+              <View style={[styles.aiTipCard, { backgroundColor: theme.background }]}>
+                <Ionicons name="warning-outline" size={16} color={theme.error} />
+                <Text style={[styles.aiTipText, { color: theme.textSecondary }]}>
+                  AI không khả dụng. Tính năng đề xuất tự động sẽ hoạt động khi AI kết nối
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Notes Section */}
@@ -322,6 +420,12 @@ const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({
                 <Ionicons name="checkmark-circle" size={16} color={theme.success} />
                 <Text style={[styles.tipText, { color: theme.textSecondary }]}>
                   Tưới đều khắp khu vườn, tránh tập trung một điểm
+                </Text>
+              </View>
+              <View style={styles.tipItem}>
+                <Ionicons name="sparkles" size={16} color={theme.primary} />
+                <Text style={[styles.tipText, { color: theme.textSecondary }]}>
+                  Sử dụng AI để nhận đề xuất lượng nước phù hợp với điều kiện thời tiết
                 </Text>
               </View>
             </View>
@@ -396,6 +500,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
     marginBottom: 12,
+  },
+  amountHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  aiButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
+  },
+  aiButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontFamily: 'Inter-Medium',
+  },
+  aiTipCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    gap: 8,
+  },
+  aiTipText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    lineHeight: 16,
   },
   dateTimeButton: {
     flexDirection: 'row',

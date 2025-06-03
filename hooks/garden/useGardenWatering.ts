@@ -3,7 +3,7 @@ import {
   wateringScheduleService, 
   wateringDecisionService 
 } from "@/service/api/watering.service";
-import { CreateWateringDecision, CreateWateringSchedule } from "@/types/activities/watering-schedules.type";
+import { CreateWateringSchedule, WateringDecisionRequestDto } from "@/types/activities/watering-schedules.type";
 import { WateringDecision, WateringStats } from "@/types/activities/watering-schedules.type";
 import { WateringSchedule } from "@/types/activities/watering-schedules.type";
 
@@ -34,8 +34,9 @@ interface UseGardenWateringReturn {
   completeSchedule: (scheduleId: number) => Promise<boolean>;
   skipSchedule: (scheduleId: number) => Promise<boolean>;
   deleteSchedule: (scheduleId: number) => Promise<boolean>;
-  getAIDecision: () => Promise<void>;
-  createCustomDecision: (data: CreateWateringDecision) => Promise<void>;
+  getAIDecision: (requestData?: WateringDecisionRequestDto) => Promise<void>;
+  getAIDecisionWithData: (requestData: WateringDecisionRequestDto) => Promise<void>;
+  getOptimalWaterAmount: (wateringTime: Date | string, notes?: string) => Promise<number | null>;
   testAIConnection: () => Promise<void>;
   
   // UI State
@@ -93,17 +94,37 @@ export const useGardenWatering = ({
   }, [gardenId]);
 
   // Load AI decision
-  const getAIDecision = useCallback(async () => {
+  const getAIDecision = useCallback(async (requestData?: WateringDecisionRequestDto) => {
     if (!gardenId) return;
     
     setDecisionLoading(true);
     try {
-      const decision = await wateringDecisionService.getDecisionByGarden(gardenId);
+      const decision = await wateringDecisionService.getDecisionByGarden(gardenId, requestData);
       setCurrentDecision(decision);
     } catch (error) {
       console.error("Error getting AI decision:", error);
     } finally {
       setDecisionLoading(false);
+    }
+  }, [gardenId]);
+
+  // Get AI decision with specific request data
+  const getAIDecisionWithData = useCallback(async (requestData: WateringDecisionRequestDto): Promise<void> => {
+    await getAIDecision(requestData);
+  }, [getAIDecision]);
+
+  // Get optimal water amount for specific time
+  const getOptimalWaterAmount = useCallback(async (
+    wateringTime: Date | string, 
+    notes?: string
+  ): Promise<number | null> => {
+    if (!gardenId) return null;
+    
+    try {
+      return await wateringDecisionService.getOptimalWaterAmount(gardenId, wateringTime, notes);
+    } catch (error) {
+      console.error("Error getting optimal water amount:", error);
+      return null;
     }
   }, [gardenId]);
 
@@ -151,6 +172,9 @@ export const useGardenWatering = ({
     
     setIsCreatingSchedule(true);
     try {
+      if(data.notes === undefined) {
+        data.notes = "";
+      }
       const result = await wateringScheduleService.create(gardenId, data);
       if (result) {
         await loadWateringSchedules();
@@ -239,22 +263,6 @@ export const useGardenWatering = ({
     }
   }, [loadWateringSchedules, setActionLoadingState]);
 
-  // Create custom AI decision
-  const createCustomDecision = useCallback(async (data: CreateWateringDecision): Promise<void> => {
-    if (!gardenId) return;
-    
-    setDecisionLoading(true);
-    try {
-      const result = await wateringDecisionService.createCustomDecision(gardenId, data);
-      setCurrentDecision(result);
-      await loadAIStats(); // Refresh stats after new decision
-    } catch (error) {
-      console.error("Error creating custom decision:", error);
-    } finally {
-      setDecisionLoading(false);
-    }
-  }, [gardenId, loadAIStats]);
-
   // Initialize data on mount and gardenId change
   useEffect(() => {
     if (gardenId) {
@@ -287,7 +295,8 @@ export const useGardenWatering = ({
     skipSchedule,
     deleteSchedule,
     getAIDecision,
-    createCustomDecision,
+    getAIDecisionWithData,
+    getOptimalWaterAmount,
     testAIConnection,
     
     // UI State

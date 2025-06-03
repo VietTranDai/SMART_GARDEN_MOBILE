@@ -437,7 +437,6 @@ export default function PostDetailScreen() {
   const renderComment = ({ item }: { item: Comment }) => {
     const isCollapsed = collapsedComments[item.id] || false;
     const hasReplies = item.replies && item.replies.length > 0;
-
     // Initialize animation value if it doesn't exist
     if (hasReplies && !fadeAnims.current[item.id]) {
       fadeAnims.current[item.id] = new Animated.Value(isCollapsed ? 0 : 1);

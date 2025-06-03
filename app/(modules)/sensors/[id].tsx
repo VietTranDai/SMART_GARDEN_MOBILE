@@ -19,6 +19,7 @@ import {
   ToastAndroid,
   Platform,
   TouchableOpacity,
+  StatusBar,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useAppTheme } from "@/hooks/ui/useAppTheme";
@@ -41,395 +42,36 @@ import {
 } from "@/types/gardens/sensor-statistics.types";
 import sensorService from "@/service/api/sensor.service";
 
-// Define time range options
-enum TimeRange {
-  DAY = "24 giờ",
-  WEEK = "7 ngày",
-  MONTH = "30 ngày",
-}
+// Import sensor components
+import {
+  // Utils
+  getEnhancedTheme,
+  getResponsiveSize,
+  hexToRgb,
+  TimeRange,
+  OPTIMAL_RANGES,
+  UNIT_DISPLAY,
+  getSensorName,
+  getSensorIcon,
+  getSensorStatus,
+  getStatusText,
+  getSimpleStatusColor,
+  // UI Components  
+  SimpleLoading,
+  ErrorDisplay,
+  LoadingCard,
+  ErrorCard,
+  EmptyDataCard,
+  // Cards
+  CurrentReadingCard,
+  // Selectors
+  TimeRangeSelector,
+} from "@/components/sensor";
 
-// Define optimal ranges for each sensor type
-const OPTIMAL_RANGES = {
-  [SensorType.TEMPERATURE]: { min: 15, max: 32 },
-  [SensorType.HUMIDITY]: { min: 30, max: 80 },
-  [SensorType.SOIL_MOISTURE]: { min: 20, max: 80 },
-  [SensorType.LIGHT]: { min: 5000, max: 12000 },
-  [SensorType.SOIL_PH]: { min: 5.5, max: 7.5 },
-  [SensorType.RAINFALL]: { min: 0, max: 50 },
-  [SensorType.WATER_LEVEL]: { min: 10, max: 80 },
-};
+// Remaining components to be refactored later
 
-// Map SensorUnit to display string
-const UNIT_DISPLAY = {
-  [SensorUnit.CELSIUS]: "°C",
-  [SensorUnit.PERCENT]: "%",
-  [SensorUnit.LUX]: "lux",
-  [SensorUnit.METER]: "m",
-  [SensorUnit.MILLIMETER]: "mm",
-  [SensorUnit.PH]: "pH",
-  [SensorUnit.LITER]: "L",
-};
-
-// Helper function to convert hex color to RGB string
-const hexToRgb = (hex: string): string => {
-  let r = "0",
-    g = "0",
-    b = "0";
-  if (hex.length === 4) {
-    r = "0x" + hex[1] + hex[1];
-    g = "0x" + hex[2] + hex[2];
-    b = "0x" + hex[3] + hex[3];
-  } else if (hex.length === 7) {
-    r = "0x" + hex[1] + hex[2];
-    g = "0x" + hex[3] + hex[4];
-    b = "0x" + hex[5] + hex[6];
-  }
-  return `${+r},${+g},${+b}`;
-};
-
-// Simplified status color function
-const getSimpleStatusColor = (
-  status: "normal" | "warning" | "critical",
-  theme: ReturnType<typeof getEnhancedTheme>
-) => {
-  const colors = {
-    normal: theme.semantic.success,
-    warning: theme.semantic.warning,
-    critical: theme.semantic.error,
-  };
-  return colors[status] || colors.normal;
-};
-
-// Loading indicator
-const SimpleLoading = ({
-  message = "Đang tải...",
-  theme,
-}: {
-  message?: string;
-  theme: ReturnType<typeof getEnhancedTheme>;
-}) => {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  return (
-    <View style={styles.centeredContainer}>
-      <ActivityIndicator size="large" color={theme.primary} />
-      <Text style={styles.infoText}>{message}</Text>
-    </View>
-  );
-};
-
-// Error display
-const ErrorDisplay = ({
-  error,
-  onRetry,
-  theme,
-}: {
-  error: string;
-  onRetry: () => void;
-  theme: ReturnType<typeof getEnhancedTheme>;
-}) => {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  return (
-    <View style={styles.centeredContainer}>
-      <Ionicons name="cloud-offline-outline" size={48} color={theme.error} />
-      <Text
-        style={[styles.infoText, { color: theme.error, marginVertical: 15 }]}
-      >
-        {error}
-      </Text>
-      <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
-        <Text style={styles.retryText}>Thử lại</Text>
-      </TouchableOpacity>
-    </View>
-  );
-};
-
-// Loading Card (for use within other cards)
-const LoadingCard = ({
-  theme,
-  message = "Đang tải dữ liệu...",
-}: {
-  theme: ReturnType<typeof getEnhancedTheme>;
-  message?: string;
-}) => {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  return (
-    <View style={[styles.cardContentPlaceholder, styles.loadingCard]}>
-      <ActivityIndicator size="large" color={theme.primary} />
-      <Text style={styles.loadingText}>{message}</Text>
-    </View>
-  );
-};
-
-// Skeleton Card (for placeholder UI)
-const SkeletonCard = ({
-  theme,
-}: {
-  theme: ReturnType<typeof getEnhancedTheme>;
-}) => {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  return (
-    <View
-      style={[
-        styles.card,
-        styles.skeletonCard,
-        { backgroundColor: theme.card },
-      ]}
-    >
-      <View
-        style={[
-          styles.skeletonTitle,
-          { backgroundColor: `${theme.textSecondary}20` },
-        ]}
-      />
-      <View
-        style={[
-          styles.skeletonContent,
-          { backgroundColor: `${theme.textSecondary}15` },
-        ]}
-      />
-      <View
-        style={[
-          styles.skeletonFooter,
-          { backgroundColor: `${theme.textSecondary}10` },
-        ]}
-      />
-    </View>
-  );
-};
-
-// Error Card (for displaying errors within a card context)
-const ErrorCard = ({
-  error,
-  onRetry,
-  theme,
-}: {
-  error: string;
-  onRetry?: () => void;
-  theme: ReturnType<typeof getEnhancedTheme>;
-}) => {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  return (
-    <View style={styles.cardContentPlaceholder}>
-      <Ionicons name="alert-circle-outline" size={32} color={theme.error} />
-      <Text
-        style={[
-          styles.infoText,
-          { color: theme.error, marginVertical: 10, fontSize: 14 },
-        ]}
-      >
-        {error}
-      </Text>
-      {onRetry && (
-        <TouchableOpacity
-          style={[
-            styles.retryButton,
-            { paddingVertical: 8, paddingHorizontal: 20, marginTop: 10 },
-          ]}
-          onPress={onRetry}
-        >
-          <Text style={[styles.retryText, { fontSize: 14 }]}>Thử lại</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-};
-
-// Empty Data Card (for displaying no data message within a card context)
-const EmptyDataCard = ({
-  theme,
-  message = "Không có dữ liệu để hiển thị.",
-}: {
-  theme: ReturnType<typeof getEnhancedTheme>;
-  message?: string;
-}) => {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  return (
-    <View style={styles.cardContentPlaceholder}>
-      <Ionicons
-        name="information-circle-outline"
-        size={32}
-        color={theme.textSecondary}
-      />
-      <Text style={[styles.infoText, { marginTop: 10, fontSize: 14 }]}>
-        {message}
-      </Text>
-    </View>
-  );
-};
-
-// --- Helper functions ---
-const getSensorName = (type: SensorType): string =>
-  ({
-    [SensorType.TEMPERATURE]: "Nhiệt độ",
-    [SensorType.HUMIDITY]: "Độ ẩm",
-    [SensorType.SOIL_MOISTURE]: "Độ ẩm đất",
-    [SensorType.LIGHT]: "Ánh sáng",
-    [SensorType.WATER_LEVEL]: "Mực nước",
-    [SensorType.RAINFALL]: "Lượng mưa",
-    [SensorType.SOIL_PH]: "Độ pH đất",
-  })[type] || "Cảm biến";
-
-const getSensorIcon = (
-  type: SensorType
-): keyof typeof MaterialCommunityIcons.glyphMap =>
-  (({
-    [SensorType.TEMPERATURE]: "thermometer",
-    [SensorType.HUMIDITY]: "water-percent",
-    [SensorType.SOIL_MOISTURE]: "water-outline",
-    [SensorType.LIGHT]: "white-balance-sunny",
-    [SensorType.WATER_LEVEL]: "water",
-    [SensorType.RAINFALL]: "weather-pouring",
-    [SensorType.SOIL_PH]: "flask-outline",
-  })[type] || "gauge") as keyof typeof MaterialCommunityIcons.glyphMap;
-
-const getSensorStatus = (
-  value: number,
-  type: SensorType
-): "normal" | "warning" | "critical" => {
-  const range = OPTIMAL_RANGES[type];
-  if (!range) return "normal";
-  if (value < range.min * 0.7 || value > range.max * 1.3) return "critical";
-  if (value < range.min || value > range.max) return "warning";
-  return "normal";
-};
-
-const getStatusText = (status: "normal" | "warning" | "critical"): string =>
-  ({
-    normal: "Bình thường",
-    warning: "Cảnh báo",
-    critical: "Nguy hiểm",
-  })[status];
-
-// --- Responsive Utils (Phase 7) ---
+// Screenwidth for chart
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
-const isTablet = screenWidth > 768;
-const isSmallScreen = screenWidth < 375;
-
-const getResponsiveSize = (base: number, tablet?: number, small?: number) => {
-  if (isTablet && tablet !== undefined) return tablet;
-  if (isSmallScreen && small !== undefined) return small;
-  return base;
-};
-
-// --- Color System Enhancement (Phase 7) ---
-const getEnhancedTheme = (baseTheme: ReturnType<typeof useAppTheme>) => ({
-  ...baseTheme,
-  semantic: {
-    success: baseTheme.success || "#10B981",
-    warning: baseTheme.warning || "#F59E0B",
-    error: baseTheme.error || "#EF4444",
-    info: baseTheme.info || "#3B82F6", // Assuming baseTheme might have an info color
-  },
-  surface: {
-    primary: baseTheme.card, // Assuming baseTheme has card
-    secondary: `${baseTheme.primary}0A`, // Adjusted alpha from 08 to 0A for better visibility if used as background
-    tertiary: `${baseTheme.textSecondary}05`,
-  },
-  shadows: {
-    light: "#00000008",
-    medium: "#00000015",
-    heavy: "#00000025",
-  },
-});
-
-// --- UI Components ---
-
-// Current Reading Card
-const CurrentReadingCard = ({
-  sensor,
-  theme,
-}: {
-  sensor: Sensor;
-  theme: ReturnType<typeof getEnhancedTheme>;
-}) => {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  const status = getSensorStatus(sensor.lastReading ?? 0, sensor.type);
-  const statusColor = getSimpleStatusColor(status, theme);
-  const iconName = getSensorIcon(sensor.type);
-  const unitDisplay = UNIT_DISPLAY[sensor.unit] || "";
-
-  return (
-    <View style={[styles.card, styles.currentReadingCard]}>
-      <View style={styles.currentReadingTitleContainer}>
-        <MaterialCommunityIcons
-          name={iconName}
-          size={28}
-          color={theme.primary}
-          style={styles.currentReadingTitleIcon}
-        />
-        <Text style={[styles.cardTitle, styles.currentReadingCardTitle]}>
-          {getSensorName(sensor.type)}
-        </Text>
-      </View>
-
-      <View style={styles.valueContainer}>
-        <Text style={[styles.mainValue, { color: statusColor }]}>
-          {(sensor.lastReading ?? 0).toFixed(1)}
-        </Text>
-        <Text style={[styles.unitText, { color: statusColor }]}>
-          {unitDisplay}
-        </Text>
-      </View>
-
-      <View
-        style={[
-          styles.statusContainer,
-          { backgroundColor: `${statusColor}15` },
-        ]}
-      >
-        <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-        <Text style={[styles.statusText, { color: statusColor }]}>
-          {getStatusText(status)}
-        </Text>
-      </View>
-
-      <Text style={styles.timestampText}>
-        Cập nhật lúc:{" "}
-        {new Date(sensor.lastReadingAt ?? Date.now()).toLocaleString("vi-VN")}
-      </Text>
-    </View>
-  );
-};
-
-// Time Range Selector
-const TimeRangeSelector = ({
-  selected,
-  onChange,
-  theme,
-}: {
-  selected: TimeRange;
-  onChange: (range: TimeRange) => void;
-  theme: ReturnType<typeof getEnhancedTheme>;
-}) => {
-  const styles = useMemo(() => createStyles(theme), [theme]);
-  return (
-    <View style={styles.timeRangeSelectorContainer}>
-      <Text style={styles.selectorLabel}>Khoảng thời gian</Text>
-      <View style={styles.timeRangeSelector}>
-        {Object.values(TimeRange).map((range) => (
-          <TouchableOpacity
-            key={range}
-            style={[
-              styles.timeRangeOption,
-              selected === range && styles.selectedTimeRange,
-            ]}
-            onPress={() => onChange(range)}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                styles.timeRangeLabel,
-                selected === range && styles.selectedTimeRangeLabel,
-              ]}
-            >
-              {range}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-};
 
 // Chart Card
 const ChartCard = ({
@@ -959,38 +601,41 @@ export default function SensorDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen
-        options={{
-          title: sensor.name || "Chi tiết Cảm biến",
-          headerStyle: { backgroundColor: theme.card },
-          headerShadowVisible: false,
-          headerTintColor: theme.text,
-          headerTitleStyle: { fontFamily: "Inter-SemiBold", fontSize: 18 },
-          headerTitleAlign: "center",
-          presentation: 'card',
-          headerLeft: () => (
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={styles.headerBackButton}
-            >
-              <Ionicons name="arrow-back" size={24} color={theme.text} />
-              <Text style={styles.headerBackButtonText}>Quay lại</Text>
-            </TouchableOpacity>
-          ),
-          headerRight: () => (
-            <TouchableOpacity
-              onPress={exportData}
-              style={{ paddingHorizontal: 15 }}
-            >
-              <Ionicons
-                name="download-outline"
-                size={22}
-                color={theme.primary}
-              />
-            </TouchableOpacity>
-          ),
-        }}
+      <StatusBar 
+        backgroundColor={theme.card} 
+        barStyle="default"
       />
+      
+      {/* Custom Header with Back Button */}
+      <View style={styles.customHeader}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="arrow-back" size={12} color={theme.text} />
+          <Text style={styles.backButtonText}>Quay lại</Text>
+        </TouchableOpacity>
+        
+        <View style={styles.headerTitle}>
+          <Text style={styles.headerTitleText}>
+            {sensor.name || "Chi tiết Cảm biến"}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          onPress={exportData}
+          style={styles.exportButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons
+            name="download-outline"
+            size={22}
+            color={theme.primary}
+          />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={
@@ -1049,16 +694,52 @@ const createStyles = (theme: ReturnType<typeof getEnhancedTheme>) =>
       flex: 1,
       backgroundColor: theme.background,
     },
-    headerBackButton: {
+    customHeader: {
       flexDirection: "row",
       alignItems: "center",
-      paddingHorizontal: 0,
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      paddingTop: Platform.OS === 'ios' ? 50 : 12,
+      backgroundColor: theme.card,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.borderLight,
+      shadowColor: theme.shadows.light,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
     },
-    headerBackButtonText: {
+    backButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 6,
+      paddingHorizontal: 2,
+      minWidth: 60,
+    },
+    backButtonText: {
       color: theme.text,
-      fontSize: 16,
-      marginLeft: 6,
+      fontSize: 14,
+      marginLeft: 4,
       fontFamily: "Inter-Medium",
+    },
+    headerTitle: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 16,
+    },
+    headerTitleText: {
+      fontSize: 18,
+      fontFamily: "Inter-SemiBold",
+      color: theme.text,
+      textAlign: "center",
+    },
+    exportButton: {
+      padding: 8,
+      borderRadius: 6,
+      minWidth: 40,
+      alignItems: "center",
     },
     scrollContent: {
       padding: 20,

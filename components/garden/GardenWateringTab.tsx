@@ -14,10 +14,8 @@ import { useAppTheme } from '@/hooks/ui/useAppTheme';
 import { useGardenWatering } from '@/hooks/garden/useGardenWatering';
 import { 
   CreateWateringSchedule, 
-  CreateWateringDecision, 
 } from '@/types/activities/watering-schedules.type';
 import CreateScheduleModal from './watering/CreateScheduleModal';
-import CustomDecisionModal from './watering/CustomDecisionModal';
 
 interface GardenWateringTabProps {
   gardenId: string | null;
@@ -26,7 +24,6 @@ interface GardenWateringTabProps {
 const GardenWateringTab: React.FC<GardenWateringTabProps> = ({ gardenId }) => {
   const theme = useAppTheme();
   const [createModalVisible, setCreateModalVisible] = useState(false);
-  const [customDecisionModalVisible, setCustomDecisionModalVisible] = useState(false);
 
   // Get surface color with fallback
   const surfaceColor = theme.card || theme.background || '#FFFFFF';
@@ -48,7 +45,7 @@ const GardenWateringTab: React.FC<GardenWateringTabProps> = ({ gardenId }) => {
     skipSchedule,
     deleteSchedule,
     getAIDecision,
-    createCustomDecision,
+    getOptimalWaterAmount,
     testAIConnection,
     isCreatingSchedule,
     isAutoGenerating,
@@ -178,10 +175,8 @@ const GardenWateringTab: React.FC<GardenWateringTabProps> = ({ gardenId }) => {
     );
   };
 
-  const handleCustomDecision = async (data: CreateWateringDecision) => {
-    await createCustomDecision(data);
-    setCustomDecisionModalVisible(false);
-    Alert.alert('Thành công', 'Đã nhận quyết định từ AI với dữ liệu tùy chỉnh');
+  const handleGetAIDecision = async () => {
+    await getAIDecision();
   };
 
   const renderAIConnectionBadge = () => (
@@ -222,6 +217,14 @@ const GardenWateringTab: React.FC<GardenWateringTabProps> = ({ gardenId }) => {
       case 'testing': return 'Đang kiểm tra';
       default: return 'Không xác định';
     }
+  };
+
+  const handleOpenCreateModal = () => {
+    if (!gardenId || isNaN(parseInt(gardenId, 10))) {
+      Alert.alert('Lỗi', 'Không thể tạo lịch tưới. Vui lòng chọn vườn hợp lệ.');
+      return;
+    }
+    setCreateModalVisible(true);
   };
 
   if (schedulesLoading && !schedules.length) {
@@ -362,7 +365,7 @@ const GardenWateringTab: React.FC<GardenWateringTabProps> = ({ gardenId }) => {
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: theme.primary }]}
-              onPress={getAIDecision}
+              onPress={handleGetAIDecision}
               disabled={decisionLoading || aiConnectionStatus !== 'connected'}
             >
               {decisionLoading ? (
@@ -371,15 +374,6 @@ const GardenWateringTab: React.FC<GardenWateringTabProps> = ({ gardenId }) => {
                 <Ionicons name="refresh" size={16} color="white" />
               )}
               <Text style={styles.actionButtonText}>Làm mới</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: theme.secondary || theme.textSecondary }]}
-              onPress={() => setCustomDecisionModalVisible(true)}
-              disabled={aiConnectionStatus !== 'connected'}
-            >
-              <Ionicons name="settings" size={16} color="white" />
-              <Text style={styles.actionButtonText}>Tùy chỉnh</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -472,7 +466,7 @@ const GardenWateringTab: React.FC<GardenWateringTabProps> = ({ gardenId }) => {
             </Text>
             <TouchableOpacity
               style={[styles.addButton, { backgroundColor: theme.primary }]}
-              onPress={() => setCreateModalVisible(true)}
+              onPress={handleOpenCreateModal}
             >
               <Ionicons name="add" size={20} color="white" />
             </TouchableOpacity>
@@ -588,20 +582,18 @@ const GardenWateringTab: React.FC<GardenWateringTabProps> = ({ gardenId }) => {
         </View>
       </ScrollView>
 
-      {/* Modals */}
-      <CreateScheduleModal
-        visible={createModalVisible}
-        onClose={() => setCreateModalVisible(false)}
-        onSubmit={handleCreateSchedule}
-        loading={isCreatingSchedule}
-      />
-
-      <CustomDecisionModal
-        visible={customDecisionModalVisible}
-        onClose={() => setCustomDecisionModalVisible(false)}
-        onSubmit={handleCustomDecision}
-        loading={decisionLoading}
-      />
+      {/* Create Schedule Modal */}
+      {gardenId && !isNaN(parseInt(gardenId, 10)) && (
+        <CreateScheduleModal
+          visible={createModalVisible}
+          onClose={() => setCreateModalVisible(false)}
+          onSubmit={handleCreateSchedule}
+          loading={isCreatingSchedule}
+          gardenId={parseInt(gardenId, 10)}
+          onGetOptimalAmount={getOptimalWaterAmount}
+          aiConnectionStatus={aiConnectionStatus}
+        />
+      )}
     </View>
   );
 };

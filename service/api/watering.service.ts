@@ -1,4 +1,4 @@
-import { CreateWateringDecision, CreateWateringSchedule, WateringDecision, WateringScheduleQueryParams, WateringStatsQueryParams, WateringStats, WateringSchedule } from "@/types/activities/watering-schedules.type";
+import { CreateWateringSchedule, WateringDecision, WateringScheduleQueryParams, WateringStatsQueryParams, WateringStats, WateringSchedule, WateringDecisionRequestDto } from "@/types/activities/watering-schedules.type";
 import apiClient from "../apiClient";
 import { WATERING_ENDPOINTS, WATERING_DECISION_ENDPOINTS } from "../endpoints";
 
@@ -32,9 +32,7 @@ class WateringScheduleService {
    */
   async getById(scheduleId: number | string): Promise<WateringSchedule | null> {
     try {
-      const response = await apiClient.get(
-        WATERING_ENDPOINTS.DETAIL(scheduleId)
-      );
+      const response = await apiClient.get(WATERING_ENDPOINTS.DETAIL(scheduleId));
       return response.data?.data || null;
     } catch (error) {
       console.error(`Error fetching watering schedule ${scheduleId}:`, error);
@@ -222,14 +220,17 @@ class WateringDecisionService {
   /**
    * Get watering decision for garden from AI model
    * @param gardenId Garden ID
+   * @param requestData Optional request data (wateringTime, notes)
    * @returns AI watering decision
    */
   async getDecisionByGarden(
-    gardenId: number | string
+    gardenId: number | string,
+    requestData: WateringDecisionRequestDto = {}
   ): Promise<WateringDecision | null> {
     try {
-      const response = await apiClient.get(
-        WATERING_DECISION_ENDPOINTS.GET_DECISION(gardenId)
+      const response = await apiClient.post(
+        WATERING_DECISION_ENDPOINTS.POST_DECISION(gardenId),
+        requestData
       );
       return response.data?.data || null;
     } catch (error) {
@@ -242,24 +243,27 @@ class WateringDecisionService {
   }
 
   /**
-   * Create custom watering decision with sensor data
+   * Get optimal water amount for specific time
    * @param gardenId Garden ID
-   * @param decisionData Custom sensor data
-   * @returns AI watering decision
+   * @param wateringTime Planned watering time
+   * @param notes Optional notes
+   * @returns Recommended water amount from AI
    */
-  async createCustomDecision(
+  async getOptimalWaterAmount(
     gardenId: number | string,
-    decisionData: CreateWateringDecision
-  ): Promise<WateringDecision | null> {
+    wateringTime: Date | string,
+    notes?: string
+  ): Promise<number | null> {
     try {
-      const response = await apiClient.post(
-        WATERING_DECISION_ENDPOINTS.CUSTOM_DECISION(gardenId),
-        decisionData
-      );
-      return response.data?.data || null;
+      const decision = await this.getDecisionByGarden(gardenId, {
+        wateringTime,
+        notes: notes || `Đề xuất lượng nước cho thời gian ${new Date(wateringTime).toLocaleString()}`
+      });
+      
+      return decision?.recommended_amount || null;
     } catch (error) {
       console.error(
-        `Error creating custom watering decision for garden ${gardenId}:`,
+        `Error getting optimal water amount for garden ${gardenId}:`,
         error
       );
       return null;
@@ -297,9 +301,7 @@ class WateringDecisionService {
    */
   async testAIConnection(): Promise<any> {
     try {
-      const response = await apiClient.get(
-        WATERING_DECISION_ENDPOINTS.TEST_AI
-      );
+      const response = await apiClient.get(WATERING_DECISION_ENDPOINTS.TEST_AI);
       return response.data || null;
     } catch (error) {
       console.error("Error testing AI connection:", error);

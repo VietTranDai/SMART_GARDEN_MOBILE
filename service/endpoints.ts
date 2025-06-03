@@ -118,10 +118,8 @@ export const WATERING_ENDPOINTS = {
 
 // Watering decision model endpoints
 export const WATERING_DECISION_ENDPOINTS = {
-  GET_DECISION: (gardenId: string | number) =>
+  POST_DECISION: (gardenId: string | number) =>
     `/watering-decision/garden/${gardenId}`,
-  CUSTOM_DECISION: (gardenId: string | number) =>
-    `/watering-decision/garden/${gardenId}/custom`,
   STATS: (gardenId: string | number) =>
     `/watering-decision/garden/${gardenId}/stats`,
   TEST_AI: "/watering-decision/test-ai",

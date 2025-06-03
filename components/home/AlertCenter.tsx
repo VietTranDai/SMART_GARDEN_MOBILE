@@ -131,7 +131,7 @@ export default function AlertCenter({
       <TouchableOpacity
         key={id}
         style={[styles.alertItem, { backgroundColor: color + "10" }]}
-        onPress={() => router.push(`/alert/${id}`)}
+        onPress={() => router.push(`/(modules)/alerts/[id]?id=${id}`)}
       >
         <View style={[styles.iconContainer, { backgroundColor: color + "20" }]}>
           <Ionicons name={iconName as any} size={20} color={color} />
@@ -164,7 +164,7 @@ export default function AlertCenter({
         </Text>
         <TouchableOpacity
           style={styles.viewAllButton}
-          onPress={() => router.push("/alerts")}
+          onPress={() => router.push("/(modules)/alerts")}
         >
           <Text style={[styles.viewAllText, { color: theme.primary }]}>
             Xem tất cả

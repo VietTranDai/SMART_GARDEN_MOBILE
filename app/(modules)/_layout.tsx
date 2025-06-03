@@ -372,6 +372,32 @@ export default function ModuleLayout() {
           }}
         />
 
+        {/* Sensor detail screen - accessed from garden detail */}
+        <Tabs.Screen
+          name="sensors/[id]"
+          options={{
+            href: null,
+            headerShown: false, // Let the screen handle its own header
+          }}
+        />
+
+        {/* Alerts screens - accessed from notifications */}
+        <Tabs.Screen
+          name="alerts/index"
+          options={{
+            href: null,
+            headerShown: false, // Let the screen handle its own header
+          }}
+        />
+        
+        <Tabs.Screen
+          name="alerts/[id]"
+          options={{
+            href: null,
+            headerShown: false, // Let the screen handle its own header
+          }}
+        />
+
         {/* 3. Community Tab */}
         <Tabs.Screen
           name="community/index"
@@ -390,7 +416,7 @@ export default function ModuleLayout() {
           }}
         />
 
-        {/* 4. Tasks Tab - Schedule and monitor tasks */}
+        {/* 4. Task Tab - Schedule and monitor tasks */}
         <Tabs.Screen
           name="tasks/index"
           options={{

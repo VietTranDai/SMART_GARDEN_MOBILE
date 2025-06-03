@@ -17,14 +17,8 @@ import {
 } from "@expo/vector-icons";
 import { useAppTheme } from "@/hooks/ui/useAppTheme";
 import { router } from "expo-router";
-import { Alert, AlertStatus, AlertType } from "@/types/alerts/alert.types";
-import { alertService, gardenService, weatherService } from "@/service/api";
-
-// Extended Alert type with UI-specific properties
-interface AlertUI extends Alert {
-  title?: string;
-  gardenName?: string;
-}
+import { Alert, AlertStatus, AlertType, Severity } from "@/types/alerts/alert.types";
+import { alertService } from "@/service/api";
 
 // Add a date formatting function
 const formatDate = (dateString: string, format: string = "default"): string => {
@@ -37,53 +31,27 @@ const formatDate = (dateString: string, format: string = "default"): string => {
 
 export default function AlertsScreen() {
   const theme = useAppTheme();
-  const [alerts, setAlerts] = useState<AlertUI[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const [typeFilter, setTypeFilter] = useState<string>("ALL");
+  const [statusFilter, setStatusFilter] = useState<AlertStatus | "ALL">("ALL");
+  const [typeFilter, setTypeFilter] = useState<AlertType | "ALL">("ALL");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAlerts();
-  }, []);
+  }, [statusFilter, typeFilter]);
 
   const fetchAlerts = async () => {
     try {
       setError(null);
-      const alertsData = await alertService.getAlerts();
-
-      // Transform to AlertUI if needed (e.g., add garden name if gardenId exists)
-      const enhancedAlerts = await Promise.all(
-        alertsData.map(async (alert) => {
-          if (alert.gardenId) {
-            try {
-              // Get garden details to add garden name
-              const garden = await gardenService.getGardenById(alert.gardenId);
-              return {
-                ...alert,
-                gardenName: garden?.name || `Garden ${alert.gardenId}`,
-                title: getAlertTitle(alert.type),
-              } as AlertUI;
-            } catch (err) {
-              // If garden fetch fails, still return the alert with default values
-              return {
-                ...alert,
-                gardenName: `Garden ${alert.gardenId}`,
-                title: getAlertTitle(alert.type),
-              } as AlertUI;
-            }
-          } else {
-            // No gardenId, return with just the alert type as title
-            return {
-              ...alert,
-              title: getAlertTitle(alert.type),
-            } as AlertUI;
-          }
-        })
-      );
-
-      setAlerts(enhancedAlerts);
+      
+      // Use the updated service method with filtering
+      const statusParam = statusFilter === "ALL" ? undefined : statusFilter;
+      const typeParam = typeFilter === "ALL" ? undefined : typeFilter;
+      
+      const alertsData = await alertService.getAlerts(statusParam, typeParam);
+      setAlerts(alertsData);
     } catch (err) {
       console.error("Failed to fetch alerts:", err);
       setError("Không thể tải thông báo cảnh báo. Vui lòng thử lại sau.");
@@ -96,7 +64,7 @@ export default function AlertsScreen() {
     setRefreshing(true);
     await fetchAlerts();
     setRefreshing(false);
-  }, []);
+  }, [statusFilter, typeFilter]);
 
   const updateAlertStatus = async (id: number, newStatus: AlertStatus) => {
     try {
@@ -117,14 +85,14 @@ export default function AlertsScreen() {
     }
   };
 
-  const handleAlertPress = (alert: AlertUI) => {
+  const handleAlertPress = (alert: Alert) => {
     // If pending, mark as in progress
     if (alert.status === AlertStatus.PENDING) {
       updateAlertStatus(alert.id, AlertStatus.IN_PROGRESS);
     }
 
     // Navigate to alert detail view
-    router.push(`/(modules)/alerts/[id]?id=${alert.id}`);
+    router.push(`/(modules)/alerts/${alert.id}`);
   };
 
   const resolveAllAlerts = async () => {
@@ -157,6 +125,16 @@ export default function AlertsScreen() {
 
   const dismissAlert = async (id: number) => {
     await updateAlertStatus(id, AlertStatus.IGNORED);
+  };
+
+  const markAsRead = async (id: number) => {
+    await alertService.markAsRead(id);
+    // Update local state
+    setAlerts((prevAlerts) =>
+      prevAlerts.map((alert) =>
+        alert.id === id ? { ...alert, status: AlertStatus.IN_PROGRESS } : alert
+      )
+    );
   };
 
   const getAlertTitle = (type: AlertType): string => {
@@ -208,74 +186,98 @@ export default function AlertsScreen() {
     return formatDate(timestamp);
   };
 
-  const getAlertIcon = (type: AlertType) => {
+  const getAlertIcon = (type: AlertType, severity?: Severity) => {
+    const iconSize = 28;
+    const iconColor = severity ? getSeverityColor(severity) : getTypeColor(type);
+    
     switch (type) {
       case AlertType.WEATHER:
         return (
           <MaterialCommunityIcons
             name="weather-lightning-rainy"
-            size={24}
-            color="#FFC107"
+            size={iconSize}
+            color={iconColor}
           />
         );
       case AlertType.SENSOR_ERROR:
         return (
           <MaterialCommunityIcons
             name="alert-circle-outline"
-            size={24}
-            color="#F44336"
+            size={iconSize}
+            color={iconColor}
           />
         );
       case AlertType.PLANT_CONDITION:
         return (
           <MaterialCommunityIcons
             name="sprout-outline"
-            size={24}
-            color="#4CAF50"
+            size={iconSize}
+            color={iconColor}
           />
         );
       case AlertType.ACTIVITY:
         return (
           <MaterialCommunityIcons
             name="calendar-clock"
-            size={24}
-            color="#2196F3"
+            size={iconSize}
+            color={iconColor}
           />
         );
       case AlertType.SYSTEM:
-        return <MaterialIcons name="system-update" size={24} color="#9C27B0" />;
+        return <MaterialIcons name="system-update" size={iconSize} color={iconColor} />;
       case AlertType.MAINTENANCE:
         return (
-          <MaterialCommunityIcons name="tools" size={24} color="#FF9800" />
+          <MaterialCommunityIcons name="tools" size={iconSize} color={iconColor} />
         );
       case AlertType.SECURITY:
         return (
           <MaterialCommunityIcons
             name="shield-alert-outline"
-            size={24}
-            color="#F44336"
+            size={iconSize}
+            color={iconColor}
           />
         );
       default:
         return (
           <Ionicons
             name="notifications-outline"
-            size={24}
-            color={theme.primary}
+            size={iconSize}
+            color={iconColor}
           />
         );
     }
   };
 
-  const getSeverityColor = (severity?: string) => {
-    switch (severity) {
-      case "CRITICAL":
-        return "#FF1744";
-      case "HIGH":
-        return "#F44336";
-      case "MEDIUM":
+  const getTypeColor = (type: AlertType) => {
+    switch (type) {
+      case AlertType.WEATHER:
         return "#FFC107";
-      case "LOW":
+      case AlertType.SENSOR_ERROR:
+        return "#F44336";
+      case AlertType.PLANT_CONDITION:
+        return "#4CAF50";
+      case AlertType.ACTIVITY:
+        return "#2196F3";
+      case AlertType.SYSTEM:
+        return "#9C27B0";
+      case AlertType.MAINTENANCE:
+        return "#FF9800";
+      case AlertType.SECURITY:
+        return "#F44336";
+      default:
+        return theme.primary;
+    }
+  };
+
+  const getSeverityColor = (severity?: Severity) => {
+    switch (severity) {
+      case Severity.CRITICAL:
+        return "#FF1744";
+      case Severity.HIGH:
+        return "#F44336";
+      case Severity.MEDIUM:
+        return "#FFC107";
+      case Severity.LOW:
         return "#4CAF50";
       default:
         return theme.warning;
@@ -285,15 +287,15 @@ export default function AlertsScreen() {
   const getStatusColor = (status: AlertStatus) => {
     switch (status) {
       case AlertStatus.PENDING:
-        return theme.warning;
+        return "#FF9500";
       case AlertStatus.IN_PROGRESS:
-        return theme.info;
+        return "#007AFF";
       case AlertStatus.RESOLVED:
-        return theme.success;
+        return "#34C759";
       case AlertStatus.IGNORED:
-        return theme.textTertiary;
+        return "#8E8E93";
       case AlertStatus.ESCALATED:
-        return "#F44336";
+        return "#FF3B30";
       default:
         return theme.textSecondary;
     }
@@ -316,21 +318,23 @@ export default function AlertsScreen() {
     }
   };
 
-  const filteredAlerts = alerts.filter((alert) => {
-    // Filter by status
-    if (statusFilter !== "ALL" && alert.status !== statusFilter) {
-      return false;
+  const getSeverityLabel = (severity?: Severity) => {
+    switch (severity) {
+      case Severity.CRITICAL:
+        return "Cực kỳ nghiêm trọng";
+      case Severity.HIGH:
+        return "Nghiêm trọng";
+      case Severity.MEDIUM:
+        return "Trung bình";
+      case Severity.LOW:
+        return "Thấp";
+      default:
+        return "";
     }
+  };
 
-    // Filter by type
-    if (typeFilter !== "ALL" && alert.type !== typeFilter) {
-      return false;
-    }
-
-    return true;
-  });
-
-  const sortedAlerts = [...filteredAlerts].sort((a, b) => {
+  // Sort alerts by priority
+  const sortedAlerts = [...alerts].sort((a, b) => {
     // Sort by status (pending first)
     if (a.status === AlertStatus.PENDING && b.status !== AlertStatus.PENDING)
       return -1;
@@ -339,18 +343,20 @@ export default function AlertsScreen() {
 
     // Then by severity if available
     if (a.severity && b.severity && a.severity !== b.severity) {
-      const severityOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-      return (
-        severityOrder[a.severity as keyof typeof severityOrder] -
-        severityOrder[b.severity as keyof typeof severityOrder]
-      );
+      const severityOrder = { 
+        [Severity.CRITICAL]: 0, 
+        [Severity.HIGH]: 1, 
+        [Severity.MEDIUM]: 2, 
+        [Severity.LOW]: 3 
+      };
+      return severityOrder[a.severity] - severityOrder[b.severity];
     }
 
     // Finally by timestamp (newest first)
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
-  const renderAlertItem = ({ item }: { item: AlertUI }) => (
+  const renderAlertItem = ({ item }: { item: Alert }) => (
     <TouchableOpacity
       style={[
         styles.alertItem,
@@ -363,16 +369,26 @@ export default function AlertsScreen() {
         },
       ]}
       onPress={() => handleAlertPress(item)}
+      activeOpacity={0.7}
     >
-      <View style={styles.alertIconContainer}>{getAlertIcon(item.type)}</View>
+      <View style={[styles.alertIconContainer, {
+        backgroundColor: item.severity 
+          ? `${getSeverityColor(item.severity)}15` 
+          : `${getStatusColor(item.status)}15`
+      }]}>
+        {getAlertIcon(item.type, item.severity)}
+      </View>
+      
       <View style={styles.alertContent}>
         <View style={styles.alertHeaderRow}>
-          <Text style={[styles.alertTitle, { color: theme.text }]}>
-            {item.title || getAlertTitle(item.type)}
+          <Text style={[styles.alertTitle, { color: theme.text }]} numberOfLines={1}>
+            {getAlertTitle(item.type)}
           </Text>
-          <Text style={[styles.alertTime, { color: theme.textTertiary }]}>
-            {formatTimestamp(item.createdAt)}
-          </Text>
+          <View style={styles.alertTimeContainer}>
+            <Text style={[styles.alertTime, { color: theme.textTertiary }]}>
+              {formatTimestamp(item.createdAt)}
+            </Text>
+          </View>
         </View>
 
         <Text
@@ -383,81 +399,76 @@ export default function AlertsScreen() {
         </Text>
 
         {item.suggestion && (
-          <Text
-            style={[styles.alertSuggestion, { color: theme.info }]}
-            numberOfLines={1}
-          >
-            Đề xuất: {item.suggestion}
-          </Text>
-        )}
-
-        {item.gardenName ? (
-          <Text style={[styles.alertGarden, { color: theme.primary }]}>
-            {item.gardenName}
-          </Text>
-        ) : null}
-
-        <View style={styles.alertFooter}>
-          <View
-            style={[
-              styles.statusBadge,
-              { backgroundColor: getStatusColor(item.status) + "20" },
-            ]}
-          >
+          <View style={styles.suggestionContainer}>
+            <MaterialCommunityIcons 
+              name="lightbulb-outline" 
+              size={14} 
+              color={theme.info} 
+              style={styles.suggestionIcon}
+            />
             <Text
-              style={[
-                styles.statusText,
-                { color: getStatusColor(item.status) },
-              ]}
+              style={[styles.alertSuggestion, { color: theme.info }]}
+              numberOfLines={1}
             >
-              {getStatusLabel(item.status)}
+              {item.suggestion}
             </Text>
           </View>
+        )}
 
-          {item.severity && (
+        {item.gardenName && (
+          <View style={styles.gardenContainer}>
+            <MaterialCommunityIcons 
+              name="home-outline" 
+              size={14} 
+              color={theme.primary} 
+              style={styles.gardenIcon}
+            />
+            <Text style={[styles.alertGarden, { color: theme.primary }]} numberOfLines={1}>
+              {item.gardenName}
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.alertFooter}>
+          <View style={styles.badgesContainer}>
             <View
               style={[
-                styles.severityBadge,
-                { backgroundColor: getSeverityColor(item.severity) + "20" },
+                styles.statusBadge,
+                { backgroundColor: getStatusColor(item.status) },
               ]}
             >
-              <Text
-                style={[
-                  styles.severityText,
-                  { color: getSeverityColor(item.severity) },
-                ]}
-              >
-                {item.severity}
+              <Text style={styles.statusText}>
+                {getStatusLabel(item.status)}
               </Text>
             </View>
-          )}
 
-          <View style={styles.alertActions}>
-            {item.status === AlertStatus.PENDING && (
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => updateAlertStatus(item.id, AlertStatus.RESOLVED)}
+            {item.severity && (
+              <View
+                style={[
+                  styles.severityBadge,
+                  { backgroundColor: getSeverityColor(item.severity) },
+                ]}
               >
-                <Text style={[styles.actionText, { color: theme.success }]}>
-                  Xử lý
+                <Text style={styles.severityText}>
+                  {getSeverityLabel(item.severity)}
                 </Text>
-              </TouchableOpacity>
-            )}
-
-            {(item.status === AlertStatus.PENDING ||
-              item.status === AlertStatus.IN_PROGRESS) && (
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => dismissAlert(item.id)}
-              >
-                <Text
-                  style={[styles.actionText, { color: theme.textSecondary }]}
-                >
-                  Bỏ qua
-                </Text>
-              </TouchableOpacity>
+              </View>
             )}
           </View>
+
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: `${theme.primary}15` }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              markAsRead(item.id);
+            }}
+          >
+            <Ionicons
+              name="checkmark-circle-outline"
+              size={20}
+              color={theme.primary}
+            />
+          </TouchableOpacity>
         </View>
       </View>
     </TouchableOpacity>
@@ -468,11 +479,12 @@ export default function AlertsScreen() {
       { label: "Tất cả", value: "ALL" },
       { label: "Chờ xử lý", value: AlertStatus.PENDING },
       { label: "Đang xử lý", value: AlertStatus.IN_PROGRESS },
-      { label: "Đã xử lý", value: AlertStatus.RESOLVED },
+      { label: "Đã giải quyết", value: AlertStatus.RESOLVED },
+      { label: "Đã bỏ qua", value: AlertStatus.IGNORED },
     ];
 
     return (
-      <View style={styles.filterContainer}>
+      <View style={[styles.filterContainer, { backgroundColor: theme.background }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -487,10 +499,16 @@ export default function AlertsScreen() {
                   backgroundColor:
                     statusFilter === option.value
                       ? theme.primary
-                      : theme.background,
+                      : theme.backgroundSecondary,
+                  borderWidth: 1,
+                  borderColor:
+                    statusFilter === option.value
+                      ? theme.primary
+                      : "transparent",
                 },
               ]}
-              onPress={() => setStatusFilter(option.value)}
+              onPress={() => setStatusFilter(option.value as AlertStatus | "ALL")}
+              activeOpacity={0.7}
             >
               <Text
                 style={[
@@ -500,6 +518,10 @@ export default function AlertsScreen() {
                       statusFilter === option.value
                         ? "#FFFFFF"
                         : theme.textSecondary,
+                    fontFamily:
+                      statusFilter === option.value
+                        ? "Inter-SemiBold"
+                        : "Inter-Medium",
                   },
                 ]}
               >
@@ -520,6 +542,8 @@ export default function AlertsScreen() {
       { label: "Cây trồng", value: AlertType.PLANT_CONDITION },
       { label: "Hoạt động", value: AlertType.ACTIVITY },
       { label: "Hệ thống", value: AlertType.SYSTEM },
+      { label: "Bảo trì", value: AlertType.MAINTENANCE },
+      { label: "An ninh", value: AlertType.SECURITY },
     ];
 
     return (
@@ -537,7 +561,7 @@ export default function AlertsScreen() {
                 {
                   backgroundColor:
                     typeFilter === option.value
-                      ? theme.primaryLight
+                      ? `${theme.primary}20`
                       : theme.backgroundSecondary,
                   borderWidth: 1,
                   borderColor:
@@ -546,7 +570,8 @@ export default function AlertsScreen() {
                       : theme.borderLight,
                 },
               ]}
-              onPress={() => setTypeFilter(option.value)}
+              onPress={() => setTypeFilter(option.value as AlertType | "ALL")}
+              activeOpacity={0.7}
             >
               <Text
                 style={[
@@ -556,6 +581,10 @@ export default function AlertsScreen() {
                       typeFilter === option.value
                         ? theme.primary
                         : theme.textSecondary,
+                    fontFamily:
+                      typeFilter === option.value
+                        ? "Inter-SemiBold"
+                        : "Inter-Medium",
                   },
                 ]}
               >
@@ -568,11 +597,63 @@ export default function AlertsScreen() {
     );
   };
 
+  // Custom header with back button
+  const renderHeader = () => (
+    <View style={[styles.header, { backgroundColor: theme.background }]}>
+      <View style={styles.headerContent}>
+        <TouchableOpacity
+          style={[styles.backButton, { backgroundColor: theme.backgroundSecondary }]}
+          onPress={() => router.back()}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={20} color={theme.text} />
+        </TouchableOpacity>
+        
+        <View style={styles.titleContainer}>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>
+            Cảnh báo & Thông báo
+          </Text>
+          <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
+            Quản lý cảnh báo hệ thống
+          </Text>
+        </View>
+        
+        <View style={styles.rightSpace} />
+      </View>
+    </View>
+  );
+
+  const renderStatsCard = () => {
+    const pendingCount = alerts.filter(a => a.status === AlertStatus.PENDING).length;
+    const inProgressCount = alerts.filter(a => a.status === AlertStatus.IN_PROGRESS).length;
+    const criticalCount = alerts.filter(a => a.severity === Severity.CRITICAL).length;
+
+    return (
+      <View style={[styles.statsCard, { backgroundColor: theme.card }]}>
+        <View style={styles.statItem}>
+          <Text style={[styles.statNumber, { color: "#FF9500" }]}>{pendingCount}</Text>
+          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Chờ xử lý</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={[styles.statNumber, { color: "#007AFF" }]}>{inProgressCount}</Text>
+          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Đang xử lý</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={[styles.statNumber, { color: "#FF3B30" }]}>{criticalCount}</Text>
+          <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Nghiêm trọng</Text>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.backgroundSecondary }]}
-      edges={["bottom"]}
+      edges={["top", "bottom"]}
     >
+      {renderHeader()}
       {renderFilterButtons()}
       {renderTypeFilterChips()}
 
@@ -583,27 +664,46 @@ export default function AlertsScreen() {
             Đang tải cảnh báo...
           </Text>
         </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <MaterialCommunityIcons
+            name="alert-circle-outline"
+            size={64}
+            color={theme.error}
+          />
+          <Text style={[styles.errorText, { color: theme.error }]}>
+            {error}
+          </Text>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: theme.primary }]}
+            onPress={fetchAlerts}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.retryText, { color: "#FFFFFF" }]}>
+              Thử lại
+            </Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <>
+          {renderStatsCard()}
+          
           <View style={styles.headerContainer}>
             <Text style={[styles.alertsCount, { color: theme.text }]}>
-              {filteredAlerts.length}{" "}
-              {statusFilter === "ALL"
-                ? "Cảnh báo"
-                : `cảnh báo ${getStatusLabel(
-                    statusFilter as AlertStatus
-                  ).toLowerCase()}`}
+              {sortedAlerts.length} cảnh báo
             </Text>
-            {filteredAlerts.some(
+            {sortedAlerts.some(
               (alert) =>
                 alert.status === AlertStatus.PENDING ||
                 alert.status === AlertStatus.IN_PROGRESS
             ) && (
               <TouchableOpacity
-                style={styles.markAllButton}
+                style={[styles.markAllButton, { backgroundColor: `${theme.success}15` }]}
                 onPress={resolveAllAlerts}
+                activeOpacity={0.7}
               >
-                <Text style={[styles.markAllText, { color: theme.primary }]}>
+                <MaterialCommunityIcons name="check-all" size={16} color={theme.success} />
+                <Text style={[styles.markAllText, { color: theme.success }]}>
                   Xử lý tất cả
                 </Text>
               </TouchableOpacity>
@@ -620,8 +720,10 @@ export default function AlertsScreen() {
                 refreshing={refreshing}
                 onRefresh={onRefresh}
                 colors={[theme.primary]}
+                tintColor={theme.primary}
               />
             }
+            showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <MaterialCommunityIcons
@@ -632,16 +734,12 @@ export default function AlertsScreen() {
                 <Text
                   style={[styles.emptyText, { color: theme.textSecondary }]}
                 >
-                  {statusFilter === "ALL"
-                    ? "Không có cảnh báo nào"
-                    : `Không có cảnh báo ${getStatusLabel(
-                        statusFilter as AlertStatus
-                      ).toLowerCase()}`}
+                  Không có cảnh báo nào
                 </Text>
                 <Text
                   style={[styles.emptySubtext, { color: theme.textTertiary }]}
                 >
-                  Kéo xuống để làm mới
+                  Hệ thống hoạt động bình thường
                 </Text>
               </View>
             }
@@ -656,41 +754,130 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  filterContainer: {
+  header: {
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.08)",
+  },
+  headerContent: {
     flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    alignItems: "center",
     justifyContent: "space-between",
   },
-  filterButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+  backButton: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  titleContainer: {
     flex: 1,
-    marginHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontFamily: "Inter-Bold",
+    marginBottom: 2,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    fontFamily: "Inter-Regular",
+  },
+  rightSpace: {
+    width: 40,
+    height: 40,
+  },
+  statsCard: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginVertical: 12,
+    borderRadius: 16,
+    padding: 20,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  statNumber: {
+    fontSize: 24,
+    fontFamily: "Inter-Bold",
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    fontFamily: "Inter-Medium",
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: "rgba(0,0,0,0.1)",
+    marginHorizontal: 16,
+  },
+  filterContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  filterScrollContent: {
+    paddingRight: 16,
+  },
+  filterButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    marginRight: 8,
+    minWidth: 80,
     alignItems: "center",
   },
   filterText: {
     fontSize: 14,
     fontFamily: "Inter-Medium",
   },
+  typeFilterContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  typeFilterScrollContent: {
+    paddingRight: 16,
+  },
+  typeFilterChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  typeFilterText: {
+    fontSize: 13,
+    fontFamily: "Inter-Medium",
+  },
   headerContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    marginBottom: 8,
+    paddingHorizontal: 20,
+    marginBottom: 12,
   },
   alertsCount: {
-    fontSize: 14,
-    fontFamily: "Inter-Medium",
+    fontSize: 16,
+    fontFamily: "Inter-SemiBold",
   },
   markAllButton: {
-    padding: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
   },
   markAllText: {
     fontSize: 14,
-    fontFamily: "Inter-Medium",
+    fontFamily: "Inter-SemiBold",
+    marginLeft: 4,
   },
   listContent: {
     padding: 16,
@@ -698,137 +885,167 @@ const styles = StyleSheet.create({
   },
   alertItem: {
     flexDirection: "row",
-    borderRadius: 12,
+    borderRadius: 16,
     marginBottom: 12,
     overflow: "hidden",
     borderLeftWidth: 4,
-    elevation: 2,
+    elevation: 3,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
   },
   alertIconContainer: {
-    padding: 16,
+    width: 56,
     alignItems: "center",
-    justifyContent: "flex-start",
+    justifyContent: "center",
+    paddingVertical: 16,
   },
   alertContent: {
     flex: 1,
     padding: 16,
-    paddingLeft: 8,
+    paddingLeft: 12,
   },
   alertHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 4,
+    alignItems: "flex-start",
+    marginBottom: 6,
   },
   alertTitle: {
     fontSize: 16,
     fontFamily: "Inter-SemiBold",
     flex: 1,
+    marginRight: 8,
+  },
+  alertTimeContainer: {
+    alignItems: "flex-end",
   },
   alertTime: {
     fontSize: 12,
-    fontFamily: "Inter-Regular",
-    marginLeft: 8,
+    fontFamily: "Inter-Medium",
   },
   alertMessage: {
     fontSize: 14,
     fontFamily: "Inter-Regular",
+    lineHeight: 20,
     marginBottom: 8,
+  },
+  suggestionContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  suggestionIcon: {
+    marginRight: 6,
   },
   alertSuggestion: {
     fontSize: 13,
     fontFamily: "Inter-Regular",
-    marginBottom: 8,
     fontStyle: "italic",
+    flex: 1,
+  },
+  gardenContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  gardenIcon: {
+    marginRight: 6,
   },
   alertGarden: {
     fontSize: 13,
-    fontFamily: "Inter-Medium",
-    marginBottom: 8,
+    fontFamily: "Inter-SemiBold",
+    flex: 1,
   },
   alertFooter: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  badgesContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
   },
   statusBadge: {
-    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
     marginRight: 8,
   },
   statusText: {
     fontSize: 11,
-    fontFamily: "Inter-Medium",
+    fontFamily: "Inter-SemiBold",
+    color: "#FFFFFF",
   },
   severityBadge: {
-    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
   },
   severityText: {
     fontSize: 11,
-    fontFamily: "Inter-Medium",
-  },
-  alertActions: {
-    flexDirection: "row",
-    marginLeft: "auto",
+    fontFamily: "Inter-SemiBold",
+    color: "#FFFFFF",
   },
   actionButton: {
-    marginLeft: 12,
-    padding: 4,
-  },
-  actionText: {
-    fontSize: 13,
-    fontFamily: "Inter-Medium",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
   },
   loadingContainer: {
     flex: 1,
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
     fontFamily: "Inter-Regular",
   },
-  emptyContainer: {
-    paddingVertical: 60,
-    alignItems: "center",
+  errorContainer: {
+    flex: 1,
     justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    fontFamily: "Inter-Regular",
+    textAlign: "center",
+    marginTop: 16,
+    marginBottom: 24,
+    lineHeight: 24,
+  },
+  retryButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 12,
+  },
+  retryText: {
+    fontSize: 16,
+    fontFamily: "Inter-SemiBold",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 60,
   },
   emptyText: {
     fontSize: 18,
-    fontFamily: "Inter-Medium",
-    marginTop: 12,
+    fontFamily: "Inter-SemiBold",
+    marginTop: 16,
+    marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
     fontFamily: "Inter-Regular",
-    marginTop: 8,
-  },
-  filterScrollContent: {
-    paddingHorizontal: 8,
-  },
-  typeFilterContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  typeFilterScrollContent: {
-    paddingHorizontal: 8,
-  },
-  typeFilterChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  typeFilterText: {
-    fontSize: 14,
-    fontFamily: "Inter-Medium",
+    textAlign: "center",
   },
 });
